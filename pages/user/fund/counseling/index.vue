@@ -1,6 +1,12 @@
 <template>
   <view class="counseling-page">
-   
+    <!-- 顶部导航栏 -->
+    <view class="navbar">
+      <view class="navbar-left" @click="goBack">
+        <uv-icon name="arrow-left" color="#FFFFFF" size="20"></uv-icon>
+        <text class="navbar-text">返回</text>
+      </view>
+    </view>
     
     <!-- Banner区域 -->
     <view class="banner">
@@ -8,32 +14,21 @@
         <view class="banner-title">Hi, 这是你的专属导师</view>
         <view class="banner-subtitle">无需预约，专属你的心理倾听老师</view>
       </view>
+      <view class="banner-shapes">
+        <view class="shape shape-1"></view>
+        <view class="shape shape-2"></view>
+        <view class="shape shape-3"></view>
+      </view>
     </view>
     
     <!-- 筛选/排序区域 -->
     <view class="filter-section">
-      <!-- 第一行：排序和筛选选项 -->
-      <view class="filter-row-top">
+      <view class="filter-row">
         <view class="filter-item" @click="showSortOptions">
           <text>{{ currentSort }}</text>
           <uv-icon name="arrow-down" size="12" color="#333333"></uv-icon>
         </view>
         
-        <view class="filter-right">
-          <view class="filter-item" @click="showSpecialtyOptions">
-            <text>擅长领域</text>
-            <uv-icon name="arrow-down" size="12" color="#333333"></uv-icon>
-          </view>
-          
-          <view class="filter-item" @click="showGenderOptions">
-            <text>性别</text>
-            <uv-icon name="arrow-down" size="12" color="#333333"></uv-icon>
-          </view>
-        </view>
-      </view>
-      
-      <!-- 第二行：标签 -->
-      <view class="filter-row-bottom">
         <scroll-view scroll-x class="filter-tags" :show-scrollbar="false">
           <view class="filter-tags-content">
             <view 
@@ -46,6 +41,16 @@
             </view>
           </view>
         </scroll-view>
+        
+        <view class="filter-item" @click="showSpecialtyOptions">
+          <text>擅长领域</text>
+          <uv-icon name="arrow-down" size="12" color="#333333"></uv-icon>
+        </view>
+        
+        <view class="filter-item" @click="showGenderOptions">
+          <text>性别</text>
+          <uv-icon name="arrow-down" size="12" color="#333333"></uv-icon>
+        </view>
       </view>
     </view>
     
@@ -69,16 +74,15 @@
             </view>
             
             <view class="counselor-tags">
-              <text class="specialty-text">{{ item.specialties.join(' | ') }}</text>
+              <view class="specialty-tag" v-for="(tag, tagIndex) in item.specialties" :key="tagIndex">
+                <text>{{ tag }}</text>
+              </view>
             </view>
             
             <view class="counselor-stats">
               <text class="consultation-count">{{ item.consultationCount }}+人已咨询</text>
-            </view>
-            
-            <view class="return-client-section" v-if="item.returnClientCount > 0">
-              <view class="return-client-tag">
-                <text>{{ item.returnClientCount }}回头客</text>
+              <view class="return-client-tag" v-if="item.returnClientCount > 0">
+                <text>[{{ item.returnClientCount }}回头客]</text>
               </view>
             </view>
             
@@ -93,7 +97,7 @@
                 <text class="price-unit">/30分钟</text>
               </view>
               <view class="consult-btn" @click.stop="consultCounselor(item)">
-                <text>立刻咨询</text>
+                <text>立即咨询</text>
               </view>
             </view>
           </view>
@@ -212,7 +216,7 @@ export default {
         { name: '文字倾诉', active: false, value: 'text_service' },
         { name: '婚恋', active: false, value: 'marriage' },
         { name: '就业压力', active: false, value: 'career' },
-        { name: '擅长倾听!', active: true, value: 'good_listener' }
+        { name: '擅长倾听', active: true, value: 'good_listener' }
       ],
       
       // 擅长领域
@@ -381,11 +385,11 @@ export default {
       const mockSpecialties = ['自我探索', '压力管理', '人际关系', '情绪调节', '焦虑缓解', '职业规划', '家庭关系', '婚恋咨询', '失眠困扰', '自信提升']
       const mockServiceTypes = ['语音/视频', '文字咨询', '语音咨询', '视频咨询']
       const mockMottos = [
-        '每个人都值得被倾听和理解',
-        '情绪不是敌人，而是内心的信号',
-        '心理咨询是一段共同成长的旅程',
+        '每个人都值得被倾听和理解，我在这里等你',
+        '情绪不是敌人，而是内心的信号，让我们一起解读',
+        '心理咨询是一段共同成长的旅程，而非单向的治疗',
         '倾听是疗愈的开始，表达是力量的来源',
-        '每个困境都是成长的机会'
+        '每个困境都是成长的机会，让我陪你一起面对'
       ]
       
       return Array.from({ length: 30 }, (_, i) => {
@@ -397,8 +401,6 @@ export default {
             randomSpecialties.push(specialty)
           }
         }
-        
-      
         
         return {
           id: i + 1,
@@ -454,17 +456,9 @@ export default {
   .banner {
     position: relative;
     height: 300rpx;
-    background-image: url('http://localhost:3000/static/bg6.png');
-    background-size: cover;
-    background-position: unset;
-    background-repeat: no-repeat;
-    padding: 120rpx 40rpx 40rpx;
+    background: linear-gradient(to right, #FFB6C1, #FFC0CB);
+    padding: 140rpx 40rpx 40rpx;
     overflow: hidden;
-    .banner-content{
-      position: relative;
-      z-index: 1;
-      top:60rpx;
-    }
     
     &-content {
       position: relative;
@@ -483,6 +477,47 @@ export default {
       color: #FFFFFF;
       opacity: 0.9;
     }
+    
+    &-shapes {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      
+      .shape {
+        position: absolute;
+        border-radius: 20rpx;
+        
+        &-1 {
+          width: 300rpx;
+          height: 300rpx;
+          background-color: rgba(255, 255, 255, 0.2);
+          right: -150rpx;
+          top: -100rpx;
+          transform: rotate(30deg);
+        }
+        
+        &-2 {
+          width: 250rpx;
+          height: 250rpx;
+          background-color: rgba(255, 255, 255, 0.15);
+          right: -50rpx;
+          top: 50rpx;
+          transform: rotate(45deg);
+        }
+        
+        &-3 {
+          width: 200rpx;
+          height: 200rpx;
+          background-color: rgba(255, 255, 255, 0.1);
+          right: 100rpx;
+          top: 150rpx;
+          transform: rotate(60deg);
+        }
+      }
+    }
   }
   
   .filter-section {
@@ -492,27 +527,13 @@ export default {
     margin-top: -40rpx;
     position: relative;
     z-index: 1;
-    padding: 20rpx 20rpx;
+    padding: 30rpx 20rpx;
     
-    .filter-row-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      margin-bottom: 20rpx;
-      
-      .filter-right {
-        display: flex;
-        align-items: center;
-        gap: 40rpx;
-        
-      }
-    }
-    
-    .filter-row-bottom {
+    .filter-row {
       display: flex;
       align-items: center;
       width: 100%;
+      overflow: hidden;
     }
     
     .filter-item {
@@ -520,6 +541,7 @@ export default {
       align-items: center;
       font-size: 28rpx;
       color: #333333;
+      margin-right: 20rpx;
       white-space: nowrap;
       
       text {
@@ -527,19 +549,15 @@ export default {
       }
     }
     
-    .filter-right .filter-item {
-      color: #8d8d8d;
-    }
-    
     .filter-tags {
       flex: 1;
       white-space: nowrap;
+      margin: 0 20rpx;
       
       .filter-tags-content {
         display: flex;
         white-space: nowrap;
         padding: 5rpx 0;
-        border-radius: 10rpx;
       }
       
       .filter-tag {
@@ -549,6 +567,7 @@ export default {
         border-radius: 10rpx;
         margin-right: 16rpx;
         transition: all 0.3s;
+        
         
         text {
           font-size: 24rpx;
@@ -577,8 +596,8 @@ export default {
     
     .counselor-item {
       display: flex;
-      padding: 10rpx 20rpx;
-      // border-bottom: 1px solid #EEEEEE;
+      padding: 30rpx 20rpx;
+      border-bottom: 1px solid #EEEEEE;
       
       &:last-child {
         border-bottom: none;
@@ -619,14 +638,10 @@ export default {
       margin-right: 16rpx;
     }
     
-    
     .service-tag {
       background-color: #FFECED;
-      padding: 2rpx 6rpx;
+      padding: 4rpx 12rpx;
       border-radius: 6rpx;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       
       text {
         font-size: 20rpx;
@@ -657,38 +672,27 @@ export default {
           color: #8E44AD;
         }
       }
-      
-      .specialty-text {
-        font-size: 24rpx;
-        color: #666666;
-      }
     }
     
     .counselor-stats {
       display: flex;
       align-items: center;
-      margin-bottom: 8rpx;
+      margin-bottom: 16rpx;
       
       .consultation-count {
         font-size: 22rpx;
         color: #999999;
+        margin-right: 16rpx;
       }
-    }
-    
-    .return-client-section {
-      margin-bottom: 16rpx;
       
       .return-client-tag {
-        border: 1px solid #FFB6C1;
+        border: 1px solid #F44336;
         border-radius: 6rpx;
-        padding: 2rpx 4rpx;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        padding: 2rpx 8rpx;
         
         text {
           font-size: 20rpx;
-          color: #FFB6C1;
+          color: #F44336;
         }
       }
     }
@@ -700,7 +704,7 @@ export default {
       margin-bottom: 20rpx;
       
       .motto-prefix {
-        color: #FFB6C1;
+        color: #FF8A80;
         font-weight: bold;
         font-size: 24rpx;
         margin-right: 8rpx;
@@ -708,7 +712,7 @@ export default {
       
       .motto-content {
         font-size: 24rpx;
-        color: #C39D9D;
+        color: #757575;
       }
     }
     
@@ -729,26 +733,20 @@ export default {
       }
       
       .price-unit {
-        font-size: 20rpx;
-        color: #DDA59C;
+        font-size: 24rpx;
+        color: #757575;
         margin-left: 4rpx;
       }
       
       .consult-btn {
-        background: linear-gradient(135deg, #FF6B6B, #FF8E53, #FFB74D);
+        background: linear-gradient(to right, #FF8A65, #FF7043);
         padding: 12rpx 30rpx;
         border-radius: 100rpx;
         
         text {
           font-size: 28rpx;
           color: #FFFFFF;
-          font-weight: 600;
-          text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.1);
-        }
-        
-        &:active {
-          transform: translateY(1rpx);
-          box-shadow: 0 2rpx 8rpx rgba(255, 107, 107, 0.3);
+          font-weight: 500;
         }
       }
     }
@@ -885,4 +883,4 @@ export default {
     }
   }
 }
-</style>
+</style> 

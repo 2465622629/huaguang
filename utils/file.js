@@ -2,6 +2,13 @@ import request from './request'
 import { API_CONFIG } from '@/config/index'
 
 /**
+ * 文件上传工具
+ * 
+ * 注意：推荐使用新的API管理系统 @/api
+ * 新功能请使用 @/api/modules/common.js 中的文件上传方法
+ */
+
+/**
  * 文件上传
  * @param {Object} options 上传选项
  * @param {File} options.file 要上传的文件
@@ -180,4 +187,4 @@ export default {
   downloadFile,
   generateTempUrl,
   deleteFile
-} 
+}

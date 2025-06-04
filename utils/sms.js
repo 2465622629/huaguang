@@ -52,8 +52,11 @@ export const sendSmsCode = async (options) => {
 }
 
 /**
- * 短信工具类
+ * 短信验证码工具
+ * 
+ * 注意：推荐使用新的API管理系统 @/api
+ * 新功能请使用 @/api/modules/auth.js 中的 sendSmsCode 方法
  */
 export default {
   sendSmsCode
-} 
+}

@@ -1,3 +1,10 @@
+/**
+ * 网络请求工具
+ * 基于 luch-request 封装
+ * 
+ * 注意：推荐使用新的API管理系统 @/api
+ * 该文件保留用于兼容性，新功能请使用 @/api/request.js
+ */
 import { API_CONFIG } from '@/config/index'
 
 // 请求拦截器
@@ -106,4 +113,4 @@ export const del = (url, data = {}, options = {}) => {
 		data,
 		...options
 	})
-} 
+}
