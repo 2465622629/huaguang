@@ -14,7 +14,6 @@
         <view class="banner-title">Hi, 这是你的专属导师</view>
         <view class="banner-subtitle">无需预约，专属你的心理倾听老师</view>
       </view>
-      
     </view>
     
     <!-- 筛选/排序区域 -->

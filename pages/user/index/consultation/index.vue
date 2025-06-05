@@ -157,49 +157,75 @@ export default {
     async loadHotLawyers() {
       try {
         this.loading = true
+        console.log('开始加载热门律师数据...')
         const response = await getHotLawyers({ limit: 10 })
+        console.log('API响应数据:', response)
         
         // 处理API响应数据，适配页面显示格式
-        if (response && response.data) {
-          this.lawyerList = response.data.map(lawyer => ({
+        if (response && Array.isArray(response)) {
+          console.log('处理API数据，律师数量:', response.length)
+          this.lawyerList = response.map(lawyer => ({
             id: lawyer.id,
             name: lawyer.name || '未知律师',
-            specialty: lawyer.specialty || '专业领域',
-            experience: lawyer.experience || '经验年限',
-            successRate: lawyer.successRate || '胜诉率',
-            consultCount: lawyer.consultCount || '咨询次数',
-            services: lawyer.services || [
-              { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
-              { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
+            specialty: lawyer.specialties ? lawyer.specialties.join('、') : '专业领域',
+            experience: lawyer.experienceYears ? `${lawyer.experienceYears}年经验` : '经验年限',
+            successRate: lawyer.successRate ? `胜诉率${lawyer.successRate}%` : '胜诉率',
+            consultCount: lawyer.consultationCount ? `${lawyer.consultationCount}+人已咨询` : '咨询次数',
+            services: [
+              { type: '图文咨询', price: Math.floor(lawyer.consultationFee * 0.6) || 60, unit: '次', icon: 'img' },
+              { type: '语音咨询', price: lawyer.consultationFee || 120, unit: '30分钟', icon: 'call' }
             ],
-            achievement: lawyer.achievement || '专业律师服务'
+            achievement: `专业${lawyer.specialties ? lawyer.specialties[0] : '法律'}服务，成功率${lawyer.successRate || 95}%`
           }))
+          console.log('处理后的律师列表:', this.lawyerList)
+        } else {
+          console.log('API响应数据格式不正确，使用默认数据')
+          this.setDefaultLawyerData()
         }
       } catch (error) {
         console.error('获取热门律师数据失败:', error)
         uni.showToast({
-          title: '获取律师数据失败',
+          title: '获取律师数据失败，显示默认数据',
           icon: 'none'
         })
         // 使用默认数据作为备选
-        this.lawyerList = [
-          {
-            id: 1,
-            name: '李晓明',
-            specialty: '劳动法专长',
-            experience: '8年经验',
-            successRate: '胜诉率91%',
-            consultCount: '400+人已咨询',
-            services: [
-              { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
-              { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
-            ],
-            achievement: '成功帮助某员工追回工资5万元'
-          }
-        ]
+        this.setDefaultLawyerData()
       } finally {
         this.loading = false
+        console.log('最终律师列表长度:', this.lawyerList.length)
       }
+    },
+    // 设置默认律师数据
+    setDefaultLawyerData() {
+      this.lawyerList = [
+        {
+          id: 1,
+          name: '李晓明',
+          specialty: '劳动法专长',
+          experience: '8年经验',
+          successRate: '胜诉率91%',
+          consultCount: '400+人已咨询',
+          services: [
+            { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
+            { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
+          ],
+          achievement: '成功帮助某员工追回工资5万元'
+        },
+        {
+          id: 2,
+          name: '王律师',
+          specialty: '合同纠纷、债务纠纷',
+          experience: '12年经验',
+          successRate: '胜诉率95%',
+          consultCount: '300+人已咨询',
+          services: [
+            { type: '图文咨询', price: 80, unit: '次', icon: 'img' },
+            { type: '语音咨询', price: 150, unit: '30分钟', icon: 'call' }
+          ],
+          achievement: '专业合同服务，成功率95%'
+        }
+      ]
+      console.log('设置默认律师数据完成:', this.lawyerList)
     },
     calculateScrollHeight() {
       // 获取系统信息
