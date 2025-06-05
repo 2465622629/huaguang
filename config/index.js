@@ -1,6 +1,6 @@
 // API配置
 export const API_CONFIG = {
-  BASE_URL: 'https://huaguang.xiaoxiangruyi.cn/api',
+  BASE_URL: 'http://localhost:8080/api',
   TIMEOUT: 10000,
   HEADERS: {
     'Content-Type': 'application/json'

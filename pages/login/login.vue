@@ -46,7 +46,7 @@
 </template>
 
 <script>
-	import { post } from '@/utils/request.js'
+	import { login } from '@/api/modules/auth.js'
 	
 	export default {
 		data() {
@@ -108,11 +108,12 @@
 						title: '登录中...'
 					})
 					console.log('登录中...')
-					// 调用登录接口
-					const data = await post('/user/login', {
-						username: this.email,
-						password: this.password
-					})
+				// 调用登录接口
+				const data = await login({
+					loginAccount: this.email,
+					password: this.password,
+					rememberMe: this.rememberPassword
+				})
 					console.log('登录成功：', data)
 					console.log('是否记住密码：', this.rememberPassword)
 					// 处理记住密码
@@ -141,7 +142,7 @@
 					
 					// 直接跳转到用户端首页
 					setTimeout(() => {
-						uni.redirectTo({
+						uni.reLaunch({
 							url: '/pages/user/index/index'
 						})
 					}, 1500)
