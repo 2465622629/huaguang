@@ -105,6 +105,7 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import { getHotLawyers } from '@/api/modules/home.js'
 
 export default {
   name: 'LawyerConsultationPage',
@@ -114,6 +115,7 @@ export default {
   data() {
     return {
       scrollHeight: '100vh',
+      loading: false,
       // 筛选标签数据
       filterTabs: [
         { name: '劳动纠纷', active: true },
@@ -123,51 +125,12 @@ export default {
         { name: '知识产权', active: false },
       ],
       // 律师信息数据
-      lawyerList: [
-        {
-          id: 1,
-          name: '李晓明',
-          specialty: '劳动法专长',
-          experience: '8年经验',
-          successRate: '胜诉率91%',
-          consultCount: '400+人已咨询',
-          services: [
-            { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
-            { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
-          ],
-          achievement: '成功帮助某员工追回工资5万元'
-        },
-        {
-          id: 2,
-          name: '王美华',
-          specialty: '合同法专长',
-          experience: '12年经验',
-          successRate: '胜诉率95%',
-          consultCount: '600+人已咨询',
-          services: [
-            { type: '图文咨询', price: 80, unit: '次', icon: 'img' },
-            { type: '语音咨询', price: 150, unit: '30分钟', icon: 'call' }
-          ],
-          achievement: '成功处理合同纠纷案件300余起'
-        },
-        {
-          id: 3,
-          name: '张建国',
-          specialty: '婚姻家庭法专长',
-          experience: '15年经验',
-          successRate: '胜诉率88%',
-          consultCount: '800+人已咨询',
-          services: [
-            { type: '图文咨询', price: 70, unit: '次', icon: 'img' },
-            { type: '语音咨询', price: 140, unit: '30分钟', icon: 'call' }
-          ],
-          achievement: '专业处理离婚财产分割案件'
-        }
-      ]
+      lawyerList: []
     }
   },
   mounted() {
     this.calculateScrollHeight()
+    this.loadHotLawyers()
   },
   methods: {
     // 返回上一页
@@ -189,6 +152,54 @@ export default {
       uni.navigateTo({
         url: '/pages/user/index/lawyer-detail/index'
       })
+    },
+    // 加载热门律师数据
+    async loadHotLawyers() {
+      try {
+        this.loading = true
+        const response = await getHotLawyers({ limit: 10 })
+        
+        // 处理API响应数据，适配页面显示格式
+        if (response && response.data) {
+          this.lawyerList = response.data.map(lawyer => ({
+            id: lawyer.id,
+            name: lawyer.name || '未知律师',
+            specialty: lawyer.specialty || '专业领域',
+            experience: lawyer.experience || '经验年限',
+            successRate: lawyer.successRate || '胜诉率',
+            consultCount: lawyer.consultCount || '咨询次数',
+            services: lawyer.services || [
+              { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
+              { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
+            ],
+            achievement: lawyer.achievement || '专业律师服务'
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门律师数据失败:', error)
+        uni.showToast({
+          title: '获取律师数据失败',
+          icon: 'none'
+        })
+        // 使用默认数据作为备选
+        this.lawyerList = [
+          {
+            id: 1,
+            name: '李晓明',
+            specialty: '劳动法专长',
+            experience: '8年经验',
+            successRate: '胜诉率91%',
+            consultCount: '400+人已咨询',
+            services: [
+              { type: '图文咨询', price: 60, unit: '次', icon: 'img' },
+              { type: '语音咨询', price: 120, unit: '30分钟', icon: 'call' }
+            ],
+            achievement: '成功帮助某员工追回工资5万元'
+          }
+        ]
+      } finally {
+        this.loading = false
+      }
     },
     calculateScrollHeight() {
       // 获取系统信息

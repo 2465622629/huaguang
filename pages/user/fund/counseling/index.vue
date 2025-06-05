@@ -14,11 +14,7 @@
         <view class="banner-title">Hi, 这是你的专属导师</view>
         <view class="banner-subtitle">无需预约，专属你的心理倾听老师</view>
       </view>
-      <view class="banner-shapes">
-        <view class="shape shape-1"></view>
-        <view class="shape shape-2"></view>
-        <view class="shape shape-3"></view>
-      </view>
+      
     </view>
     
     <!-- 筛选/排序区域 -->
@@ -74,15 +70,21 @@
             </view>
             
             <view class="counselor-tags">
-              <view class="specialty-tag" v-for="(tag, tagIndex) in item.specialties" :key="tagIndex">
-                <text>{{ tag }}</text>
-              </view>
+              <template v-for="(tag, tagIndex) in item.specialties">
+                <view class="specialty-tag" :key="'tag-' + tagIndex">
+                  <text> {{ tag }} </text>
+                </view>
+                <text v-if="tagIndex < item.specialties.length - 1" class="tag-separator" :key="'sep-' + tagIndex"> | </text>
+              </template>
             </view>
             
             <view class="counselor-stats">
               <text class="consultation-count">{{ item.consultationCount }}+人已咨询</text>
-              <view class="return-client-tag" v-if="item.returnClientCount > 0">
-                <text>[{{ item.returnClientCount }}回头客]</text>
+            </view>
+            
+            <view class="return-client-section" v-if="item.returnClientCount > 0">
+              <view class="return-client-tag">
+                <text>{{ item.returnClientCount }}回头客</text>
               </view>
             </view>
             
@@ -456,7 +458,9 @@ export default {
   .banner {
     position: relative;
     height: 300rpx;
-    background: linear-gradient(to right, #FFB6C1, #FFC0CB);
+    background: url('http://localhost:3000/static/bg6.png');
+    background-size: cover;
+    
     padding: 140rpx 40rpx 40rpx;
     overflow: hidden;
     
@@ -640,59 +644,73 @@ export default {
     
     .service-tag {
       background-color: #FFECED;
-      padding: 4rpx 12rpx;
+      padding: 6rpx 10rpx;
       border-radius: 6rpx;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
       
       text {
         font-size: 20rpx;
         color: #D32F2F;
+        line-height: 1;
       }
     }
     
     .counselor-desc {
       font-size: 24rpx;
       color: #666666;
-      margin-bottom: 16rpx;
+      margin-bottom: 3rpx;
     }
     
     .counselor-tags {
       display: flex;
+      align-items: center;
       flex-wrap: wrap;
-      margin-bottom: 16rpx;
+      margin-bottom: 3rpx;
       
       .specialty-tag {
-        background-color: #F5EEF8;
-        padding: 4rpx 12rpx;
-        border-radius: 6rpx;
-        margin-right: 16rpx;
-        margin-bottom: 10rpx;
+        display: inline-block;
         
         text {
           font-size: 24rpx;
-          color: #8E44AD;
+          color: #666666;
         }
+      }
+      
+      .tag-separator {
+        font-size: 24rpx;
+        color: rgba(0, 0, 0, 0.3);
+        margin: 0 12rpx;
       }
     }
     
     .counselor-stats {
-      display: flex;
-      align-items: center;
-      margin-bottom: 16rpx;
+      margin-bottom: 3rpx;
       
       .consultation-count {
         font-size: 22rpx;
         color: #999999;
-        margin-right: 16rpx;
       }
+    }
+    
+    .return-client-section {
+      margin-bottom: 16rpx;
       
       .return-client-tag {
-        border: 1px solid #F44336;
+        border: 1px solid #FAA9A9;
         border-radius: 6rpx;
-        padding: 2rpx 8rpx;
+        padding: 4rpx 8rpx;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
         
         text {
-          font-size: 20rpx;
-          color: #F44336;
+          font-size: 22rpx;
+          color: #FAA9A9;
+          line-height: 1;
         }
       }
     }
@@ -883,4 +901,4 @@ export default {
     }
   }
 }
-</style> 
+</style>

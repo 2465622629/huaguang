@@ -116,6 +116,10 @@
 				})
 					console.log('登录成功：', data)
 					console.log('是否记住密码：', this.rememberPassword)
+					
+					// 检查返回数据的结构
+					console.log('API返回数据结构：', JSON.stringify(data, null, 2))
+					
 					// 处理记住密码
 					if (this.rememberPassword) {
 						const loginData = {
@@ -129,11 +133,36 @@
 						console.log('清除记住的密码')
 					}
 
-					// 保存用户信息和token
-					uni.setStorageSync('token', data.token)
-					uni.setStorageSync('userInfo', data.userInfo)
-					uni.setStorageSync('tokenExpireTime', data.tokenExpireTime)
-					uni.setStorageSync('userId', data.userId)
+					// 保存用户信息和token - 适配实际API返回结构
+					if (data && data.accessToken) {
+						uni.setStorageSync('token', data.accessToken)
+						console.log('Token存储成功：', data.accessToken)
+					} else {
+						console.error('AccessToken不存在于返回数据中：', data)
+					}
+					
+					// 构建用户信息对象
+					if (data && data.userId && data.username) {
+						const userInfo = {
+							userId: data.userId,
+							username: data.username,
+							userType: data.userType || 'user'
+						}
+						uni.setStorageSync('userInfo', userInfo)
+						console.log('用户信息存储成功：', userInfo)
+					} else {
+						console.error('用户基本信息不完整：', data)
+					}
+					
+					if (data && data.tokenExpireTime) {
+						uni.setStorageSync('tokenExpireTime', data.tokenExpireTime)
+						console.log('Token过期时间存储成功：', data.tokenExpireTime)
+					}
+					
+					if (data && data.userId) {
+						uni.setStorageSync('userId', data.userId)
+						console.log('用户ID存储成功：', data.userId)
+					}
 					
 					uni.showToast({
 						title: '登录成功',

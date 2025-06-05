@@ -75,7 +75,7 @@
           <text class="header-title">热门律师推荐</text>
         </view>
         <view class="header-right">
-          <view class="more-btn">
+          <view class="more-btn" @click="handleLawyerMoreClick">
             <text class="more-text">了解更多</text>
             <view class="triangle"></view>
           </view>
@@ -98,7 +98,7 @@
           <text class="header-title">热门职业推荐</text>
         </view>
         <view class="header-right">
-          <view class="more-btn">
+          <view class="more-btn" @click="handleLawyerMoreClick">
             <text class="more-text">了解更多</text>
             <view class="triangle"></view>
           </view>
@@ -278,6 +278,19 @@ export default {
       // 跳转到投递简历页面
       uni.navigateTo({
         url: '/pages/user/index/job-platform/index',
+      })
+    },
+    handleLawyerMoreClick() {
+      // 跳转到律师咨询页面
+      uni.navigateTo({
+        url: '/pages/user/index/consultation/index',
+        fail: (err) => {
+          console.error('跳转失败：', err)
+          uni.showToast({
+            icon: 'none',
+            title: '页面跳转失败'
+          })
+        }
       })
     }
   }

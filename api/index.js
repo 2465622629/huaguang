@@ -19,6 +19,7 @@ import psychologistApi from './modules/psychologist.js'
 import chatApi from './modules/chat.js'
 import enterpriseApi from './modules/enterprise.js'
 import commonApi from './modules/common.js'
+import homeApi from './modules/home.js'
 
 // 统一导出所有API
 export {
@@ -32,7 +33,8 @@ export {
   psychologistApi,
   chatApi,
   enterpriseApi,
-  commonApi
+  commonApi,
+  homeApi
 }
 
 // 默认导出
@@ -49,5 +51,6 @@ export default {
   psychologist: psychologistApi,
   chat: chatApi,
   enterprise: enterpriseApi,
-  common: commonApi
+  common: commonApi,
+  home: homeApi
 }
