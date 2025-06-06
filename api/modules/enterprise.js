@@ -14,6 +14,14 @@ export const getEnterpriseInfo = () => {
 }
 
 /**
+ * 获取当前登录企业的详细信息
+ * @returns {Promise} 企业详细信息
+ */
+export const getCurrentEnterpriseInfo = () => {
+  return get('/enterprise/profile')
+}
+
+/**
  * 更新企业信息
  * @param {Object} data 企业信息
  * @param {string} [data.companyName] 企业名称
@@ -30,6 +38,34 @@ export const getEnterpriseInfo = () => {
  */
 export const updateEnterpriseInfo = (data) => {
   return put('/enterprise/info', data)
+}
+
+/**
+ * 更新企业详细信息
+ * @param {Object} data 企业详细信息数据
+ * @param {string} [data.companyName] 企业名称
+ * @param {string} [data.businessLicense] 营业执照号
+ * @param {string} [data.unifiedSocialCreditCode] 统一社会信用代码
+ * @param {string} [data.legalPerson] 法人代表
+ * @param {string} [data.registeredCapital] 注册资本
+ * @param {string} [data.establishmentDate] 成立日期
+ * @param {string} [data.businessScope] 经营范围
+ * @param {string} [data.contactPerson] 联系人
+ * @param {string} [data.contactPhone] 联系电话
+ * @param {string} [data.contactEmail] 联系邮箱
+ * @param {string} [data.registeredAddress] 注册地址
+ * @param {string} [data.businessAddress] 经营地址
+ * @param {string} [data.industry] 行业类型
+ * @param {string} [data.companyType] 企业类型
+ * @param {string} [data.description] 企业描述
+ * @param {string} [data.website] 企业官网
+ * @param {string} [data.logo] 企业Logo
+ * @param {Array} [data.businessLicenseImages] 营业执照图片
+ * @param {Object} [data.bankInfo] 银行信息
+ * @returns {Promise} 更新结果
+ */
+export const updateEnterpriseDetailInfo = (data) => {
+  return put('/enterprise/profile', data)
 }
 
 /**
@@ -234,6 +270,42 @@ export const signEnterpriseContract = (contractId, data) => {
   return post(`/enterprise/contracts/${contractId}/sign`, data)
 }
 
+/**
+ * 企业注册接口
+ * @param {Object} data 注册数据
+ * @param {string} data.companyName 企业名称
+ * @param {string} data.businessLicense 营业执照号
+ * @param {string} data.unifiedSocialCreditCode 统一社会信用代码
+ * @param {string} data.legalPerson 法人代表
+ * @param {string} data.contactPerson 联系人
+ * @param {string} data.contactPhone 联系电话
+ * @param {string} data.contactEmail 联系邮箱
+ * @param {string} data.password 密码
+ * @param {string} data.confirmPassword 确认密码
+ * @param {string} data.registeredAddress 注册地址
+ * @param {string} data.industry 行业类型
+ * @param {string} data.companyType 企业类型
+ * @param {Array} data.businessLicenseImages 营业执照图片
+ * @param {string} [data.verificationCode] 验证码
+ * @returns {Promise} 注册结果
+ */
+export const registerEnterprise = (data) => {
+  return post('/enterprise/register', data)
+}
+
+/**
+ * 删除企业账号及相关信息
+ * @param {Object} data 删除确认数据
+ * @param {string} data.password 当前密码
+ * @param {string} [data.reason] 删除原因
+ * @param {boolean} [data.deleteAllData] 是否删除所有相关数据
+ * @param {string} [data.confirmText] 确认文本
+ * @returns {Promise} 删除结果
+ */
+export const deleteEnterpriseAccount = (data) => {
+  return del('/enterprise/account', data)
+}
+
 // 导出所有企业相关API
 export default {
   getEnterpriseInfo,
@@ -253,5 +325,10 @@ export default {
   payEnterpriseBill,
   getEnterpriseContracts,
   getEnterpriseContractDetail,
-  signEnterpriseContract
+  signEnterpriseContract,
+  // 新增的企业管理接口
+  getCurrentEnterpriseInfo,
+  updateEnterpriseDetailInfo,
+  registerEnterprise,
+  deleteEnterpriseAccount
 }

@@ -6,9 +6,11 @@
 import { get, post } from '../request.js'
 
 /**
- * 获取热门律师列表
+ * 获取热门律师推荐列表
  * @param {Object} params 查询参数
  * @param {number} [params.limit=10] 限制数量
+ * @param {string} [params.specialty] 专业领域
+ * @param {string} [params.location] 地区
  * @returns {Promise} 热门律师列表
  */
 export const getHotLawyers = (params = {}) => {
@@ -16,9 +18,12 @@ export const getHotLawyers = (params = {}) => {
 }
 
 /**
- * 获取热门职位列表
+ * 获取热门职位推荐列表
  * @param {Object} params 查询参数
  * @param {number} [params.limit=10] 限制数量
+ * @param {string} [params.location] 地区
+ * @param {string} [params.industry] 行业
+ * @param {string} [params.salary] 薪资范围
  * @returns {Promise} 热门职位列表
  */
 export const getHotJobs = (params = {}) => {
@@ -26,12 +31,14 @@ export const getHotJobs = (params = {}) => {
 }
 
 /**
- * 获取主页数据
  * 获取主页所有模块的数据，包括轮播图、导航、推荐等
+ * @param {Object} params 查询参数
+ * @param {string} [params.platform] 平台类型（web/mobile/app）
+ * @param {string} [params.userType] 用户类型（individual/enterprise）
  * @returns {Promise} 主页数据
  */
-export const getHomePageData = () => {
-  return get('/home/data')
+export const getHomePageData = (params = {}) => {
+  return get('/home/data', params)
 }
 
 /**

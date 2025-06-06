@@ -20,6 +20,21 @@ import chatApi from './modules/chat.js'
 import enterpriseApi from './modules/enterprise.js'
 import commonApi from './modules/common.js'
 import homeApi from './modules/home.js'
+import recruitmentApi from './modules/recruitment.js'
+import searchApi from './modules/search.js'
+import navigationApi from './modules/navigation.js'
+import personalCenterApi from './modules/personal-center.js'
+import youthAssistanceApi from './modules/youth-assistance.js'
+import statisticsApi from './modules/statistics.js'
+import skillTrainingApi from './modules/skill-training.js'
+import applicationRecordApi from './modules/application-record.js'
+import legalServiceApi from './modules/legal-service.js'
+import aboutApi from './modules/about.js'
+import adminUserApi from './modules/admin-user.js'
+import adminOrderApi from './modules/admin-order.js'
+import adminContentApi from './modules/admin-content.js'
+import lawyerWorkspaceApi from './modules/lawyer-workspace.js'
+import fileManagementApi from './modules/file-management.js'
 
 // 统一导出所有API
 export {
@@ -34,7 +49,22 @@ export {
   chatApi,
   enterpriseApi,
   commonApi,
-  homeApi
+  homeApi,
+  recruitmentApi,
+  searchApi,
+  navigationApi,
+  personalCenterApi,
+  youthAssistanceApi,
+  statisticsApi,
+  skillTrainingApi,
+  applicationRecordApi,
+  legalServiceApi,
+  aboutApi,
+  adminUserApi,
+  adminOrderApi,
+  adminContentApi,
+  lawyerWorkspaceApi,
+  fileManagementApi
 }
 
 // 默认导出
@@ -52,5 +82,20 @@ export default {
   chat: chatApi,
   enterprise: enterpriseApi,
   common: commonApi,
-  home: homeApi
+  home: homeApi,
+  recruitment: recruitmentApi,
+  search: searchApi,
+  navigation: navigationApi,
+  personalCenter: personalCenterApi,
+  youthAssistance: youthAssistanceApi,
+  statistics: statisticsApi,
+  skillTraining: skillTrainingApi,
+  applicationRecord: applicationRecordApi,
+  legalService: legalServiceApi,
+  about: aboutApi,
+  adminUser: adminUserApi,
+  adminOrder: adminOrderApi,
+  adminContent: adminContentApi,
+  lawyerWorkspace: lawyerWorkspaceApi,
+  fileManagement: fileManagementApi
 }

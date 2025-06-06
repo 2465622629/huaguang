@@ -13,18 +13,17 @@
       </view>
     </view>
     
-    <!-- 可滚动内容区域 -->
-    <scroll-view class="page-scroll" scroll-y="true" :style="{ height: scrollHeight }">
-      <!-- 页面标题区域 -->
-      <view class="page-header">
-        <text class="main-title">法律帮助</text>
-        <text class="sub-title">一对一咨询</text>
-        <text class="description">专业律师为您排忧解难</text>
-      </view>
-      
-      <!-- 内容区域 -->
-      <view class="content-container">
-        <!-- 筛选标签栏 -->
+    <!-- 页面标题区域 -->
+    <view class="page-header">
+      <text class="main-title">法律帮助</text>
+      <text class="sub-title">一对一咨询</text>
+      <text class="description">专业律师为您排忧解难</text>
+    </view>
+    
+    <!-- 内容区域 -->
+    <view class="content-container" :style="{ height: scrollHeight }">
+      <!-- 固定的筛选标签栏 -->
+      <view class="fixed-tabs-area">
         <scroll-view class="filter-tabs" scroll-x="true" show-scrollbar="false">
           <view class="tabs-container">
             <view 
@@ -39,64 +38,69 @@
             
           </view>
         </scroll-view>
-        
-        <!-- 律师卡片列表 -->
-        <view class="lawyer-list">
-          <view 
-            v-for="(lawyer, index) in lawyerList" 
-            :key="lawyer.id"
-            class="lawyer-card"
-          >
-            <view class="card-content">
-              <!-- 律师基本信息区域 -->
-              <view class="lawyer-basic-info">
-                <!-- 律师头像 -->
-                <view class="lawyer-avatar"></view>
-                
-                <!-- 律师文本信息 -->
-                <view class="lawyer-text-info">
-                  <text class="lawyer-name">{{ lawyer.name }}</text>
-                  <text class="lawyer-tags">{{ lawyer.specialty }} | {{ lawyer.experience }} | {{ lawyer.successRate }}</text>
-                  <text class="consult-count">{{ lawyer.consultCount }}</text>
-                </view>
-              </view>
-              
-              <!-- 服务项目区域 -->
-              <view class="services-section">
-                <view class="services">
-                  <view 
-                    v-for="(service, sIndex) in lawyer.services" 
-                    :key="sIndex"
-                    class="service-item"
-                  >
-                    <image :src="`http://localhost:3000/static/icons/${service.icon}.png`" style="width: 12px; height: 12px;" mode="aspectFit"></image>
-                    <text class="service-name">{{ service.type }}</text>
-                    <view class="service-price-container">
-                      <text class="service-price">¥{{ service.price }}</text>
-                      <text class="service-unit">/{{ service.unit }}</text>
-                    </view>
+      </view>
+      
+      <!-- 可滚动的律师列表区域 -->
+      <view class="scrollable-list-area">
+        <scroll-view class="list-scroll" scroll-y="true" style="height: 100%;">
+          <!-- 律师卡片列表 -->
+          <view class="lawyer-list">
+            <view 
+              v-for="(lawyer, index) in lawyerList" 
+              :key="lawyer.id"
+              class="lawyer-card"
+            >
+              <view class="card-content">
+                <!-- 律师基本信息区域 -->
+                <view class="lawyer-basic-info">
+                  <!-- 律师头像 -->
+                  <view class="lawyer-avatar"></view>
+                  
+                  <!-- 律师文本信息 -->
+                  <view class="lawyer-text-info">
+                    <text class="lawyer-name">{{ lawyer.name }}</text>
+                    <text class="lawyer-tags">{{ lawyer.specialty }} | {{ lawyer.experience }} | {{ lawyer.successRate }}</text>
+                    <text class="consult-count">{{ lawyer.consultCount }}</text>
                   </view>
                 </view>
                 
-                <!-- 立即咨询按钮 -->
-                <view class="consult-button" @click="consultLawyer(lawyer)">
-                  <text class="consult-text">立即咨询</text>
+                <!-- 服务项目区域 -->
+                <view class="services-section">
+                  <view class="services">
+                    <view 
+                      v-for="(service, sIndex) in lawyer.services" 
+                      :key="sIndex"
+                      class="service-item"
+                    >
+                      <image :src="`http://localhost:3000/static/icons/${service.icon}.png`" style="width: 12px; height: 12px;" mode="aspectFit"></image>
+                      <text class="service-name">{{ service.type }}</text>
+                      <view class="service-price-container">
+                        <text class="service-price">¥{{ service.price }}</text>
+                        <text class="service-unit">/{{ service.unit }}</text>
+                      </view>
+                    </view>
+                  </view>
+                  
+                  <!-- 立即咨询按钮 -->
+                  <view class="consult-button" @click="consultLawyer(lawyer)">
+                    <text class="consult-text">立即咨询</text>
+                  </view>
                 </view>
+                
+                <!-- 成功案例 -->
+                <text class="achievement">{{ lawyer.achievement }}</text>
               </view>
               
-              <!-- 成功案例 -->
-              <text class="achievement">{{ lawyer.achievement }}</text>
+              <!-- 分割线 -->
+              <view v-if="index < lawyerList.length - 1" class="divider"></view>
             </view>
-            
-            <!-- 分割线 -->
-            <view v-if="index < lawyerList.length - 1" class="divider"></view>
           </view>
-        </view>
-        
-        <!-- 底部安全区域 -->
-        <view class="bottom-safe-area"></view>
+          
+          <!-- 底部安全区域 -->
+          <view class="bottom-safe-area"></view>
+        </scroll-view>
       </view>
-    </scroll-view>
+    </view>
     
     <!-- 底部导航栏 -->
     <user-tabbar></user-tabbar>
@@ -230,12 +234,10 @@ export default {
     calculateScrollHeight() {
       // 获取系统信息
       const systemInfo = uni.getSystemInfoSync()
-      const statusBarHeight = systemInfo.statusBarHeight || 0
-      const navBarHeight = 44 // 导航栏高度
       const tabBarHeight = 50 // 底部导航栏高度
       const safeAreaBottom = systemInfo.safeAreaInsets?.bottom || 0
       
-      // 计算可滚动区域高度
+      // 计算content-container占满底部的高度 (100vh - 底部导航栏 - 安全区域)
       const availableHeight = systemInfo.windowHeight - tabBarHeight - safeAreaBottom
       this.scrollHeight = availableHeight + 'px'
     }
@@ -321,13 +323,33 @@ export default {
   margin-top: -25px;
   position: relative;
   z-index: 5;
-  padding: 20px;
+  overflow: hidden;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+// 固定的标签区域
+.fixed-tabs-area {
+  padding: 20px 20px 0 20px;
+  flex-shrink: 0;
+}
+
+// 可滚动的列表区域
+.scrollable-list-area {
+  flex: 1;
+  overflow: hidden;
+}
+
+// 列表滚动容器
+.list-scroll {
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 // 筛选标签栏
 .filter-tabs {
-  margin-bottom: 20px;
   
   .tabs-container {
     display: flex;
@@ -490,10 +512,7 @@ export default {
   }
 }
 
-// 页面滚动容器
-.page-scroll {
-  width: 100%;
-}
+
 
 // 底部安全区域
 .bottom-safe-area {

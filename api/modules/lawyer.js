@@ -183,6 +183,80 @@ export const getLegalRegulationDetail = (regulationId) => {
   return get(`/legal/regulations/${regulationId}`)
 }
 
+/**
+ * 获取当前登录律师的详细信息
+ * @returns {Promise} 律师详细信息
+ */
+export const getCurrentLawyerInfo = () => {
+  return get('/lawyer/profile')
+}
+
+/**
+ * 更新律师详细信息
+ * @param {Object} data 律师信息数据
+ * @param {string} [data.name] 律师姓名
+ * @param {string} [data.phone] 联系电话
+ * @param {string} [data.email] 邮箱地址
+ * @param {string} [data.avatar] 头像URL
+ * @param {string} [data.specialty] 专业领域
+ * @param {string} [data.experience] 执业经验
+ * @param {string} [data.education] 教育背景
+ * @param {string} [data.certification] 执业证书
+ * @param {string} [data.office] 执业机构
+ * @param {string} [data.address] 办公地址
+ * @param {string} [data.introduction] 个人简介
+ * @param {Array} [data.serviceAreas] 服务区域
+ * @param {Array} [data.practiceAreas] 执业领域
+ * @param {Object} [data.pricing] 收费标准
+ * @returns {Promise} 更新结果
+ */
+export const updateLawyerInfo = (data) => {
+  return put('/lawyer/profile', data)
+}
+
+/**
+ * 更新律师在线状态
+ * @param {Object} data 状态数据
+ * @param {boolean} data.isOnline 是否在线
+ * @param {string} [data.status] 状态描述 (available, busy, offline)
+ * @param {string} [data.statusMessage] 状态消息
+ * @returns {Promise} 更新结果
+ */
+export const updateLawyerOnlineStatus = (data) => {
+  return put('/lawyer/status', data)
+}
+
+/**
+ * 律师注册接口
+ * @param {Object} data 注册数据
+ * @param {string} data.name 律师姓名
+ * @param {string} data.phone 手机号码
+ * @param {string} data.email 邮箱地址
+ * @param {string} data.password 密码
+ * @param {string} data.confirmPassword 确认密码
+ * @param {string} data.licenseNumber 执业证号
+ * @param {string} data.lawFirm 律师事务所
+ * @param {string} data.specialty 专业领域
+ * @param {string} data.experience 执业年限
+ * @param {string} [data.verificationCode] 验证码
+ * @returns {Promise} 注册结果
+ */
+export const registerLawyer = (data) => {
+  return post('/lawyer/register', data)
+}
+
+/**
+ * 删除律师账号及相关信息
+ * @param {Object} data 删除确认数据
+ * @param {string} data.password 当前密码
+ * @param {string} [data.reason] 删除原因
+ * @param {boolean} [data.deleteAllData] 是否删除所有相关数据
+ * @returns {Promise} 删除结果
+ */
+export const deleteLawyerAccount = (data) => {
+  return del('/lawyer/account', data)
+}
+
 // 导出所有律师相关API
 export default {
   getLawyers,
@@ -199,5 +273,11 @@ export default {
   getLegalArticles,
   getLegalArticleDetail,
   getLegalRegulations,
-  getLegalRegulationDetail
+  getLegalRegulationDetail,
+  // 新增的律师管理接口
+  getCurrentLawyerInfo,
+  updateLawyerInfo,
+  updateLawyerOnlineStatus,
+  registerLawyer,
+  deleteLawyerAccount
 }

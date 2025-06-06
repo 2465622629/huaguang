@@ -222,6 +222,77 @@ export const getPsychArticleDetail = (articleId) => {
   return get(`/psych/articles/${articleId}`)
 }
 
+/**
+ * 获取当前登录心理师的详细信息
+ * @returns {Promise} 心理师详细信息
+ */
+export const getPsychologistProfile = () => {
+  return get('/psychologist/profile')
+}
+
+/**
+ * 更新心理师详细信息
+ * @param {Object} data 更新数据
+ * @param {string} [data.licenseNumber] 执业证号
+ * @param {Array} [data.specialties] 专业领域
+ * @param {number} [data.experienceYears] 执业年限
+ * @param {number} [data.textFee] 文字咨询费用
+ * @param {number} [data.voiceFee] 语音咨询费用
+ * @param {number} [data.videoFee] 视频咨询费用
+ * @param {boolean} [data.acceptConsultation] 是否接受咨询
+ * @param {string} [data.introduction] 个人介绍
+ * @param {Array} [data.certificates] 证书信息
+ * @param {string} [data.serviceAdvantages] 服务优势
+ * @param {string} [data.slogan] 个人标语
+ * @returns {Promise} 更新后的心理师信息
+ */
+export const updatePsychologistProfile = (data) => {
+  return put('/psychologist/profile', data)
+}
+
+/**
+ * 更新心理师在线状态
+ * @param {boolean} isOnline 是否在线
+ * @returns {Promise} 更新结果
+ */
+export const updatePsychologistOnlineStatus = (isOnline) => {
+  return put('/psychologist/online-status', null, { isOnline })
+}
+
+/**
+ * 心理师注册接口
+ * @param {Object} data 注册数据
+ * @param {string} data.realName 真实姓名
+ * @param {string} data.nickname 昵称
+ * @param {string} data.email 邮箱
+ * @param {string} data.birthDate 出生日期
+ * @param {string} data.phone 手机号
+ * @param {string} data.password 密码
+ * @param {string} [data.inviteCode] 邀请码
+ * @param {string} data.licenseNumber 执业证号
+ * @param {Array} data.specialties 专业领域
+ * @param {number} data.experienceYears 执业年限
+ * @param {number} data.textFee 文字咨询费用
+ * @param {number} data.voiceFee 语音咨询费用
+ * @param {number} data.videoFee 视频咨询费用
+ * @param {string} data.introduction 个人介绍
+ * @param {Array} data.certificates 证书信息
+ * @param {string} data.serviceAdvantages 服务优势
+ * @param {string} data.slogan 个人标语
+ * @returns {Promise} 注册结果
+ */
+export const registerPsychologist = (data) => {
+  return post('/psychologist/register', data)
+}
+
+/**
+ * 删除心理师账号及相关信息
+ * @returns {Promise} 删除结果
+ */
+export const deletePsychologistAccount = () => {
+  return del('/psychologist/account')
+}
+
 // 导出所有心理师相关API
 export default {
   getPsychologists,
@@ -242,5 +313,10 @@ export default {
   getPsychTestResult,
   getUserPsychTestHistory,
   getPsychArticles,
-  getPsychArticleDetail
+  getPsychArticleDetail,
+  getPsychologistProfile,
+  updatePsychologistProfile,
+  updatePsychologistOnlineStatus,
+  registerPsychologist,
+  deletePsychologistAccount
 }
