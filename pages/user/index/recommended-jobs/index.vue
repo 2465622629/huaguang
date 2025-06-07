@@ -7,19 +7,20 @@
     <view class="nav-bar">
       <!-- 返回按钮 -->
       <view class="nav-back" @click="goBack">
-        <uv-icon name="arrow-left" size="18" color="#333333"></uv-icon>
+        <uv-icon name="arrow-left" size="32" color="#333333"></uv-icon>
         <text class="back-text">返回</text>
       </view>
       
-      <!-- 排序选项 - 位于返回按钮下方偏右 -->
-      <view class="sort-option" @click="showSortMenu">
-        <text class="sort-text">{{ currentSort.label }}</text>
-        <view class="sort-arrow">▼</view>
-      </view>
-      
-      <!-- 搜索图标 - 位于导航栏右侧 -->
-      <view class="search-icon" @click="handleSearch">
-        <uv-icon name="search" size="22" color="#87CEFA"></uv-icon>
+      <!-- 排序选项和搜索图标 - 位于同一行 -->
+      <view class="nav-controls">
+        <view class="sort-option" @click="showSortMenu">
+          <text class="sort-text">{{ currentSort.label }}</text>
+          <view class="sort-arrow">▼</view>
+        </view>
+        
+        <view class="search-icon" @click="handleSearch">
+          <uv-icon name="search" size="32" color="#46D7FF"></uv-icon>
+        </view>
       </view>
     </view>
     
@@ -40,7 +41,7 @@
       </scroll-view>
     </view>
     
-    <!-- 职业列表 - 带渐变背景 -->
+    <!-- 职位列表 - 带渐变背景 -->
     <scroll-view class="job-list" scroll-y="true" @scrolltolower="loadMore">
       <view 
         v-for="(job, index) in jobList" 
@@ -48,30 +49,27 @@
         class="job-card"
         @click="goToJobDetail(job)"
       >
-        <!-- 职业图标占位符 -->
-        <view class="job-icon">
-          <uv-image 
-            v-if="job.icon"
-            :src="job.icon" 
-            width="50px" 
-            height="50px" 
-            mode="aspectFill"
-            radius="25px"
-          ></uv-image>
-          <view v-else class="icon-placeholder">
-            <text class="icon-text">{{ job.name.charAt(0) }}</text>
-          </view>
+        <!-- 第一行：职位名称与薪资 -->
+        <view class="job-card-header">
+          <text class="job-title">{{ job.title }}</text>
+          <text class="job-salary">{{ job.salary }}</text>
         </view>
         
-        <!-- 职业信息 -->
-        <view class="job-info">
-          <text class="job-name">{{ job.name }}</text>
-          <text class="job-desc">{{ job.industry }} · {{ job.salaryRange }}</text>
-        </view>
+        <!-- 第二行：地点与学历 -->
+         <view class="job-card-info">
+           <view class="info-item">
+             <uv-icon name="http://localhost:3000/static/icons/location.png" :size="24" color="#888888"></uv-icon>
+             <text class="info-text">{{ job.location }}</text>
+           </view>
+           <view class="info-item">
+             <uv-icon name="http://localhost:3000/static/icons/graduation.png" :size="24" color="#888888"></uv-icon>
+             <text class="info-text">{{ job.education }}</text>
+           </view>
+         </view>
         
         <!-- 箭头图标 -->
         <view class="arrow-icon">
-          <text class="arrow-text">></text>
+          <uv-icon name="arrow-right" :size="32" color="#CCCCCC"></uv-icon>
         </view>
       </view>
       
@@ -124,6 +122,9 @@
 </template>
 
 <script>
+// 导入企业API
+import { enterpriseApi } from '@/api/index.js'
+
 export default {
   data() {
     return {
@@ -137,62 +138,62 @@ export default {
         { label: '默认排序', value: 'default' },
         { label: '最新发布', value: 'newest' },
         { label: '薪资最高', value: 'salary_high' },
-        { label: '热门程度', value: 'popularity' }
+        { label: '规模最大', value: 'scale_large' }
       ],
       
       // 筛选标签
       filterTags: [
         { label: '推荐', active: true },
         { label: '附近', active: false },
-        { label: '高薪', active: false },
-        { label: '热门', active: false },
-        { label: '急招', active: false },
-        { label: '无经验', active: false }
+        { label: '无学历限制', active: false },
+        { label: '推荐', active: false },
+        { label: '附近', active: false },
+        { label: '无学历限制', active: false }
       ],
       
-      // 职业列表数据
+      // 职位列表数据
       jobList: [
         {
           id: 1,
-          name: '法务专员',
-          industry: '法律服务',
-          salaryRange: '6k-9k',
-          icon: ''
+          title: '法务专员',
+          salary: '6k-9k',
+          location: '上海市 · 浦东新区',
+          education: '本科'
         },
         {
           id: 2,
-          name: '心理咨询师',
-          industry: '医疗健康',
-          salaryRange: '8k-12k',
-          icon: ''
+          title: '法务助理',
+          salary: '4k-6k',
+          location: '北京市 · 朝阳区',
+          education: '大专'
         },
         {
           id: 3,
-          name: '软件工程师',
-          industry: '互联网',
-          salaryRange: '10k-18k',
-          icon: ''
+          title: '法务经理',
+          salary: '10k-15k',
+          location: '深圳市 · 南山区',
+          education: '本科'
         },
         {
           id: 4,
-          name: '市场专员',
-          industry: '市场营销',
-          salaryRange: '5k-8k',
-          icon: ''
+          title: '合规专员',
+          salary: '7k-10k',
+          location: '广州市 · 天河区',
+          education: '本科'
         },
         {
           id: 5,
-          name: '财务分析师',
-          industry: '金融',
-          salaryRange: '7k-12k',
-          icon: ''
+          title: '法务顾问',
+          salary: '8k-12k',
+          location: '杭州市 · 西湖区',
+          education: '硕士'
         },
         {
           id: 6,
-          name: '人力资源',
-          industry: '人力资源',
-          salaryRange: '6k-10k',
-          icon: ''
+          title: '律师助理',
+          salary: '5k-8k',
+          location: '成都市 · 高新区',
+          education: '本科'
         }
       ],
       
@@ -241,35 +242,69 @@ export default {
       })
     },
     
-    // 跳转到职业详情
+    // 跳转到职位详情
     goToJobDetail(job) {
+      console.log('点击职位卡片', job)
       uni.navigateTo({
         url: `/pages/user/index/job-detail/index?id=${job.id}`
       })
     },
     
-    // 加载职业列表
+    // 加载职位列表
     async loadJobList() {
       if (this.loading || this.noMore) return
       
       this.loading = true
       
       try {
-        // 模拟API调用
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // 调用真实API
+        const params = {
+          page: this.page,
+          size: this.pageSize
+        }
         
-        // 模拟数据
-        const jobTypes = ['法务专员', '心理咨询师', '软件工程师', '市场专员', '财务分析师', '人力资源', '销售代表', '客服专员']
-        const industries = ['法律服务', '医疗健康', '互联网', '市场营销', '金融', '人力资源', '销售', '服务业']
-        const salaryRanges = ['5k-8k', '6k-9k', '7k-12k', '8k-15k', '10k-18k', '12k-20k']
+        // 添加排序参数
+        if (this.currentSort.value !== 'default') {
+          params.sort = this.currentSort.value
+        }
         
-        const newData = Array.from({ length: this.pageSize }, (_, i) => ({
-          id: this.jobList.length + i + 1,
-          name: jobTypes[Math.floor(Math.random() * jobTypes.length)],
-          industry: industries[Math.floor(Math.random() * industries.length)],
-          salaryRange: salaryRanges[Math.floor(Math.random() * salaryRanges.length)],
-          icon: ''
-        }))
+        // 添加筛选参数
+        const activeFilters = this.filterTags.filter(tag => tag.active).map(tag => tag.label)
+        if (activeFilters.length > 0) {
+          params.filters = activeFilters.join(',')
+        }
+        
+        // 暂时使用模拟数据，后续可替换为真实的职位API
+        // const response = await jobApi.getJobList(params)
+        console.log('职位列表数据加载中...');
+        
+        // 模拟API延迟
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // 处理API返回数据 - 使用模拟数据
+        let newData = [
+          {
+            id: this.page * 10 + 1,
+            title: '法务专员',
+            salary: '6k-9k',
+            location: '上海市 · 浦东新区',
+            education: '本科'
+          },
+          {
+            id: this.page * 10 + 2,
+            title: '法务助理',
+            salary: '4k-6k',
+            location: '北京市 · 朝阳区',
+            education: '大专'
+          },
+          {
+            id: this.page * 10 + 3,
+            title: '法务经理',
+            salary: '10k-15k',
+            location: '深圳市 · 南山区',
+            education: '本科'
+          }
+        ]
         
         if (this.page === 1) {
           this.jobList = newData
@@ -277,16 +312,19 @@ export default {
           this.jobList.push(...newData)
         }
         
-        this.page++
-        
-        // 模拟没有更多数据
-        if (this.page > 3) {
+        // 检查是否还有更多数据
+        if (newData.length < this.pageSize) {
           this.noMore = true
+        } else {
+          this.page++
         }
+        
       } catch (error) {
+        console.error('加载职位列表失败:', error)
         uni.showToast({
-          title: '加载失败',
-          icon: 'none'
+          title: error.message || '加载失败，请稍后重试',
+          icon: 'none',
+          duration: 2000
         })
       } finally {
         this.loading = false
@@ -298,6 +336,7 @@ export default {
       this.page = 1
       this.noMore = false
       this.jobList = []
+      this.loading = false // 重置加载状态
       this.loadJobList()
     },
     
@@ -314,7 +353,10 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(to bottom, #E0F2FF 0%, #F5FAFF 100%);
+  background-image: url('http://localhost:3000/static/bg9.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
 }
 
@@ -328,14 +370,14 @@ export default {
 // 重构后的导航栏
 .nav-bar {
   height: 80px;
-  background-color: #F0F8FF;
+  // background-color: rgba(240, 248, 255, 0.9);
   position: relative;
   padding: 0 16px;
   flex-shrink: 0;
   
   .nav-back {
     position: absolute;
-    top: 8px;
+    top: 20px;
     left: 16px;
     display: flex;
     align-items: center;
@@ -348,43 +390,49 @@ export default {
     }
   }
   
-  .sort-option {
+  .nav-controls {
     position: absolute;
-    top: 30px;
-    left: 50px;
+    top: 50px;
+    left: 10px;
+    right: 16px;
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    min-width: 80px;
-    min-height: 30px;
-    cursor: pointer;
+    justify-content: space-between;
     
-    .sort-text {
-      font-size: 13px;
-      color: #666666;
-      font-weight: 400;
+    .sort-option {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      min-width: 80px;
+      min-height: 30px;
+      cursor: pointer;
+      
+      .sort-text {
+        font-size: 13px;
+        color: #666666;
+        font-weight: 400;
+      }
+      
+      .sort-arrow {
+        font-size: 10px;
+        color: #666666;
+        transform: scale(0.8);
+      }
     }
     
-    .sort-arrow {
-      font-size: 10px;
-      color: #666666;
-      transform: scale(0.8);
+    .search-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-  }
-  
-  .search-icon {
-    position: absolute;
-    top: 50%;
-    right: 16px;
-    transform: translateY(-50%);
   }
 }
 
 // 简化后的筛选栏
 .filter-bar {
   height: 50px;
-  background-color: #F0F8FF;
+  // background-color: rgba(240, 248, 255, 0.9);
   padding: 0 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
@@ -402,12 +450,12 @@ export default {
       padding-right: 20px;
       
       .filter-tag {
-        height: 30px;
+        height: 40rpx; 
         padding: 0 12px;
         border-radius: 6px;
         display: flex;
         align-items: center;
-        background-color: #EAF4FF;
+        background-color: #e2f6ff;
         white-space: nowrap;
         flex-shrink: 0;
         
@@ -430,7 +478,7 @@ export default {
   }
 }
 
-// 职业列表 - 带渐变背景
+// 职位列表 - 带渐变背景
 .job-list {
   flex: 1;
   width: 100%;
@@ -439,6 +487,7 @@ export default {
   box-sizing: border-box;
   
   .job-card {
+    position: relative;
     width: calc(100% - 0px);
     max-width: 100%;
     box-sizing: border-box;
@@ -446,43 +495,20 @@ export default {
     border-radius: 10px;
     padding: 12px 16px;
     margin: 12px 0;
-    display: flex;
-    align-items: center;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     overflow: hidden;
     
-    .job-icon {
-      width: 52px;
-      height: 52px;
-      margin-right: 10px;
-      flex-shrink: 0;
-      
-      .icon-placeholder {
-        width: 52px;
-        height: 52px;
-        border-radius: 26px;
-        background-color: #87CEFA;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        
-        .icon-text {
-          font-size: 18px;
-          color: #FFFFFF;
-          font-weight: 600;
-        }
-      }
+    &:active {
+      transform: scale(0.98);
+      transition: transform 0.1s ease;
     }
     
-    .job-info {
-      flex: 1;
+    .job-card-header {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-      overflow: hidden;
+      align-items: center;
+      margin-bottom: 8px;
       
-      .job-name {
+      .job-title {
         font-size: 16px;
         color: #333333;
         font-weight: 600;
@@ -490,32 +516,43 @@ export default {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 100%;
+        margin-right: 12px;
       }
       
-      .job-desc {
-        font-size: 12px;
-        color: #888888;
-        line-height: 1.2;
-        font-weight: 400;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      .job-salary {
+        font-size: 16px;
+        color: #9ADBDA;
+        font-weight: 600;
         white-space: nowrap;
-        max-width: 100%;
+      }
+    }
+    
+    .job-card-info {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 8px;
+      
+      .info-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        
+        .info-text {
+          font-size: 12px;
+          color: #666666;
+          line-height: 1.2;
+        }
       }
     }
     
     .arrow-icon {
-      width: 20px;
-      margin-left: 10px;
-      flex-shrink: 0;
-      text-align: center;
-      
-      .arrow-text {
-        font-size: 14px;
-        color: #AAAAAA;
-        font-weight: 400;
-      }
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
   }
   
@@ -579,4 +616,4 @@ export default {
     }
   }
 }
-</style> 
+</style>

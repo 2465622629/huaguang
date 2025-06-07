@@ -123,6 +123,9 @@
 </template>
 
 <script>
+// 导入企业API
+import { enterpriseApi } from '@/api/index.js'
+
 export default {
   data() {
     return {
@@ -248,6 +251,7 @@ export default {
     
     // 跳转到公司详情
     goToCompanyDetail(company) {
+      console.log('点击公司卡片', company)
       uni.navigateTo({
         url: `/pages/user/index/company-detail/index?id=${company.id}`
       })
@@ -260,18 +264,40 @@ export default {
       this.loading = true
       
       try {
-        // 模拟API调用
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // 调用真实API
+        const params = {
+          page: this.page,
+          size: this.pageSize
+        }
         
-        // 模拟数据
-        const newData = Array.from({ length: this.pageSize }, (_, i) => ({
-          id: this.companyList.length + i + 1,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        }))
+        // 添加排序参数
+        if (this.currentSort.value !== 'default') {
+          params.sort = this.currentSort.value
+        }
+        
+        // 添加筛选参数
+        const activeFilters = this.filterTags.filter(tag => tag.active).map(tag => tag.label)
+        if (activeFilters.length > 0) {
+          params.filters = activeFilters.join(',')
+        }
+        
+        const response = await enterpriseApi.getEnterpriseList(params)
+        console.log('企业列表数据:', response);
+        
+        // 处理API返回数据
+        let newData = []
+        if (response) {
+          
+          const apiData = response.records 
+          newData = apiData.map(item => ({
+            id: item.id || item.enterpriseId,
+            name: item.companyName || item.name || '未知企业',
+            industry: item.industry || '未知行业',
+            type: item.companyType || item.type || '',
+            scale: item.scale || item.employeeCount || '',
+            logo: item.logo || item.logoUrl || ''
+          }))
+        }
         
         if (this.page === 1) {
           this.companyList = newData
@@ -279,16 +305,19 @@ export default {
           this.companyList.push(...newData)
         }
         
-        this.page++
-        
-        // 模拟没有更多数据
-        if (this.page > 3) {
+        // 检查是否还有更多数据
+        if (newData.length < this.pageSize) {
           this.noMore = true
+        } else {
+          this.page++
         }
+        
       } catch (error) {
+        console.error('加载企业列表失败:', error)
         uni.showToast({
-          title: '加载失败',
-          icon: 'none'
+          title: error.message || '加载失败，请稍后重试',
+          icon: 'none',
+          duration: 2000
         })
       } finally {
         this.loading = false
@@ -300,6 +329,7 @@ export default {
       this.page = 1
       this.noMore = false
       this.companyList = []
+      this.loading = false // 重置加载状态
       this.loadCompanyList()
     },
     

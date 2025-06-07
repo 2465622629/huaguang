@@ -120,6 +120,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { getLawyerDetail } from '@/api/modules/legal-service.js'
 
 export default {
   data() {
@@ -156,8 +157,15 @@ export default {
       config
     }
   },
-  onLoad() {
+  onLoad(options) {
     this.getSystemInfo()
+    // 接收传入的律师ID参数
+    if (options.lawyerId) {
+      console.log('接收到律师ID:', options.lawyerId)
+      this.lawyerInfo.id = parseInt(options.lawyerId)
+      // 根据律师ID加载具体的律师信息
+      this.loadLawyerDetail(options.lawyerId)
+    }
   },
   methods: {
     // 获取系统信息
@@ -165,6 +173,60 @@ export default {
       const systemInfo = uni.getSystemInfoSync()
       this.statusBarHeight = systemInfo.statusBarHeight || 0
       this.safeAreaBottom = systemInfo.safeAreaInsets?.bottom || 0
+    },
+    
+    // 加载律师详细信息
+    async loadLawyerDetail(lawyerId) {
+      console.log('加载律师详细信息:', lawyerId);
+      
+      try {
+        uni.showLoading({
+          title: '加载中...'
+        })
+        
+        const response = await getLawyerDetail(lawyerId)
+        console.log('律师详情:', response)
+        
+        if (response) {
+          // 将API响应数据映射到页面所需的数据结构
+          const lawyerData = response
+          this.lawyerInfo = {
+            id: lawyerData.id,
+            name: lawyerData.name,
+            avatar: lawyerData.avatar || "",
+            isOnline: lawyerData.isOnline,
+            specialty: Array.isArray(lawyerData.specialties) ? lawyerData.specialties.join('、') : lawyerData.specialties || "专业领域",
+            experience: `${lawyerData.experienceYears}年执业经验`,
+            successRate: `${lawyerData.successRate}%`,
+            recentCase: lawyerData.recentCases || "暂无近期案例",
+            background: lawyerData.introduction || "暂无介绍",
+            advantages: lawyerData.serviceAdvantages ? lawyerData.serviceAdvantages.split('、') : [
+              "经验丰富",
+              "专业可靠",
+              "服务优质"
+            ],
+            cases: [
+              `成功代理案件${lawyerData.caseCount || 0}起`,
+              `胜诉率${lawyerData.successRate || 0}%`,
+              "为众多当事人成功维权"
+            ],
+            consultationScope: lawyerData.consultationScope ? lawyerData.consultationScope.split('、') : [
+              "法律咨询",
+              "案件代理",
+              "法律顾问"
+            ]
+          }
+        }
+        
+        uni.hideLoading()
+      } catch (error) {
+        console.error('获取律师详情失败:', error)
+        uni.hideLoading()
+        uni.showToast({
+          title: '获取律师信息失败',
+          icon: 'none'
+        })
+      }
     },
     
     // 返回上一页

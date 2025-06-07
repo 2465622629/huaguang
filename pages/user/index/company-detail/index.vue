@@ -87,9 +87,9 @@
                     <text class="job-company">{{ job.company }}</text>
                   </view>
                   <view class="job-details-row">
-                    <text class="job-salary">{{ job.salary }}</text>
+                    <text class="job-salary">{{ job.salaryRange }}</text>
                     <text class="job-location">{{ job.location }}</text>
-                    <text class="job-education">{{ job.education }}</text>
+                    <text class="job-education">{{ job.educationRequirement }}</text>
                   </view>
                 </view>
                 <view class="job-action">
@@ -111,6 +111,8 @@
 </template>
 
 <script>
+import { getEnterpriseDetail } from '@/api/modules/enterprise.js'
+
 export default {
   data() {
     return {
@@ -197,9 +199,59 @@ export default {
     },
     
     // 根据公司ID加载公司详情
-    loadCompanyDetail(companyId) {
-      // TODO: 调用API获取公司详情数据
-      console.log('加载公司详情:', companyId)
+    async loadCompanyDetail(companyId) {
+      try {
+        uni.showLoading({
+          title: '加载中...'
+        })
+        
+        const response = await getEnterpriseDetail(companyId)
+        console.log(response);
+        
+        if (response ) {
+          const enterprise = response.enterprise
+          const activeJobs = response.activeJobs || [] 
+          
+          // 更新企业信息数据
+          this.companyInfo = {
+            name: enterprise.companyName || 'XX科技公司',
+            industry: enterprise.industry || '互联网 · 软件开发',
+            scale: enterprise.companySize || '500-999人',
+            logo: enterprise.logo || '',
+            educationRequirement: enterprise.educationRequirement || '本科及以上',
+            salaryRange: enterprise.salaryRange || '面议',
+            about: {
+              title: '关于' + (enterprise.companyName || 'XX科技'),
+              description: enterprise.description || '企业简介暂无',
+              highlights: []
+            },
+            benefits: enterprise.benefits ? enterprise.benefits.map(benefit => {
+              // 定义可用的图标数组
+              const icons = ['wuxian', 'tanxing', 'nian'];
+              // 随机获取一个图标
+              const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+              return {
+                icon: randomIcon,
+                text: benefit
+              };
+            }) : [
+              { icon: 'wuxian', text: '五险一金' },
+              { icon: 'tanxing', text: '弹性工作' },
+              { icon: 'nian', text: '年终奖金' }
+            ],
+            jobs: activeJobs
+          }
+        }
+        
+        uni.hideLoading()
+      } catch (error) {
+        console.error('获取企业详情失败:', error)
+        uni.hideLoading()
+        uni.showToast({
+          title: '获取企业信息失败',
+          icon: 'none'
+        })
+      }
     }
   }
 }
@@ -336,16 +388,18 @@ export default {
 
 /* 福利待遇区块样式 */
 .benefits-section {
-  display: flex;
-  justify-content: space-around;
   padding: 20px 0;
+  overflow-x: auto;
+  white-space: nowrap;
   // border-bottom: 1px solid #F0F0F0;
   
   .benefit-item {
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
     align-items: center;
-    flex: 1;
+    width: calc(100% / 3);
+    min-width: calc(100% / 3);
+    flex-shrink: 0;
     
     .benefit-icon {
       margin-bottom: 8px;
@@ -355,6 +409,7 @@ export default {
       font-size: 12px;
       color: #666666;
       text-align: center;
+      white-space: normal;
     }
   }
 }

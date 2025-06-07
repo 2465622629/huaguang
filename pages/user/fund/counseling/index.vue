@@ -187,6 +187,7 @@
 <script>
 import config from '@/config/index.js'
 import request from '@/utils/request.js'
+import { getPsychologistList } from '@/api/modules/legal-service.js'
 
 export default {
   name: 'CounselingPage',
@@ -267,9 +268,18 @@ export default {
         // 构建请求参数
         const params = {
           page: this.currentPage,
-          sort: this.getSortValue(),
-          gender: this.selectedGender === '不限' ? '' : this.selectedGender,
-          specialties: this.selectedSpecialties.join(',')
+          size: 10,
+          sortBy: this.getSortValue()
+        }
+        
+        // 添加性别筛选
+        if (this.selectedGender !== '不限') {
+          params.gender = this.selectedGender
+        }
+        
+        // 添加擅长领域筛选
+        if (this.selectedSpecialties.length > 0) {
+          params.specialty = this.selectedSpecialties.join(',')
         }
         
         // 添加标签筛选
@@ -278,24 +288,25 @@ export default {
           params.tags = activeTags.join(',')
         }
         
-        // 模拟API响应
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        const res = {
-          code: 0,
-          data: {
-            list: this.getMockCounselors(),
-            total: 30,
-            totalPages: 3
-          }
-        }
+        // 调用真实API
+        const res = await getPsychologistList(params)
+        console.log('res',res);
         
-        if (res.code === 0) {
+        if (res && res.records) {
+          const responseData = res
+          
+          // 映射API数据到前端字段
+          const mappedData = responseData.records.map(item => this.mapCounselorData(item))
+          
           if (refresh) {
-            this.counselorList = res.data.list
+            this.counselorList = mappedData
           } else {
-            this.counselorList = [...this.counselorList, ...res.data.list]
+            this.counselorList = [...this.counselorList, ...mappedData]
           }
-          this.totalPages = res.data.totalPages
+          // 计算总页数
+          const total = responseData.total || 0
+          const size = params.size || 10
+          this.totalPages = Math.ceil(total / size)
         }
       } catch (error) {
         console.error('获取咨询师列表失败：', error)
@@ -303,6 +314,11 @@ export default {
           icon: 'none',
           title: '获取咨询师列表失败'
         })
+        // 如果API调用失败，可以回退到模拟数据
+        if (this.counselorList.length === 0) {
+          this.counselorList = this.getMockCounselors()
+          this.totalPages = 3
+        }
       } finally {
         this.isLoading = false
         this.isRefreshing = false
@@ -378,6 +394,22 @@ export default {
           res.eventChannel.emit('counselorData', { counselor })
         }
       })
+    },
+    
+    // 映射API数据到前端字段
+    mapCounselorData(apiData) {
+      return {
+        id: apiData.id || apiData.psychologistId,
+        name: apiData.name || apiData.psychologistName,
+        serviceType: apiData.serviceType || apiData.consultationType || '语音/视频',
+        age: apiData.age || 30,
+        certificates: apiData.certificates || apiData.qualification || '心理咨询师',
+        specialties: apiData.specialties || apiData.expertiseAreas || [],
+        consultationCount: apiData.consultationCount || apiData.totalConsultations || 0,
+        returnClientCount: apiData.returnClientCount || apiData.returningClients || 0,
+        motto: apiData.motto || apiData.personalStatement || '专业倾听，用心陪伴',
+        price: apiData.price || apiData.consultationFee || 99.9
+      }
     },
     
     // 模拟数据生成

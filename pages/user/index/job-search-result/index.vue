@@ -30,7 +30,21 @@
     
     <!-- 职位列表区域 -->
     <scroll-view class="job-list-container" scroll-y="true">
+      <!-- 加载状态 -->
+      <view v-if="loading" class="loading-container">
+        <uv-loading-icon mode="circle" color="#20B2AA" size="40"></uv-loading-icon>
+        <text class="loading-text">正在搜索职位...</text>
+      </view>
+      
+      <!-- 错误提示 -->
+      <view v-else-if="error" class="error-container">
+        <uv-icon name="error-circle" size="60" color="#FF6B6B"></uv-icon>
+        <text class="error-text">{{ error }}</text>
+      </view>
+      
+      <!-- 职位列表 -->
       <view 
+        v-else
         v-for="(job, index) in jobList" 
         :key="job.id"
         class="job-card"
@@ -45,18 +59,18 @@
         <!-- 第二行：地点与学历 -->
         <view class="job-card-info">
           <view class="info-item">
-            <uv-icon name="map-pin" :size="12" color="#888888"></uv-icon>
+            <uv-icon name="http://localhost:3000/static/icons/location.png" :size="24" color="#888888"></uv-icon>
             <text class="info-text">{{ job.location }}</text>
           </view>
           <view class="info-item">
-            <uv-icon name="graduation-cap" :size="12" color="#888888"></uv-icon>
+            <uv-icon name="http://localhost:3000/static/icons/graduation.png" :size="24" color="#888888"></uv-icon>
             <text class="info-text">{{ job.education }}</text>
           </view>
         </view>
         
         <!-- 右侧箭头图标 -->
         <view class="arrow-icon">
-          <uv-icon name="arrow-right" :size="16" color="#CCCCCC"></uv-icon>
+          <uv-icon name="arrow-right" :size="32" color="#CCCCCC"></uv-icon>
         </view>
       </view>
     </scroll-view>
@@ -64,12 +78,18 @@
 </template>
 
 <script>
+import { searchJobs } from '@/api/modules/enterprise.js'
+
 export default {
   data() {
     return {
       searchKeyword: '新媒体',
       statusBarHeight: 0,
-      resultCount: 12,
+      resultCount: 0,
+      loading: false,
+      error: null,
+      currentPage: 1,
+      pageSize: 10,
       jobList: [
         {
           id: 1,
@@ -112,9 +132,11 @@ export default {
       }
     }
   },
-  onLoad() {
+  async onLoad() {
     // 获取状态栏高度
     this.getStatusBarHeight()
+    // 执行初始搜索
+    await this.performSearch(this.searchKeyword)
   },
   methods: {
     // 获取状态栏高度
@@ -124,9 +146,92 @@ export default {
     },
     
     // 搜索提交处理
-    onSearch(value) {
+    async onSearch(value) {
       console.log('搜索内容:', value)
-      // TODO: 实现搜索逻辑
+      await this.performSearch(value || this.searchKeyword)
+    },
+    
+    // 执行搜索的核心逻辑
+    async performSearch(keyword) {
+      if (!keyword || keyword.trim() === '') {
+        this.error = '请输入搜索关键词'
+        return
+      }
+      
+      this.loading = true
+      this.error = null
+      
+      try {
+        const params = {
+          keyword: keyword.trim(),
+          page: this.currentPage,
+          size: this.pageSize
+        }
+        
+        const response = await searchJobs(params)
+      console.log('响应',response);
+      
+        
+        if (response ) {
+          this.jobList = this.formatJobData(response.jobs || [])
+          this.resultCount = response.totalCount || 0
+        } else {
+          this.jobList = []
+          this.resultCount = 0
+        }
+        
+        if (this.jobList.length === 0) {
+          this.error = '未找到相关职位，请尝试其他关键词'
+        }
+        
+      } catch (error) {
+        this.handleSearchError(error)
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 转换API数据格式到UI需要的格式
+    formatJobData(apiDataList) {
+      if (!Array.isArray(apiDataList)) {
+        return []
+      }
+      
+      return apiDataList.map(item => {
+        // 处理薪资格式转换
+        let salary = '面议'
+        if (item.salaryMin && item.salaryMax) {
+          const minK = Math.floor(item.salaryMin / 1000)
+          const maxK = Math.floor(item.salaryMax / 1000)
+          salary = `${minK}k-${maxK}k`
+        } else if (item.salary) {
+          salary = item.salary
+        }
+        
+        return {
+          id: item.id,
+          title: item.title || '职位名称',
+          salary: salary,
+          location: item.location || '工作地点',
+          education: item.educationRequirement || item.education || '学历要求'
+        }
+      })
+    },
+    
+    // 统一错误处理
+    handleSearchError(error) {
+      console.error('搜索职位失败:', error)
+      
+      if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {
+        this.error = '网络连接失败，请检查网络设置'
+      } else if (error.message) {
+        this.error = error.message
+      } else {
+        this.error = '搜索失败，请稍后重试'
+      }
+      
+      this.jobList = []
+      this.resultCount = 0
     },
     
     // 取消搜索处理
@@ -162,7 +267,7 @@ export default {
 }
 
 .search-section {
-  padding: 20rpx 0;
+  padding: 40rpx 0 30rpx 0;
 }
 
 .result-count-section {
@@ -178,14 +283,23 @@ export default {
 .job-list-container {
   flex: 1;
   padding: 0 30rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .job-card {
   position: relative;
+  width: calc(100% - 0px);
+  max-width: 100%;
+  box-sizing: border-box;
   background-color: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
   
   &:active {
     transform: scale(0.98);
@@ -195,16 +309,16 @@ export default {
 
 .job-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 16rpx;
+  padding-right: 40rpx;
 }
 
 .job-title {
   font-size: 34rpx;
   font-weight: 600;
   color: #222222;
-  flex: 1;
+  margin-right: 20rpx;
 }
 
 .job-salary {
@@ -232,8 +346,41 @@ export default {
 
 .arrow-icon {
   position: absolute;
-  right: 30rpx;
+  right: 16px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-</style> 
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #FF6B6B;
+  text-align: center;
+  padding: 0 40rpx;
+}
+</style>

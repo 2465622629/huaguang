@@ -149,12 +149,10 @@ export default {
     },
     // 咨询律师
     consultLawyer(lawyer) {
-      uni.showToast({
-        title: `咨询${lawyer.name}`,
-        icon: 'none'
-      })
+      console.log('咨询律师:', lawyer)
+      
       uni.navigateTo({
-        url: '/pages/user/index/lawyer-detail/index'
+        url: `/pages/user/index/lawyer-detail/index?lawyerId=${lawyer.id}`
       })
     },
     // 加载热门律师数据

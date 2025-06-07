@@ -30,8 +30,9 @@ import skillTrainingApi from './modules/skill-training.js'
 import applicationRecordApi from './modules/application-record.js'
 import legalServiceApi from './modules/legal-service.js'
 import aboutApi from './modules/about.js'
-import adminUserApi from './modules/admin-user.js'
-import adminOrderApi from './modules/admin-order.js'
+// 注释掉不存在的模块导入
+// import adminUserApi from './modules/admin-user.js'
+// import adminOrderApi from './modules/admin-order.js'
 import adminContentApi from './modules/admin-content.js'
 import lawyerWorkspaceApi from './modules/lawyer-workspace.js'
 import fileManagementApi from './modules/file-management.js'
@@ -60,8 +61,8 @@ export {
   applicationRecordApi,
   legalServiceApi,
   aboutApi,
-  adminUserApi,
-  adminOrderApi,
+  // adminUserApi,
+  // adminOrderApi,
   adminContentApi,
   lawyerWorkspaceApi,
   fileManagementApi
@@ -93,8 +94,8 @@ export default {
   applicationRecord: applicationRecordApi,
   legalService: legalServiceApi,
   about: aboutApi,
-  adminUser: adminUserApi,
-  adminOrder: adminOrderApi,
+  // adminUser: adminUserApi,
+  // adminOrder: adminOrderApi,
   adminContent: adminContentApi,
   lawyerWorkspace: lawyerWorkspaceApi,
   fileManagement: fileManagementApi

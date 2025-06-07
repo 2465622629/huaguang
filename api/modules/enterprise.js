@@ -306,6 +306,213 @@ export const deleteEnterpriseAccount = (data) => {
   return del('/enterprise/account', data)
 }
 
+/**
+ * 获取企业列表
+ * @param {Object} params 查询参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @returns {Promise} 企业列表
+ */
+export const getEnterpriseList = (params) => {
+  return get('/enterprise/list', params)
+}
+
+// ==================== 企业招聘相关接口 ====================
+
+/**
+ * 更新职位信息
+ * @param {string|number} jobId 职位ID
+ * @param {Object} data 职位数据
+ * @param {string} data.title 职位标题
+ * @param {string} data.description 职位描述
+ * @param {string} data.requirements 职位要求
+ * @param {number} data.salaryMin 最低薪资
+ * @param {number} data.salaryMax 最高薪资
+ * @param {string} data.location 工作地点
+ * @param {string} [data.workExperience] 工作经验要求
+ * @param {string} [data.educationRequirement] 学历要求
+ * @param {string} [data.jobType] 工作类型（full_time/part_time/internship/contract）
+ * @returns {Promise} 更新结果
+ */
+export const updateJob = (jobId, data) => {
+  return put(`/enterprise/jobs/${jobId}`, data)
+}
+
+/**
+ * 删除职位（软删除）
+ * @param {string|number} jobId 职位ID
+ * @returns {Promise} 删除结果
+ */
+export const deleteJob = (jobId) => {
+  return del(`/enterprise/jobs/${jobId}`)
+}
+
+/**
+ * 获取当前企业的职位列表
+ * @param {Object} params 查询参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @returns {Promise} 职位列表
+ */
+export const getEnterpriseJobs = (params) => {
+  return get('/enterprise/jobs', params)
+}
+
+/**
+ * 发布新的招聘职位
+ * @param {Object} data 职位数据
+ * @param {string} data.title 职位标题
+ * @param {string} data.description 职位描述
+ * @param {string} data.requirements 职位要求
+ * @param {number} data.salaryMin 最低薪资
+ * @param {number} data.salaryMax 最高薪资
+ * @param {string} data.location 工作地点
+ * @param {string} [data.workExperience] 工作经验要求
+ * @param {string} [data.educationRequirement] 学历要求
+ * @param {string} [data.jobType] 工作类型（full_time/part_time/internship/contract）
+ * @returns {Promise} 创建结果
+ */
+export const createJob = (data) => {
+  return post('/enterprise/jobs', data)
+}
+
+/**
+ * 记录职位浏览行为
+ * @param {string|number} jobId 职位ID
+ * @returns {Promise} 记录结果
+ */
+export const incrementJobViewCount = (jobId) => {
+  return post(`/enterprise/jobs/${jobId}/view`)
+}
+
+/**
+ * 上传简历文件
+ * @param {File} file 简历文件
+ * @returns {Promise} 上传结果，包含文件URL
+ */
+export const uploadResume = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return post('/enterprise/resume/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
+ * 向指定职位投递简历
+ * @param {Object} data 投递数据
+ * @param {string|number} data.jobId 职位ID
+ * @param {string} [data.resumeUrl] 简历文件URL
+ * @param {string} [data.coverLetter] 求职信
+ * @returns {Promise} 投递结果
+ */
+export const applyJob = (data) => {
+  return post('/enterprise/jobs/apply', data)
+}
+
+/**
+ * 企业更新简历投递申请的状态
+ * @param {string|number} applicationId 申请ID
+ * @param {Object} data 状态数据
+ * @param {string} data.status 申请状态（pending/reviewing/interviewed/hired/rejected）
+ * @param {string} [data.feedback] 反馈信息
+ * @returns {Promise} 更新结果
+ */
+export const updateApplicationStatus = (applicationId, data) => {
+  return put(`/enterprise/applications/${applicationId}/status`, data)
+}
+
+/**
+ * 获取企业详情页数据，包括企业信息、在招职位和统计数据
+ * @param {string|number} enterpriseId 企业ID
+ * @returns {Promise} 企业详情数据
+ */
+export const getEnterpriseDetail = (enterpriseId) => {
+  return get(`/enterprise/${enterpriseId}/detail`)
+}
+
+/**
+ * 获取企业工作台数据，包括企业信息、职位统计、最新职位和投递记录
+ * @returns {Promise} 企业工作台数据
+ */
+export const getEnterpriseWorkspace = () => {
+  return get('/enterprise/workspace')
+}
+
+/**
+ * 获取职位详情页数据，包括职位信息、企业信息和相关职位推荐
+ * @param {string|number} jobId 职位ID
+ * @returns {Promise} 职位详情数据
+ */
+export const getJobDetail = (jobId) => {
+  return get(`/enterprise/jobs/${jobId}/detail`)
+}
+
+/**
+ * 根据条件搜索职位
+ * @param {Object} params 搜索参数
+ * @param {string} [params.keyword] 关键词
+ * @param {string} [params.location] 工作地点
+ * @param {string} [params.jobType] 工作类型
+ * @param {number} [params.salaryMin] 最低薪资
+ * @param {number} [params.salaryMax] 最高薪资
+ * @param {string} [params.workExperience] 工作经验
+ * @param {string} [params.educationRequirement] 学历要求
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @returns {Promise} 搜索结果
+ */
+export const searchJobs = (params) => {
+  return get('/enterprise/jobs/search', params)
+}
+
+/**
+ * 获取热门职位列表
+ * @param {Object} params 查询参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @returns {Promise} 热门职位列表
+ */
+export const getHotJobs = (params) => {
+  return get('/enterprise/jobs/hot', params)
+}
+
+/**
+ * 获取简历投递申请的详细信息
+ * @param {string|number} applicationId 申请ID
+ * @returns {Promise} 申请详情
+ */
+export const getApplicationDetail = (applicationId) => {
+  return get(`/enterprise/applications/${applicationId}`)
+}
+
+/**
+ * 获取当前用户的简历投递记录
+ * @param {Object} params 查询参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @param {string} [params.status] 申请状态筛选
+ * @returns {Promise} 用户投递记录
+ */
+export const getUserApplications = (params) => {
+  return get('/enterprise/applications/user', params)
+}
+
+/**
+ * 获取企业收到的简历投递记录
+ * @param {Object} params 查询参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @param {string} [params.status] 申请状态筛选
+ * @param {string|number} [params.jobId] 职位ID筛选
+ * @returns {Promise} 企业收到的投递记录
+ */
+export const getEnterpriseApplications = (params) => {
+  return get('/enterprise/applications/received', params)
+}
+
 // 导出所有企业相关API
 export default {
   getEnterpriseInfo,
@@ -330,5 +537,28 @@ export default {
   getCurrentEnterpriseInfo,
   updateEnterpriseDetailInfo,
   registerEnterprise,
-  deleteEnterpriseAccount
+  deleteEnterpriseAccount,
+  // 企业招聘相关接口
+  getEnterpriseList,
+  // 职位管理接口
+  updateJob,
+  deleteJob,
+  getEnterpriseJobs,
+  createJob,
+  incrementJobViewCount,
+  // 简历投递接口
+  uploadResume,
+  applyJob,
+  updateApplicationStatus,
+  // 企业招聘工作台接口
+  getEnterpriseDetail,
+  getEnterpriseWorkspace,
+  // 职位搜索和推荐接口
+  getJobDetail,
+  searchJobs,
+  getHotJobs,
+  // 申请记录管理接口
+  getApplicationDetail,
+  getUserApplications,
+  getEnterpriseApplications
 }

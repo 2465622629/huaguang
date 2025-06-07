@@ -50,8 +50,8 @@
 
       <!-- 推荐律师卡片 -->
       <view class="content-card">
-        <view class="card-title">推荐律师</view>
-        <view class="card-subtitle">精选经验丰富律师，快速响应您的需求</view>
+        <view class="card-title" @click="handleLawyerRecommend">推荐律师</view>
+        <view class="card-subtitle" @click="handleLawyerRecommend">精选经验丰富律师，快速响应您的需求</view>
         <uv-scroll-list :indicator="false">
           <view v-for="(lawyer, index) in lawyerList" :key="index" class="lawyer-item">
             <view class="lawyer-avatar"></view>
@@ -93,6 +93,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
+import { getHotLawyers } from '@/api/modules/home.js'
 
 export default {
   name: 'LegalHelpPage',
@@ -114,26 +115,7 @@ export default {
         { name: '解除协议模版' }
       ],
       // 推荐律师列表
-      lawyerList: [
-        {
-          name: '李律师',
-          specialty: '劳动纠纷',
-          price: '60元/30分钟',
-          avatar: ''
-        },
-        {
-          name: '王律师',
-          specialty: '合同纠纷',
-          price: '80元/30分钟',
-          avatar: ''
-        },
-        {
-          name: '张律师',
-          specialty: '房产纠纷',
-          price: '100元/30分钟',
-          avatar: ''
-        }
-      ],
+      lawyerList: [],
       // 法律知识科普
       knowledgeList: [
         {
@@ -158,7 +140,32 @@ export default {
       }
     }
   },
+  onLoad() {
+    // 页面加载时获取热门律师数据
+    this.loadHotLawyers()
+  },
   methods: {
+    // 加载热门律师数据
+    async loadHotLawyers() {
+      try {
+        const response = await getHotLawyers({ limit: 10 })
+        console.log('res',response);
+        if (response ) {
+          // 将API响应数据映射到模板所需的数据结构
+          this.lawyerList = response.map(lawyer => ({
+            name: lawyer.name,
+            specialty: lawyer.specialties ? lawyer.specialties.join('、') : '',
+            price: `¥${lawyer.consultationFee}/次`
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门律师失败:', error)
+        uni.showToast({
+          title: '获取律师信息失败',
+          icon: 'none'
+        })
+      }
+    },
     handleDocumentDownload() {
       uni.showToast({
         title: '文书下载功能开发中',
@@ -179,6 +186,7 @@ export default {
       })
     },
     handleConsult(lawyer) {
+      
       uni.showToast({
         title: `咨询${lawyer.name}`,
         icon: 'none'
