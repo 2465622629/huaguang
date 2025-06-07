@@ -544,6 +544,32 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/enterprise",
+			"pages": [
+				{
+					"path": "jobhunting/index",
+					"style": {
+						"navigationBarTitleText": "我的企业",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "jobdetails/index",
+					"style": {
+						"navigationBarTitleText": "职位详情",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "companydetails/index",
+					"style": {
+						"navigationBarTitleText": "公司详情",
+						"navigationStyle": "custom"
+					}
+				}
+			]
 		}
 	],
 	"preloadRule": {
