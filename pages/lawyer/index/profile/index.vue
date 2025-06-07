@@ -22,7 +22,7 @@
 			</view>
 			
 			<!-- 服务状态卡片 -->
-			<view class="service-status-card">
+			<view class="service-status-card" @click="handleServiceStatusClick">
 				<view class="status-content">
 					<text class="status-label">我的服务状态:</text>
 					<view class="status-bottom">
@@ -115,14 +115,32 @@ export default {
 			switch(type) {
 				case 'password':
 					// 跳转到修改密码页面
+					uni.navigateTo({
+						url: '/pages/lawyer/index/change-password/index'
+					});
 					break;
 				case 'userinfo':
 					// 跳转到修改用户信息页面
+					uni.navigateTo({
+						url: '/pages/user/profile/edit/index'
+					});
 					break;
 				case 'notification':
 					// 跳转到消息通知设置页面
+					uni.navigateTo({
+						url: '/pages/lawyer/index/notification-settings/index'
+					});
 					break;
 			}
+		},
+		
+		// 处理服务状态点击
+		handleServiceStatusClick() {
+			console.log('服务状态点击');
+			// 跳转到在线状态设置页面
+			uni.navigateTo({
+				url: '/pages/lawyer/index/online-status/index'
+			});
 		}
 	}
 }

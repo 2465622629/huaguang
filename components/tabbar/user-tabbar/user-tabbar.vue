@@ -42,6 +42,12 @@ import { staticBaseUrl } from '@/config/index'
 
 export default {
   name: 'UserTabbar',
+  props: {
+    defaultActive: {
+      type: Number,
+      default: -1
+    }
+  },
   data() {
     return {
       current: 0,
@@ -49,6 +55,13 @@ export default {
     }
   },
   created() {
+    // 如果传入了默认选中索引，直接使用
+    if (this.defaultActive !== -1) {
+      this.current = this.defaultActive
+      console.log('使用传入的defaultActive:', this.defaultActive)
+      return
+    }
+    
     // 根据当前路由设置 current 值
     const routes = [
       '/pages/user/index/index',

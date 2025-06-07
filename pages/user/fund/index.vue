@@ -214,7 +214,7 @@ export default {
     async getCaseList() {
       try {
         const res = await request({
-          url: '/api/help-loan/cases',
+          url: '/help-loan/cases',
           method: 'GET'
         })
         if (res.code === 0 && res.data && res.data.length > 0) {

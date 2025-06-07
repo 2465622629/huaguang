@@ -37,8 +37,9 @@
           :customStyle="{
             backgroundColor: '#58AFFF',
             borderRadius: '8px',
-            height: '32px',
-            fontSize: '14px'
+            height: '28px',
+            fontSize: '12px',
+            padding: '0 8px'
           }"
           @click="editCompanyInfo"
         ></uv-button>
@@ -65,8 +66,9 @@
           :customStyle="{
             backgroundColor: '#58AFFF',
             borderRadius: '8px',
-            height: '32px',
-            fontSize: '14px'
+            height: '28px',
+            fontSize: '12px',
+            padding: '0 8px'
           }"
           @click="editJobs"
         ></uv-button>
@@ -99,34 +101,20 @@
       </view>
     </view>
     
-    <!-- 底部导航栏 -->
-    <view class="bottom-tabbar">
-      <view class="tab-item">
-        <uv-icon name="home" size="24" color="#888888"></uv-icon>
-        <text class="tab-text">首页</text>
-      </view>
-      <view class="tab-item active">
-        <uv-icon name="heart" size="24" color="#1E88E5"></uv-icon>
-        <text class="tab-text active">青年帮扶资金</text>
-      </view>
-      <view class="tab-item">
-        <uv-icon name="chat-circle" size="24" color="#888888"></uv-icon>
-        <text class="tab-text">信息</text>
-      </view>
-      <view class="tab-item">
-        <uv-icon name="account" size="24" color="#888888"></uv-icon>
-        <text class="tab-text">我的</text>
-      </view>
-    </view>
     
-    <!-- iOS Home Indicator -->
-    <view class="home-indicator"></view>
+    <!-- 底部导航栏 -->
+    <UserTabbar :defaultActive="1" />
   </view>
 </template>
 
 <script>
+import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+
 export default {
   name: 'EnterpriseJobHunting',
+  components: {
+    UserTabbar
+  },
   data() {
     return {
       statusBarHeight: 0,
@@ -163,23 +151,20 @@ export default {
   methods: {
     editCompanyInfo() {
       console.log('编辑公司详情')
-      uni.showToast({
-        title: '编辑公司详情',
-        icon: 'none'
+      uni.navigateTo({
+        url: '/pages/enterprise/companydetails/index'
       })
     },
     editJobs() {
       console.log('立即编辑职位')
-      uni.showToast({
-        title: '立即编辑职位',
-        icon: 'none'
+      uni.navigateTo({
+        url: '/pages/enterprise/jobdetails/index'
       })
     },
     goToJobDetail(job) {
       console.log('查看职位详情', job)
-      uni.showToast({
-        title: `查看${job.title}详情`,
-        icon: 'none'
+      uni.navigateTo({
+        url: `/pages/enterprise/jobdetails/index?jobId=${job.id}&title=${encodeURIComponent(job.title)}`
       })
     }
   }
@@ -189,7 +174,10 @@ export default {
 <style lang="scss" scoped>
 .enterprise-page {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #E0F5FF 0%, #FFFFFF 45%);
+  background: url('http://localhost:3000/static/bg3.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   position: relative;
 }
 
@@ -202,7 +190,7 @@ export default {
   padding: 20rpx 40rpx 30rpx;
   
   .page-title {
-    font-size: 60rpx;
+    font-size: 45rpx;
     font-weight: bold;
     color: #333333;
     line-height: 1.2;
@@ -229,7 +217,7 @@ export default {
     flex: 1;
     
     .company-name {
-      font-size: 40rpx;
+      font-size: 32rpx;
       font-weight: bold;
       color: #333333;
       margin-bottom: 20rpx;
@@ -239,12 +227,15 @@ export default {
     .company-tags {
       display: flex;
       gap: 20rpx;
+      align-items: center; /* 让文字垂直居中 */
       
       .tag {
-        background-color: #FFFFFF;
-        border: 1px solid #E0E0E0;
-        border-radius: 8rpx;
-        padding: 8rpx 16rpx;
+        background-color: #eefdff;
+        // border: 1px solid #E0E0E0;
+        border-radius: 12rpx;
+        padding: 4rpx 8rpx;
+        display: flex; /* 让标签内容也使用flex布局 */
+        align-items: center; /* 让标签内文字垂直居中 */
         
         .tag-text {
           font-size: 24rpx;
@@ -354,44 +345,5 @@ export default {
   }
 }
 
-.bottom-tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #FFFFFF;
-  border-top: 1px solid #E0E0E0;
-  display: flex;
-  padding: 20rpx 0 40rpx;
-  z-index: 1000;
-  
-  .tab-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8rpx;
-    
-    .tab-text {
-      font-size: 20rpx;
-      color: #888888;
-      
-      &.active {
-        color: #1E88E5;
-      }
-    }
-  }
-}
 
-.home-indicator {
-  position: fixed;
-  bottom: 10rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 270rpx;
-  height: 8rpx;
-  background-color: #000000;
-  border-radius: 4rpx;
-  z-index: 1001;
-}
 </style>

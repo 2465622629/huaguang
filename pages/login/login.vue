@@ -59,6 +59,12 @@
 					borderRadius: '8px',
 					padding: '0 12px',
 					height: '44px'
+				},
+				// 用户类型路由映射
+				userTypeRoutes: {
+					'user': '/pages/user/index/index',
+					'lawyer': '/pages/lawyer/index/dashboard/index',
+					'psychologist': '/pages/psychologist/index/dashboard/index'
 				}
 			}
 		},
@@ -92,6 +98,10 @@
 			toggleRememberPassword() {
 				this.rememberPassword = !this.rememberPassword
 			},
+			// 根据用户类型获取跳转路径
+			getRouteByUserType(userType) {
+				return this.userTypeRoutes[userType] || this.userTypeRoutes['user']
+			},
 			// 处理登录
 			async handleLogin() {
 				if (!this.email || !this.password) {
@@ -109,16 +119,20 @@
 					})
 					console.log('登录中...')
 				// 调用登录接口
-				const data = await login({
+				const response = await login({
 					loginAccount: this.email,
 					password: this.password,
 					rememberMe: this.rememberPassword
 				})
-					console.log('登录成功：', data)
+					console.log('登录响应：', response)
 					console.log('是否记住密码：', this.rememberPassword)
 					
 					// 检查返回数据的结构
-					console.log('API返回数据结构：', JSON.stringify(data, null, 2))
+					console.log('API返回数据结构：', JSON.stringify(response, null, 2))
+					
+					// 获取实际的用户数据
+					const data = response.data || response
+					console.log('用户数据：', data)
 					
 					// 处理记住密码
 					if (this.rememberPassword) {
@@ -146,7 +160,8 @@
 						const userInfo = {
 							userId: data.userId,
 							username: data.username,
-							userType: data.userType || 'user'
+							userType: data.userType || 'user',
+							nickname: data.nickname || ''
 						}
 						uni.setStorageSync('userInfo', userInfo)
 						console.log('用户信息存储成功：', userInfo)
@@ -169,10 +184,14 @@
 						icon: 'success'
 					})
 					
-					// 直接跳转到用户端首页
+					// 根据用户类型跳转到对应页面
+					const userType = data.userType || 'user'
+					const targetRoute = this.getRouteByUserType(userType)
+					console.log('用户类型：', userType, '跳转路径：', targetRoute)
+					
 					setTimeout(() => {
 						uni.reLaunch({
-							url: '/pages/user/index/index'
+							url: targetRoute
 						})
 					}, 1500)
 				} catch (error) {

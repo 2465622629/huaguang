@@ -60,9 +60,8 @@ export default {
     // 处理招聘点击
     handleRecruitment() {
       // 暂时只显示提示，后续添加跳转逻辑
-      uni.showToast({
-        title: '招聘功能',
-        icon: 'none'
+      uni.navigateTo({
+        url: '/pages/enterprise/jobhunting/index'
       })
     }
   }

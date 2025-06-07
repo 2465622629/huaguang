@@ -273,6 +273,10 @@ export default {
 .company-details-page {
   min-height: 100vh;
   background-color: #F8F9FA;
+  background-image: url('http://localhost:3000/static/bg9.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   position: relative;
 }
 
@@ -283,7 +287,7 @@ export default {
 
 .navigation-bar {
   height: 44px;
-  background-color: #EDF8F7;
+  // background-color: #eaf5fa;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -305,7 +309,7 @@ export default {
   
   .nav-title {
     font-size: 18px;
-    font-weight: 600;
+    // font-weight: 600;
     color: #333333;
   }
 }
@@ -341,7 +345,7 @@ export default {
   .form-input {
     flex: 1;
     height: 40px;
-    background-color: #EDF8F7;
+    background-color: #eaf5fa;
     border-radius: 8px;
     padding: 0 12px;
     display: flex;
@@ -361,7 +365,7 @@ export default {
   .avatar-upload {
     width: 80px;
     height: 80px;
-    background-color: #EDF8F7;
+    background-color: #eaf5fa;
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -393,7 +397,7 @@ export default {
   }
   
   .content-container {
-    background-color: #EDF8F7;
+    background-color: #eaf5fa;
     border-radius: 8px;
     padding: 16px;
     

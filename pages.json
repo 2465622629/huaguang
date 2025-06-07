@@ -476,12 +476,7 @@
 		{
 			"root": "pages/psychologist",
 			"pages": [
-				{
-					"path": "index/index",
-					"style": {
-						"navigationBarTitleText": "心理师工作台"
-					}
-				},
+				
 				{
 					"path": "index/dashboard/index",
 					"style": {

@@ -50,12 +50,16 @@
 </template>
 
 <script>
+import { getIncomeStatistics } from '@/api/modules/lawyer-workspace.js'
+
 export default {
   name: 'IncomeManagement',
   data() {
     return {
-      totalIncome: '8,550',
-      todayIncome: '256.00',
+      totalIncome: '0',
+      todayIncome: '0.00',
+      loading: false,
+      error: null,
       scrollViewHeight: 400,
       incomeRecords: [
         {
@@ -103,8 +107,36 @@ export default {
   },
   mounted() {
     this.calculateScrollViewHeight()
+    this.fetchIncomeStatistics()
   },
   methods: {
+    // 获取收入统计数据
+    async fetchIncomeStatistics() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const response = await getIncomeStatistics()
+        
+        if (response) {
+          // 根据API返回的数据结构更新收入信息
+          this.totalIncome = response.totalIncome || '0'
+          this.todayIncome = response.todayIncome || '0.00'
+        }
+      } catch (error) {
+        console.error('获取收入统计失败:', error)
+        this.error = '获取收入数据失败，请稍后重试'
+        
+        // 显示错误提示
+        uni.showToast({
+          title: '获取收入数据失败',
+          icon: 'none',
+          duration: 2000
+        })
+      } finally {
+        this.loading = false
+      }
+    },
     // 返回上一页
     goBack() {
       uni.navigateBack()

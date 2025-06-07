@@ -25,20 +25,35 @@
       <view class="job-key-info">
         <view class="info-row">
           <text class="info-label">工作地点</text>
-          <view class="info-placeholder">
-            <text class="placeholder-text">{{ jobInfo.location || '' }}</text>
+          <view class="info-input-container">
+            <uv-input 
+              v-model="jobInfo.location"
+              placeholder=""
+              :customStyle="inputCustomStyle"
+              border="none"
+            ></uv-input>
           </view>
         </view>
         <view class="info-row">
           <text class="info-label">工作经验</text>
-          <view class="info-placeholder">
-            <text class="placeholder-text">{{ jobInfo.experience || '' }}</text>
+          <view class="info-input-container">
+            <uv-input 
+              v-model="jobInfo.experience"
+              placeholder=""
+              :customStyle="inputCustomStyle"
+              border="none"
+            ></uv-input>
           </view>
         </view>
         <view class="info-row">
           <text class="info-label">学历要求</text>
-          <view class="info-placeholder">
-            <text class="placeholder-text">{{ jobInfo.education || '' }}</text>
+          <view class="info-input-container">
+            <uv-input 
+              v-model="jobInfo.education"
+              placeholder=""
+              :customStyle="inputCustomStyle"
+              border="none"
+            ></uv-input>
           </view>
         </view>
       </view>
@@ -50,50 +65,32 @@
         
         <!-- 职位描述 -->
         <text class="sub-title">职位描述</text>
-        <text class="description-text">
-          {{ jobInfo.description || '本岗位主要负责公司合同审核、法律咨询支持、风险防控管理及法律文书处理等相关事务，确保公司经营活动合法合规。' }}
-        </text>
-        
-        <!-- 职位职责 -->
-        <view class="responsibility-list">
-          <view class="list-item" v-for="(item, index) in responsibilities" :key="index">
-            <text class="bullet-point">・</text>
-            <text class="list-text">{{ item }}</text>
-          </view>
+        <view class="description-container">
+          <uv-textarea 
+            v-model="jobInfo.description"
+            placeholder="请输入职位描述"
+            :customStyle="textareaCustomStyle"
+            autoHeight
+            maxlength="500"
+          ></uv-textarea>
         </view>
+        
+        
         
         <!-- 职业要求 -->
         <text class="sub-title">职业要求</text>
         <view class="requirement-item">
-          <text class="requirement-text">
-            <text class="requirement-label">学历要求: </text>
-            <text class="requirement-value">{{ jobInfo.educationRequirement || '本科及以上 (法律相关专业优先)' }}</text>
-          </text>
-        </view>
-        <view class="requirement-item">
-          <text class="requirement-text">
-            <text class="requirement-label">工作经验: </text>
-            <text class="requirement-value">{{ jobInfo.experienceRequirement || '1-3年相关工作经验' }}</text>
-          </text>
-        </view>
-        
-        <!-- 专业技能 -->
-        <text class="sub-title">专业技能:</text>
-        <view class="skill-list">
-          <view class="list-item" v-for="(skill, index) in professionalSkills" :key="index">
-            <text class="bullet-point">・</text>
-            <text class="list-text">{{ skill }}</text>
+          <view class="requirement-input-container">
+            <uv-textarea 
+              v-model="jobInfo.educationRequirement"
+              placeholder="请输入学历要求"
+              :customStyle="requirementTextareaStyle"
+              autoHeight
+              maxlength="1000"
+            ></uv-textarea>
           </view>
         </view>
         
-        <!-- 其他要求 -->
-        <text class="sub-title">其他要求:</text>
-        <view class="other-requirements-list">
-          <view class="list-item" v-for="(requirement, index) in otherRequirements" :key="index">
-            <text class="bullet-point">・</text>
-            <text class="list-text">{{ requirement }}</text>
-          </view>
-        </view>
         
         <!-- 操作按钮 -->
         <view class="action-button-container">
@@ -126,8 +123,23 @@ export default {
         location: '',
         experience: '',
         education: '',
-        description: '本岗位主要负责公司合同审核、法律咨询支持、风险防控管理及法律文书处理等相关事务，确保公司经营活动合法合规。',
-        educationRequirement: '本科及以上 (法律相关专业优先)',
+        description: `       本岗位主要负责公司合同审核、法律咨询支持、风险防控管理及法律文书处理等相关事务，确保公司经营活动合法合规。
+        负责各类合同、协议的起草与审核；
+        提供日常法律咨询服务，出具法律意见书；
+        参与处理劳动人事、商业合作等相关法律事务；
+        协助进行公司合规体系建设，培训业务部门员工；
+        配合处理公司重大突发法律事务。
+        `,
+        educationRequirement: `学历要求：本科及以上（法律相关专业优先）
+工作经验：1–3年相关工作经验
+专业技能：
+熟悉合同法、劳动法、公司法等相关法律法规
+能独立起草、审核法律文件
+其他要求：
+具备较强的沟通协调能力与逻辑分析能力
+具备良好的职业道德，严谨细致
+有律师资格证者优先
+        `,
         experienceRequirement: '1-3年相关工作经验'
       },
       responsibilities: [
@@ -151,6 +163,35 @@ export default {
         height: '50px',
         fontSize: '18px',
         fontWeight: 'normal'
+      },
+      inputCustomStyle: {
+        backgroundColor: '#eaf5fa',
+        borderRadius: '4px',
+        padding: '0 12px',
+        fontSize: '14px',
+        color: '#555555'
+      },
+      textareaCustomStyle: {
+        backgroundColor: '#eaf5fa',
+        borderRadius: '4px',
+        padding: '12px',
+        fontSize: '14px',
+        color: '#555555'
+      },
+      requirementInputStyle: {
+        backgroundColor: '#eaf5fa',
+        borderRadius: '4px',
+        padding: '0 8px',
+        fontSize: '14px',
+        color: '#555555',
+        flex: 1
+      },
+      requirementTextareaStyle: {
+        backgroundColor: '#eaf5fa',
+        borderRadius: '4px',
+        padding: '12px',
+        fontSize: '14px',
+        color: '#555555'
       }
     }
   },
@@ -232,15 +273,18 @@ export default {
 <style lang="scss" scoped>
 .job-detail-container {
   min-height: 100vh;
-  background-color: #F0F4F7;
+  background-image: url('http://localhost:3000/static/bg9.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .status-bar {
-  background-color: #F0F4F7;
+  background-color: transparent;
 }
 
 .navbar {
-  background-color: #F0F4F7;
+  background-color: transparent;
   padding: 0 16px;
   
   .navbar-content {
@@ -282,7 +326,7 @@ export default {
   padding: 24px 16px 16px 16px;
   
   .job-title {
-    font-size: 30px;
+    font-size: 45rpx;
     color: #212121;
     font-weight: bold;
     font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
@@ -306,27 +350,18 @@ export default {
       flex-shrink: 0;
     }
     
-    .info-placeholder {
+    .info-input-container {
       flex: 1;
       height: 32px;
-      background-color: #F0F4F7;
-      border-radius: 4px;
       margin-left: 12px;
       display: flex;
       align-items: center;
-      padding: 0 12px;
-      
-      .placeholder-text {
-        font-size: 14px;
-        color: #555555;
-        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
-      }
     }
   }
 }
 
 .job-detail-card {
-  background-color: #FFFFFF;
+  // background-color: #FFFFFF;
   border-radius: 8px 8px 0 0;
   padding: 16px;
   margin-top: 8px;
@@ -349,12 +384,7 @@ export default {
     margin-top: 20px;
   }
   
-  .description-text {
-    font-size: 14px;
-    color: #555555;
-    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
-    line-height: 1.5;
-    display: block;
+  .description-container {
     margin-bottom: 16px;
   }
   
@@ -389,19 +419,20 @@ export default {
   
   .requirement-item {
     margin-bottom: 8px;
+    display: flex;
+    align-items: center;
     
-    .requirement-text {
+    .requirement-label {
       font-size: 14px;
+      color: #666666;
       font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
-      line-height: 1.5;
-      
-      .requirement-label {
-        color: #666666;
-      }
-      
-      .requirement-value {
-        color: #555555;
-      }
+      width: 80px;
+      flex-shrink: 0;
+    }
+    
+    .requirement-input-container {
+      flex: 1;
+      margin-left: 8px;
     }
   }
   
