@@ -160,7 +160,7 @@ export default {
     }
   },
   onLoad() {
-    this.getStatistics()
+    // this.getStatistics()
     this.getCaseList()
   },
   methods: {

@@ -25,37 +25,45 @@
         <view class="input-grid-2x2">
           <view class="input-row">
             <view class="input-field">
-              <input 
+              <uv-input 
                 v-model="formData.loanInfo.bank" 
                 placeholder="银行/平台" 
-                placeholder-class="input-placeholder"
-                class="input-control"
+                placeholderClass="input-placeholder"
+                border="none"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                clearable
               />
             </view>
             <view class="input-field">
-              <input 
+              <uv-input 
                 v-model="formData.loanInfo.loanTime" 
                 placeholder="借款时间" 
-                placeholder-class="input-placeholder"
-                class="input-control"
+                placeholderClass="input-placeholder"
+                border="none"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                clearable
               />
             </view>
           </view>
           <view class="input-row">
             <view class="input-field">
-              <input 
+              <uv-input 
                 v-model="formData.loanInfo.amount" 
                 placeholder="金额" 
-                placeholder-class="input-placeholder"
-                class="input-control"
+                placeholderClass="input-placeholder"
+                border="none"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                clearable
               />
             </view>
             <view class="input-field">
-              <input 
+              <uv-input 
                 v-model="formData.loanInfo.overdueTime" 
                 placeholder="逾期时间" 
-                placeholder-class="input-placeholder"
-                class="input-control"
+                placeholderClass="input-placeholder"
+                border="none"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                clearable
               />
             </view>
           </view>
@@ -69,27 +77,59 @@
         <!-- 1x2 输入框 -->
         <view class="input-grid-1x2">
           <view class="input-field">
-            <input 
+            <uv-input 
               v-model="formData.repaymentInfo.remainingAmount" 
               placeholder="剩余金额" 
-              placeholder-class="input-placeholder"
-              class="input-control"
+              placeholderClass="input-placeholder"
+              border="none"
+              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+              clearable
             />
           </view>
           <view class="input-field">
-            <input 
+            <uv-input 
               v-model="formData.repaymentInfo.repaymentAmount" 
               placeholder="补交金额" 
-              placeholder-class="input-placeholder"
-              class="input-control"
+              placeholderClass="input-placeholder"
+              border="none"
+              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+              clearable
             />
           </view>
         </view>
         
         <!-- 文件上传区域 -->
-        <view class="file-upload-area" @click="handleScreenshotUpload">
+        <view class="file-upload-area" v-if="!formData.repaymentInfo.screenshot" @click="chooseScreenshot">
           <view class="upload-icon">+</view>
           <view class="upload-text">上传补交截图</view>
+        </view>
+        
+        <!-- 图片预览区域 -->
+        <view class="screenshot-preview" v-if="formData.repaymentInfo.screenshot">
+          <view class="preview-container">
+            <image 
+              :src="formData.repaymentInfo.screenshot.url || formData.repaymentInfo.screenshot.tempPath" 
+              class="preview-image"
+              mode="aspectFill"
+              @click="previewImage"
+              @error="onImageError"
+              @load="onImageLoad"
+            />
+            <view class="preview-overlay" v-if="formData.repaymentInfo.screenshot.status === 'uploading'">
+              <uv-loading-icon size="24" mode="circle" color="#FFFFFF"></uv-loading-icon>
+              <text class="upload-status-text">上传中...</text>
+            </view>
+            <view class="preview-overlay" v-if="formData.repaymentInfo.screenshot.status === 'failed'">
+              <uv-icon name="close-circle" color="#FFFFFF" size="24"></uv-icon>
+              <text class="upload-status-text">上传失败</text>
+            </view>
+            <view class="delete-btn" @click.stop="deleteScreenshot" v-if="formData.repaymentInfo.screenshot.status !== 'uploading'">
+              <uv-icon name="close" color="#FFFFFF" size="12"></uv-icon>
+            </view>
+          </view>
+          <view class="reselect-btn" @click="chooseScreenshot" v-if="formData.repaymentInfo.screenshot.status !== 'uploading'">
+            <text class="reselect-text">重新选择</text>
+          </view>
         </view>
       </view>
       
@@ -106,6 +146,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { uploadFile } from '@/utils/file.js'
 
 export default {
   name: 'CreditRecoveryPage',
@@ -122,7 +163,7 @@ export default {
         repaymentInfo: {
           remainingAmount: '',
           repaymentAmount: '',
-          screenshot: null
+          screenshot: null // { tempPath, url, status: 'uploading' | 'success' | 'failed' }
         }
       }
     }
@@ -138,31 +179,134 @@ export default {
         }
       })
     },
-    handleScreenshotUpload() {
-      uni.showToast({
-        title: '截图上传功能开发中',
-        icon: 'none'
+    
+    // 选择截图
+    chooseScreenshot() {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['original', 'compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          const tempPath = res.tempFilePaths[0]
+          this.formData.repaymentInfo.screenshot = {
+            tempPath: tempPath,
+            url: '',
+            status: 'uploading'
+          }
+          
+          // 开始上传
+          this.uploadScreenshot(tempPath)
+        },
+        fail: (err) => {
+          console.error('选择图片失败:', err)
+          uni.showToast({
+            title: '选择图片失败',
+            icon: 'none'
+          })
+        }
       })
     },
+    
+    // 上传截图
+    async uploadScreenshot(filePath) {
+      try {
+        const uploadParams = {
+          file: filePath,
+          businessType: 'CREDIT_RECOVERY_SCREENSHOT'
+        }
+        
+        const uploadResult = await uploadFile(uploadParams)
+        console.log('上传结果：', uploadResult)
+        
+        // 上传成功 - 处理不同的响应格式
+        const finalUrl = uploadResult.fileUrl || uploadResult.url || this.formData.repaymentInfo.screenshot.tempPath
+        console.log('最终使用的图片URL：', finalUrl)
+        
+        this.formData.repaymentInfo.screenshot = {
+          ...this.formData.repaymentInfo.screenshot,
+          url: finalUrl,
+          fileId: uploadResult.fileId || uploadResult.id || Date.now(),
+          status: 'success'
+        }
+        
+        console.log('更新后的screenshot对象：', this.formData.repaymentInfo.screenshot)
+        
+        uni.showToast({
+          title: '上传成功',
+          icon: 'success'
+        })
+      } catch (error) {
+        console.error('上传失败:', error)
+        this.formData.repaymentInfo.screenshot.status = 'failed'
+        
+        uni.showToast({
+          title: '上传失败，请重试',
+          icon: 'none'
+        })
+      }
+    },
+    
+    // 删除截图
+    deleteScreenshot() {
+      this.formData.repaymentInfo.screenshot = null
+    },
+    
+    // 预览图片
+    previewImage() {
+      const screenshot = this.formData.repaymentInfo.screenshot
+      if (screenshot && (screenshot.url || screenshot.tempPath)) {
+        const previewUrl = screenshot.url || screenshot.tempPath
+        uni.previewImage({
+          urls: [previewUrl],
+          current: 0
+        })
+      }
+    },
+    
+    // 图片加载成功
+    onImageLoad(e) {
+      console.log('图片加载成功：', e)
+    },
+    
+    // 图片加载失败
+    onImageError(e) {
+      console.error('图片加载失败：', e)
+      console.log('当前图片URL：', this.formData.repaymentInfo.screenshot?.url)
+      console.log('当前tempPath：', this.formData.repaymentInfo.screenshot?.tempPath)
+      
+      // 如果url加载失败，尝试使用tempPath
+      if (this.formData.repaymentInfo.screenshot && this.formData.repaymentInfo.screenshot.url && this.formData.repaymentInfo.screenshot.tempPath) {
+        this.formData.repaymentInfo.screenshot.url = this.formData.repaymentInfo.screenshot.tempPath
+      }
+    },
+    
     handleSubmit() {
-      // 简单的表单验证
-      // const { loanInfo, repaymentInfo } = this.formData
+      // 表单验证
+      const { loanInfo, repaymentInfo } = this.formData
       
-      // if (!loanInfo.bank || !loanInfo.loanTime || !loanInfo.amount || !loanInfo.overdueTime) {
-      //   uni.showToast({
-      //     title: '请完善借款逾期信息',
-      //     icon: 'none'
-      //   })
-      //   return
-      // }
+      if (!loanInfo.bank || !loanInfo.loanTime || !loanInfo.amount || !loanInfo.overdueTime) {
+        uni.showToast({
+          title: '请完善借款逾期信息',
+          icon: 'none'
+        })
+        return
+      }
       
-      // if (!repaymentInfo.remainingAmount || !repaymentInfo.repaymentAmount) {
-      //   uni.showToast({
-      //     title: '请完善补交信息',
-      //     icon: 'none'
-      //   })
-      //   return
-      // }
+      if (!repaymentInfo.remainingAmount || !repaymentInfo.repaymentAmount) {
+        uni.showToast({
+          title: '请完善补交信息',
+          icon: 'none'
+        })
+        return
+      }
+      
+      if (!repaymentInfo.screenshot || repaymentInfo.screenshot.status !== 'success') {
+        uni.showToast({
+          title: '请上传补交截图',
+          icon: 'none'
+        })
+        return
+      }
       
       // 显示提交成功提示
       uni.showToast({
@@ -197,7 +341,6 @@ export default {
   
   .page-header {
     position: relative;
- 
     padding: 70rpx 30rpx 60rpx;
     overflow: hidden;
     
@@ -263,21 +406,7 @@ export default {
           .input-field {
             flex: 1;
             
-            .input-control {
-              background-color: #F7F7F7;
-              border-radius: 12rpx;
-              padding: 34rpx 20rpx;
-              font-size: 28rpx;
-              color: #333333;
-              width: 100%;
-              box-sizing: border-box;
-              border: none;
-              outline: none;
-            }
-            
-            .input-placeholder {
-              color: #AAAAAA;
-            }
+            // 移除原有的input-control样式，因为现在使用uv-input
           }
         }
       }
@@ -290,22 +419,18 @@ export default {
         .input-field {
           flex: 1;
           
-          .input-control {
-            background-color: #F7F7F7;
-            border-radius: 12rpx;
-            padding: 34rpx 20rpx;
-            font-size: 28rpx;
-            color: #333333;
-            width: 100%;
-            box-sizing: border-box;
-            border: none;
-            outline: none;
-          }
-          
-          .input-placeholder {
-            color: #AAAAAA;
-          }
+          // 移除原有的input-control样式，因为现在使用uv-input
         }
+      }
+      
+      .input-placeholder {
+        color: #AAAAAA;
+      }
+      
+      // uv-input内部输入框的样式调整
+      :deep(.uv-input__content__field-wrapper__field) {
+        padding: 34rpx 20rpx !important;
+        box-sizing: border-box !important;
       }
       
       .file-upload-area {
@@ -333,6 +458,65 @@ export default {
           text-align: center;
         }
       }
+      
+      .screenshot-preview {
+        .preview-container {
+          position: relative;
+          width: 100%;
+          height: 300rpx;
+          border-radius: 16rpx;
+          overflow: hidden;
+          margin-bottom: 20rpx;
+          
+          .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          
+          .preview-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            
+            .upload-status-text {
+              color: #FFFFFF;
+              font-size: 24rpx;
+              margin-top: 12rpx;
+            }
+          }
+          
+          .delete-btn {
+            position: absolute;
+            top: 12rpx;
+            right: 12rpx;
+            width: 40rpx;
+            height: 40rpx;
+            background-color: rgba(0, 0, 0, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+        }
+        
+        .reselect-btn {
+          text-align: center;
+          padding: 20rpx;
+          
+          .reselect-text {
+            color: #3B82F6;
+            font-size: 28rpx;
+          }
+        }
+      }
     }
     
     .submit-button {
@@ -344,11 +528,10 @@ export default {
       justify-content: center;
       margin: 0 auto;
       width: 90%;
-      // box-shadow: 0 4rpx 12rpx rgba(59, 130, 246, 0.3);
-      position: fixed; /* 使按钮固定在底部 */
-      bottom: 90rpx; /* 距离底部的距离 */
-      left: 50%; /* 水平居中 */
-      transform: translateX(-50%); /* 使按钮居中对齐 */
+      position: fixed;
+      bottom: 90rpx;
+      left: 50%;
+      transform: translateX(-50%);
       
       .submit-text {
         color: #FFFFFF;

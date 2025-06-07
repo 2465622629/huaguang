@@ -91,6 +91,7 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import { personalCenterApi } from '@/api/index.js'
 
 export default {
 	components: {
@@ -100,6 +101,7 @@ export default {
 		return {
 			statusBarHeight: 0,
 			scrollHeight: 0,
+			loading: false,
 			userInfo: {
 				avatar: '',
 				nickname: '昵称',
@@ -177,9 +179,43 @@ export default {
 		},
 		
 		// 加载用户信息
-		loadUserInfo() {
-			// 这里可以从全局状态或接口获取用户信息
-			// 暂时使用模拟数据
+		async loadUserInfo() {
+			if (this.loading) return;
+			
+			this.loading = true;
+			uni.showLoading({
+				title: '加载中...'
+			});
+			
+			try {
+				const response = await personalCenterApi.getUserCenterPage();
+				
+				// 检查响应数据
+				if (response) {
+					// 将API返回的数据映射到userInfo
+					this.userInfo = {
+						avatar: response.userBasicInfo.avatar || '',
+						nickname: response.userBasicInfo.nickname || '昵称',
+						memberId: response.userBasicInfo.memberId || '9842108'
+					};
+					
+					console.log('用户信息加载成功:', this.userInfo);
+				} else {
+					console.warn('API返回数据格式异常:', response);
+					// 保持默认值不变
+				}
+			} catch (error) {
+				console.error('获取用户信息失败:', error);
+				uni.showToast({
+					title: '获取用户信息失败',
+					icon: 'none',
+					duration: 2000
+				});
+				// 发生错误时保持默认值
+			} finally {
+				this.loading = false;
+				uni.hideLoading();
+			}
 		},
 		
 		// 处理快捷功能点击

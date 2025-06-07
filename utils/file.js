@@ -32,19 +32,30 @@ export const uploadFile = async (options) => {
         url: `${API_CONFIG.BASE_URL}${url}`,
         filePath: options.file.path || options.file,
         name: 'file',
-        header: {
-          'Content-Type': 'multipart/form-data'
-        },
+        // 移除Content-Type设置，让uni.uploadFile自动设置正确的multipart/form-data和boundary
         success: (uploadRes) => {
           try {
+            console.log('上传响应原始数据：', uploadRes)
             const res = JSON.parse(uploadRes.data)
-            if (res.code === 0) {
-              resolve(res.data)
+            console.log('解析后的响应数据：', res)
+            
+            // 处理不同的响应格式
+            if (res.code === 0 || res.code === 200 || uploadRes.statusCode === 200) {
+              // 如果有data字段，使用data；否则使用整个res作为结果
+              const resultData = res.data || res
+              resolve(resultData)
             } else {
               reject(new Error(res.message || '文件上传失败'))
             }
           } catch (error) {
-            reject(new Error('解析响应数据失败'))
+            console.error('解析响应数据失败：', error)
+            // 如果解析失败，检查是否是HTTP 200成功响应
+            if (uploadRes.statusCode === 200) {
+              console.log('HTTP状态码200，但解析JSON失败，可能是纯文本响应')
+              resolve({ message: uploadRes.data })
+            } else {
+              reject(new Error('解析响应数据失败'))
+            }
           }
         },
         fail: (error) => {

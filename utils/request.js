@@ -30,10 +30,10 @@ const responseInterceptor = (response) => {
 	}
 	// 请求失败
 	else {
-		uni.showToast({
-			title: '网络错误，请稍后重试',
-			icon: 'none'
-		})
+		// uni.showToast({
+		// 	title: '网络错误，请稍后重试',
+		// 	icon: 'none'
+		// })
 		return Promise.reject(response)
 	}
 }
@@ -65,10 +65,10 @@ const request = (options) => {
 				}
 			},
 			fail: (error) => {
-				uni.showToast({
-					title: '网络错误，请稍后重试',
-					icon: 'none'
-				})
+				// uni.showToast({
+				// 	title: '网络错误，请稍后重试',
+				// 	icon: 'none'
+				// })
 				reject(error)
 			}
 		})
