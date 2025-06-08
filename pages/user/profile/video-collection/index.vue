@@ -1,5 +1,5 @@
 <template>
-  <view class="video-collection-page">
+  <view class="video-collection-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
     <!-- 自定义状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -86,12 +86,14 @@
 <script>
 import { getMyFavoriteVideos } from '@/api/modules/personal-center.js'
 import { toggleFavorite } from '@/api/modules/skill-training.js'
+import config from '@/config/index.js'
 
 export default {
   data() {
     return {
       statusBarHeight: 0,
       scrollHeight: 0,
+      config: config,
       videoList: [],
       loading: false,
       error: null,
@@ -104,7 +106,7 @@ export default {
   },
   onLoad() {
     this.initPage()
-    this.loadFavoriteVideos()
+    this.loadFavoriteVideos(true) // 初始加载时设置为刷新模式
   },
   methods: {
     // 初始化页面
@@ -169,7 +171,7 @@ export default {
         }
         
         // 如果是首次加载且列表为空，跳转到空状态页面
-        if (isRefresh && this.isEmpty) {
+        if (this.isEmpty) {
           this.navigateToEmptyPage()
           return
         }
@@ -178,8 +180,8 @@ export default {
         console.error('获取收藏视频失败:', error)
         this.showError('获取收藏视频失败，请稍后重试')
         
-        // 如果是首次加载失败，跳转到空状态页面
-        if (isRefresh && this.videoList.length === 0) {
+        // 如果加载失败且没有视频，跳转到空状态页面
+        if (this.videoList.length === 0) {
           setTimeout(() => {
             this.navigateToEmptyPage()
           }, 2000) // 延迟2秒显示错误提示后跳转
@@ -279,7 +281,6 @@ export default {
 .video-collection-page {
   width: 100%;
   height: 100vh;
-  background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
   position: relative;
 }
 

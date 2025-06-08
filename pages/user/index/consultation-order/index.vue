@@ -1,5 +1,5 @@
 <template>
-  <view class="consultation-order-page">
+  <view class="consultation-order-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg8.png')` }">
     <!-- 自定义导航栏 -->
     <uv-navbar 
       title="咨询订单" 
@@ -33,7 +33,7 @@
           @click="selectConsultationType('text')"
         >
           <view class="option-icon text-icon">
-            <image src="http://localhost:3000/static/icons/img_big.png" class="icon-image"></image>
+            <image :src="`${config.staticBaseUrl}/icons/img_big.png`" class="icon-image"></image>
           </view>
           <view class="option-text">
             <text class="option-title">图文咨询</text>
@@ -65,10 +65,13 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'ConsultationOrder',
   data() {
     return {
+      config,
       selectedConsultationType: 'text', // 默认选中图文咨询
       lawyerInfo: {
         name: '李律师',
@@ -98,7 +101,6 @@ export default {
 <style lang="scss" scoped>
 .consultation-order-page {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg8.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

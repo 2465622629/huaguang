@@ -1,5 +1,5 @@
 <template>
-  <view class="order-detail-page">
+  <view class="order-detail-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg8.png')` }">
     <!-- 自定义导航栏 -->
     <uv-navbar 
       title="订单详情" 
@@ -73,10 +73,13 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'OrderDetail',
   data() {
     return {
+      config,
       lawyerInfo: {
         name: '李律师',
         service: '已选语音咨询120元/30分钟'
@@ -130,7 +133,6 @@ export default {
 <style lang="scss" scoped>
 .order-detail-page {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg8.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

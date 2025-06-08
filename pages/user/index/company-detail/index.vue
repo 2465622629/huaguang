@@ -1,5 +1,5 @@
 <template>
-  <view class="company-detail-container">
+  <view class="company-detail-container" :style="{ background: `url('${config.staticBaseUrl}/bg9.png') no-repeat center center / cover` }">
     <!-- 自定义导航栏 -->
     <uv-navbar 
       title="公司详情" 
@@ -65,7 +65,7 @@
               class="benefit-item"
             >
               <view class="benefit-icon">
-                <image :src="`http://localhost:3000/static/icons/${benefit.icon}.png`" style="width: 51rpx; height: 48rpx;"></image>
+                <image :src="`${config.staticBaseUrl}/icons/${benefit.icon}.png`" style="width: 51rpx; height: 48rpx;"></image>
               </view>
               <text class="benefit-text">{{ benefit.text }}</text>
             </view>
@@ -112,6 +112,7 @@
 
 <script>
 import { getEnterpriseDetail } from '@/api/modules/enterprise.js'
+import config from '@/config/index.js'
 
 export default {
   data() {
@@ -125,6 +126,7 @@ export default {
         width: '80px',
         fontSize: '13px'
       },
+      config,
       // 公司信息数据
       companyInfo: {
         name: 'XX科技公司',
@@ -260,7 +262,6 @@ export default {
 <style lang="scss" scoped>
 .company-detail-container {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg9.png') no-repeat center center / cover;
   
 }
 

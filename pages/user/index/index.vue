@@ -161,15 +161,15 @@ export default {
         }
       ],
       lawyerList: [{
-        image: "http://localhost:3000/static/lawyer1.png"
+        image: `${config.staticBaseUrl}/lawyer1.png`
       }, {
-        image: "http://localhost:3000/static/lawyer2.png"
+        image: `${config.staticBaseUrl}/lawyer2.png`
       }, {
-        image: "http://localhost:3000/static/lawyer3.png"
+        image: `${config.staticBaseUrl}/lawyer3.png`
       }, {
-        image: "http://localhost:3000/static/lawyer1.png"
+        image: `${config.staticBaseUrl}/lawyer1.png`
       }, {
-        image: "http://localhost:3000/static/lawyer3.png"
+        image: `${config.staticBaseUrl}/lawyer3.png`
       }],
       jobList: [{
         image: "https://via.placeholder.com/200x200.png/3c9cff/fff"
@@ -306,9 +306,10 @@ export default {
   padding-bottom: 100rpx;
   /* 为 TabBar 预留空间 */
   background-image: $bg-image;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .swiper-section {

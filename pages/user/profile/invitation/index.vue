@@ -1,12 +1,12 @@
 <template>
-	<view class="invitation-page">
+	<view class="invitation-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
 		<!-- 导航栏 -->
 		<view class="nav-bar">
 			<view class="nav-back" @click="goBack">
-				<image class="back-icon" src="http://localhost:3000/static/icons/back.png" mode="aspectFit"></image>
+				<image class="back-icon" :src="config.staticBaseUrl + '/icons/back.png'" mode="aspectFit"></image>
 				<text class="back-text">返回</text>
 			</view>
 		</view>
@@ -26,7 +26,7 @@
 						<text class="code-text">{{ invitationCode }}</text>
 					</view>
 					<view class="copy-icon" @click="copyInvitationCode">
-						<image class="copy-symbol" src="http://localhost:3000/static/icons/copy.png" mode="aspectFit"></image>
+						<image class="copy-symbol" :src="config.staticBaseUrl + '/icons/copy.png'" mode="aspectFit"></image>
 					</view>
 				</view>
 				<view class="stats-row">
@@ -38,7 +38,7 @@
 			<!-- 邀请海报入口 -->
 			<view class="poster-entry" @click="goToPoster" hover-class="poster-entry-hover">
 				<text class="poster-text">邀请海报</text>
-				<image class="arrow-icon" src="http://localhost:3000/static/icons/back.png" mode="aspectFit"></image>
+				<image class="arrow-icon" :src="config.staticBaseUrl + '/icons/back.png'" mode="aspectFit"></image>
 			</view>
 			
 			<!-- 用户列表卡片 -->
@@ -79,12 +79,15 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
 	data() {
 		return {
 			statusBarHeight: 0,
 			scrollHeight: 0,
 			userListHeight: 400,
+			config: config,
 			invitationCode: 'ABC123',
 			invitedCount: 12,
 			totalTeamCount: 56,
@@ -228,7 +231,6 @@ export default {
 .invitation-page {
 	width: 100%;
 	height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
 	position: relative;
 }
 

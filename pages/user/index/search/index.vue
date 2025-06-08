@@ -1,5 +1,5 @@
 <template>
-  <view class="search-container">
+  <view class="search-container" :style="{ background: `url('${config.staticBaseUrl}/bg9.png') no-repeat center center/cover fixed` }">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -42,9 +42,12 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   data() {
     return {
+      config,
       searchKeyword: '',
       statusBarHeight: 0,
       hotSearchList: [
@@ -103,9 +106,7 @@ export default {
 
 <style lang="scss" scoped>
 .search-container {
-  min-height: 100vh;
-  background: url('http://localhost:3000/static/bg9.png') no-repeat center center fixed;
-  background-size: cover;
+  height: 100vh;
 }
 
 .status-bar {

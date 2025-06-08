@@ -1,5 +1,5 @@
 <template>
-  <view class="apply-page">
+  <view class="apply-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
     <!-- 状态栏（iOS风格） -->
     <view class="status-bar"></view>
     
@@ -80,21 +80,60 @@
               </view>
               <!-- 上传负债截图 -->
               <view class="upload-section">
-                <uv-upload 
-                  :fileList="item.images" 
-                  :name="index.toString()"
-                  multiple 
-                  :maxCount="1" 
-                  @afterRead="afterRead"
-                  @delete="deletePic"
-                  :width="690"
-                  :height="200"
-                >
-                  <view class="upload-box" v-if="!item.images || item.images.length === 0">
-                    <uv-icon name="plus" color="#B0B0B0" size="60"></uv-icon>
-                    <text class="upload-text">上传负债截图</text>
+               
+                <!-- 未上传状态 -->
+                <view class="custom-upload-box" v-if="!item.images || item.images.length === 0" @click="chooseImage(index)">
+                  <uv-icon name="plus" color="#B0B0B0" size="60"></uv-icon>
+                  <text class="upload-text">上传负债截图</text>
+                </view>
+                
+                <!-- 有图片时的显示 -->
+                <view v-else>
+                  <!-- 上传中状态 -->
+                  <view class="upload-loading" v-if="item.images[0].status === 'uploading'">
+                    <view class="loading-content">
+                      <uv-icon name="loading" color="#407BFF" size="40"></uv-icon>
+                      <text class="loading-text">上传中...</text>
+                    </view>
                   </view>
-                </uv-upload>
+                  
+                  <!-- 上传成功状态 -->
+                  <view class="upload-success" v-else-if="item.images[0].status === 'success'">
+                    <image 
+                      class="preview-image" 
+                      :src="item.images[0].url" 
+                      mode="aspectFill"
+                      @error="handleImageError(index)"
+                      @load="handleImageLoad(index)"
+                      style="width: 100%; height: 200rpx; display: block;"
+                    ></image>
+                    <view class="image-overlay">
+                      <view class="overlay-actions">
+                        <view class="action-btn reupload-btn" @click="chooseImage(index)">
+                          <uv-icon name="camera" color="#FFFFFF" size="20"></uv-icon>
+                          <text class="btn-text">重新上传</text>
+                        </view>
+                        <view class="action-btn delete-btn" @click="confirmDeleteImage(index)">
+                          <uv-icon name="trash" color="#FFFFFF" size="20"></uv-icon>
+                          <text class="btn-text">删除</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                  
+                  <!-- 其他状态 -->
+                  <view class="upload-error" v-else>
+                    <view class="error-content">
+                      <uv-icon name="image" color="#FF4757" size="40"></uv-icon>
+                      <text class="error-text">状态异常: {{item.images[0].status}}</text>
+                      <view class="error-actions">
+                        <view class="action-btn reupload-btn" @click="chooseImage(index)">
+                          <text class="btn-text">重新上传</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </view>
               </view>
             </view>
           </view>
@@ -122,11 +161,13 @@
 import request from '@/utils/request.js'
 import { uploadFile } from '@/utils/file.js'
 import config from '@/config/index.js'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'FundApplyPage',
   data() {
     return {
+      backgroundImage: staticBaseUrl + '/apply-bg.png',
       formData: {
         applicantName: '',
         birthDate: '',
@@ -184,52 +225,96 @@ export default {
     deleteDebtItem(index) {
       this.debtList.splice(index, 1)
     },
-    async afterRead(event) {
-      let lists = [].concat(event.file)
-      let fileListLen = this.debtList[event.name].images.length
-      
-      lists.map((item) => {
-        this.debtList[event.name].images.push({
-          ...item,
-          status: 'uploading',
-          message: '上传中'
-        })
-      })
-      
-      for (let i = 0; i < lists.length; i++) {
-        try {
-          const file = lists[i]
-          
-          let uploadParams = {
-            file: file.url,
-            businessType: 'DEBT_IMAGE',
-            businessId: this.debtList[event.name].id || ''
-          }
-          
-          const fileRes = await uploadFile(uploadParams)
-          
-          let item = this.debtList[event.name].images[fileListLen]
-          
-          this.debtList[event.name].images.splice(fileListLen, 1, Object.assign(item, {
-            status: 'success',
-            message: '',
-            url: fileRes.fileUrl,
-            id: fileRes.fileId
-          }))
-          
-          fileListLen++
-        } catch (error) {
-          uni.showToast({
-            title: '图片上传失败',
-            icon: 'none'
-          })
-          this.debtList[event.name].images.splice(fileListLen, 1)
+
+    
+    // 选择图片
+    chooseImage(index) {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          this.uploadImage(res.tempFilePaths[0], index)
+        },
+        fail: (err) => {
+          console.log('选择图片失败:', err)
         }
+      })
+    },
+    
+    // 上传图片
+    async uploadImage(filePath, index) {
+      // 设置上传中状态
+      this.debtList[index].images = [{
+        status: 'uploading',
+        message: '上传中',
+        url: filePath
+      }]
+      
+      try {
+        let uploadParams = {
+          file: filePath,
+          businessType: 'DEBT_IMAGE',
+          businessId: this.debtList[index].id || ''
+        }
+        
+        const fileRes = await uploadFile(uploadParams)
+        
+        // 上传成功，更新状态
+        this.debtList[index].images = [{
+          status: 'success',
+          message: '',
+          url: fileRes.fileUrl,
+          id: fileRes.fileId
+        }]
+        
+        uni.showToast({
+          title: '上传成功',
+          icon: 'success'
+        })
+        
+      } catch (error) {
+        console.log('上传失败:', error)
+        uni.showToast({
+          title: '图片上传失败',
+          icon: 'none'
+        })
+        // 上传失败，清空图片
+        this.debtList[index].images = []
       }
     },
     
-    deletePic(event) {
-      this.debtList[event.name].images.splice(event.index, 1)
+    // 重新上传图片
+    reUploadImage(index) {
+      // 清空当前图片，触发重新上传
+      this.debtList[index].images = []
+    },
+    
+    // 确认删除图片
+    confirmDeleteImage(index) {
+      uni.showModal({
+        title: '确认删除',
+        content: '确定要删除这张图片吗？',
+        success: (res) => {
+          if (res.confirm) {
+            this.debtList[index].images = []
+          }
+        }
+      })
+    },
+    
+    // 图片加载错误处理
+    handleImageError(index) {
+      console.log('图片加载失败:', this.debtList[index].images[0])
+      uni.showToast({
+        title: '图片加载失败',
+        icon: 'none'
+      })
+    },
+    
+    // 图片加载成功处理
+    handleImageLoad(index) {
+      console.log('图片加载成功:', this.debtList[index].images[0])
     },
     
     async handleSubmit() {
@@ -357,13 +442,13 @@ export default {
 @import '@/styles/variables.scss';
 
 .apply-page {
-  min-height: 100vh;
+  height: 100vh;
   padding-bottom: 100rpx;
   position: relative;
-  background-image: $fund-bg-image;
   background-size: cover;
   background-position: top;
   background-repeat: no-repeat;
+  overflow-y: auto;
 
   /* 状态栏 */
   .status-bar {
@@ -558,8 +643,10 @@ export default {
   margin-top: 20rpx;
   width: 100%;
   box-sizing: border-box;
+  position: relative;
   
-  .upload-box {
+  // 未上传状态样式
+  .custom-upload-box {
     width: 100%;
     height: 200rpx;
     background-color: #F5F5F5;
@@ -570,30 +657,151 @@ export default {
     justify-content: center;
     gap: 16rpx;
     box-sizing: border-box;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:active {
+      background-color: #EEEEEE;
+    }
 
     .upload-text {
       color: #AAAAAA;
       font-size: 28rpx;
     }
   }
-
-  :deep(.uv-upload__wrap) {
-    width: 100% !important;
+  
+  // 上传中状态样式
+  .upload-loading {
+    width: 100%;
+    height: 200rpx;
+    background-color: #F5F5F5;
+    border-radius: 8rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     
-    uni-view {
-      width: 100% !important;
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16rpx;
+      
+      .loading-text {
+        color: #407BFF;
+        font-size: 28rpx;
+      }
     }
-
-    .uv-upload__wrap__item {
+  }
+  
+  // 上传成功状态样式
+  .upload-success {
+    width: 100% !important;
+    height: 200rpx !important;
+    position: relative;
+    border-radius: 8rpx;
+    overflow: hidden;
+    box-sizing: border-box;
+    background-color: #f0f0f0; // 添加背景色用于调试
+    
+    .preview-image {
       width: 100% !important;
-      height: 200rpx !important;
-      margin: 0 !important;
-    }
-
-    .uv-upload__wrap__item__image {
-      width: 100% !important;
-      height: 200rpx !important;
+      height: 100% !important;
+      border-radius: 8rpx;
+      display: block !important;
       object-fit: cover;
+    }
+    
+    .image-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      
+      &:active {
+        opacity: 1;
+      }
+      
+      .overlay-actions {
+        display: flex;
+        gap: 30rpx;
+        
+        .action-btn {
+          padding: 20rpx 30rpx;
+          border-radius: 8rpx;
+          background: rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(10rpx);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8rpx;
+          transition: all 0.3s ease;
+          
+          &:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+          }
+          
+          .btn-text {
+            color: #FFFFFF;
+            font-size: 24rpx;
+          }
+        }
+      }
+    }
+    
+    // 点击整个图片区域也显示操作按钮
+    &:active .image-overlay {
+      opacity: 1;
+    }
+  }
+  
+  // 图片加载失败状态样式
+  .upload-error {
+    width: 100%;
+    height: 200rpx;
+    background-color: #FFF5F5;
+    border: 2rpx dashed #FF4757;
+    border-radius: 8rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    
+    .error-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16rpx;
+      
+      .error-text {
+        color: #FF4757;
+        font-size: 28rpx;
+      }
+      
+      .error-actions {
+        .action-btn {
+          padding: 16rpx 32rpx;
+          background-color: #FF4757;
+          border-radius: 8rpx;
+          
+          .btn-text {
+            color: #FFFFFF;
+            font-size: 26rpx;
+          }
+          
+          &:active {
+            opacity: 0.8;
+          }
+        }
+      }
     }
   }
 }

@@ -58,11 +58,11 @@
         <!-- 第二行：地点与学历 -->
          <view class="job-card-info">
            <view class="info-item">
-             <uv-icon name="http://localhost:3000/static/icons/location.png" :size="24" color="#888888"></uv-icon>
+             <uv-icon :name="`${config.staticBaseUrl}/icons/location.png`" :size="24" color="#888888"></uv-icon>
              <text class="info-text">{{ job.location }}</text>
            </view>
            <view class="info-item">
-             <uv-icon name="http://localhost:3000/static/icons/graduation.png" :size="24" color="#888888"></uv-icon>
+             <uv-icon :name="`${config.staticBaseUrl}/icons/graduation.png`" :size="24" color="#888888"></uv-icon>
              <text class="info-text">{{ job.education }}</text>
            </view>
          </view>
@@ -124,10 +124,12 @@
 <script>
 // 导入企业API
 import { enterpriseApi } from '@/api/index.js'
+import config from '@/config/index.js'
 
 export default {
   data() {
     return {
+      config,
       // 排序相关
       showSort: false,
       currentSort: {

@@ -16,7 +16,7 @@
           <text class="lawyer-name">林默</text>
           <text class="lawyer-desc">专业心理咨询师</text>
           <view class="timer-container">
-            <uv-icon name="http://localhost:3000/static/icons/shalou.png" color="#FFFFFF" size="32"></uv-icon>
+            <uv-icon :name="`${config.staticBaseUrl}/icons/shalou.png`" color="#FFFFFF" size="32"></uv-icon>
             <text class="timer-text">19:58</text>
           </view>
         </view>
@@ -71,7 +71,7 @@
       <view class="video-invitation-card" :style="{ backgroundColor: themeColors.cardBg, borderColor: themeColors.cardBorder }">
         <view class="invitation-info">
           <view class="video-icon" :style="{ backgroundColor: themeColors.iconColor }">
-            <uv-icon name="http://localhost:3000/static/icons/zixun-liao.png" color="#FFFFFF" size="32"></uv-icon>
+            <uv-icon :name="`${config.staticBaseUrl}/icons/zixun-liao.png`" color="#FFFFFF" size="32"></uv-icon>
           </view>
           <view class="invitation-text">
             <text class="invitation-line1">为了让咨询师更好的了解你,</text>
@@ -109,13 +109,13 @@
      
       <view class="action-item" @click="sendTestResult">
         <view class="action-icon" >
-          <uv-icon name="http://localhost:3000/static/icons/send_test.png" color="#FFFFFF" size="64"></uv-icon>
+          <uv-icon :name="`${config.staticBaseUrl}/icons/send_test.png`" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">发送测试结果</text>
       </view>
       <view class="action-item" @click="openAlbum">
         <view class="action-icon" >
-          <uv-icon name="http://localhost:3000/static/icons/photo.png" color="#FFFFFF" size="64"></uv-icon>
+          <uv-icon :name="`${config.staticBaseUrl}/icons/photo.png`" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">相册</text>
       </view>
@@ -124,6 +124,8 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'ChatPage',
   data() {
@@ -132,7 +134,8 @@ export default {
       scrollTop: 0,
       inputMessage: '',
       messages: [],
-      themeType: 'pink' // 默认粉色主题
+      themeType: 'pink', // 默认粉色主题
+      config
     }
   },
   onLoad(options) {

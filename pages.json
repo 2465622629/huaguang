@@ -198,13 +198,6 @@
 					}
 				},
 				{
-					"path": "apply/index",
-					"style": {
-						"navigationBarTitleText": "填写申请表",
-						"navigationStyle": "custom"
-					}
-				},
-				{
 					"path": "index/chat/index",
 					"style": {
 						"navigationBarTitleText": "律师咨询",

@@ -1,5 +1,5 @@
 <template>
-  <view class="job-detail-container">
+  <view class="job-detail-container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg9.png')` }">
     <!-- 自定义导航栏 -->
     <uv-navbar title="职位详情" :autoBack="true" leftText="返回" leftIcon="arrow-left" :bgColor="navbarBgColor"
       :leftIconColor="navbarTextColor" :safeAreaInsetTop="true" :fixed="true" :placeholder="true"
@@ -16,15 +16,15 @@
           </view>
           <view class="job-tags">
             <view class="tag-item">
-              <uv-icon name="http://localhost:3000/static/icons/location.png" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="`${config.staticBaseUrl}/icons/location.png`" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.location }}</text>
             </view>
             <view class="tag-item">
-              <uv-icon name="http://localhost:3000/static/icons/experience.png" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="`${config.staticBaseUrl}/icons/experience.png`" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.experience }}</text>
             </view>
             <view class="tag-item">
-              <uv-icon name="http://localhost:3000/static/icons/graduation.png" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="`${config.staticBaseUrl}/icons/graduation.png`" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.education }}</text>
             </view>
           </view>
@@ -107,9 +107,12 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   data() {
     return {
+      config,
       safeAreaBottom: 0,
       navbarBgColor: 'transparent',
       navbarTextColor: '#3F3F3F',
@@ -290,7 +293,6 @@ export default {
   display: flex;
   flex-direction: column;
   // background-color: #F7F8FA;
-  background-image: url('http://localhost:3000/static/bg9.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

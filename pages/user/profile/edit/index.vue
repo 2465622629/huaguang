@@ -1,12 +1,12 @@
 <template>
-	<view class="profile-edit-page">
+	<view class="profile-edit-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover fixed` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
 		<!-- 导航栏 -->
 		<view class="nav-bar">
 			<view class="nav-back" @click="goBack">
-				<uv-icon size="40" name="http://localhost:3000/static/icons/back.png"></uv-icon>
+				<uv-icon size="40" :name="config.staticBaseUrl + '/icons/back.png'"></uv-icon>
 				<text class="nav-back-text">返回</text>
 			</view>
 		</view>
@@ -91,11 +91,14 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
 	data() {
 		return {
 			statusBarHeight: 0,
 			scrollHeight: 0,
+			config: config,
 			gender: 'male', // 默认选中男性
 			nickname: '李晓明',
 			memberId: '9842108',
@@ -153,8 +156,9 @@ export default {
 .profile-edit-page {
 	width: 100%;
 	height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center fixed;
 	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
 }
 
 .status-bar {

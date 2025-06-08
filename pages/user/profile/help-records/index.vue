@@ -1,5 +1,5 @@
 <template>
-  <view class="help-records-page">
+  <view class="help-records-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
     <!-- 自定义状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -48,7 +48,7 @@
             <view class="service-icon-container">
               <view class="service-icon">
                 <image
-                  :src="`http://localhost:3000/static/icons/${record.iconName}.png`"
+                  :src="`${config.staticBaseUrl}/icons/${record.iconName}.png`"
                   mode="aspectFit"
                   style="width: 40rpx; height: 40rpx;"
                 />
@@ -65,11 +65,14 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   data() {
     return {
       statusBarHeight: 0,
       scrollHeight: 0,
+      config: config,
       helpRecords: [
         {
           id: 1,
@@ -134,7 +137,6 @@ export default {
 .help-records-page {
   width: 100%;
   height: 100vh;
-  background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
 }
 
 .status-bar {

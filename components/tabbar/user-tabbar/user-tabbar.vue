@@ -17,14 +17,15 @@
           <image class="icon" :src="`${staticBaseUrl}/fund.png`"></image>
         </template>
       </uv-tabbar-item>
-      <uv-tabbar-item text="信息">
+      <!-- 信息页面功能已注释 -->
+      <!-- <uv-tabbar-item text="信息">
         <template v-slot:active-icon>
           <image class="icon" :src="`${staticBaseUrl}/icons/info-active.png`"></image>
         </template>
         <template v-slot:inactive-icon>
           <image class="icon" :src="`${staticBaseUrl}/info.png`"></image>
         </template>
-      </uv-tabbar-item>
+      </uv-tabbar-item> -->
       <uv-tabbar-item text="我的">
         <template v-slot:active-icon>
           <image class="icon" :src="`${staticBaseUrl}/icons/profile-active.png`"></image>
@@ -66,7 +67,7 @@ export default {
     const routes = [
       '/pages/user/index/index',
       '/pages/user/fund/index',
-      '/pages/user/info/index',
+      // '/pages/user/info/index', // 信息页面已注释
       '/pages/user/profile/index'
     ]
     const currentRoute = getCurrentPages()[getCurrentPages().length - 1].route
@@ -102,7 +103,7 @@ export default {
       const routes = [
         '/pages/user/index/index',
         '/pages/user/fund/index',
-        '/pages/user/info/index',
+        // '/pages/user/info/index', // 信息页面已注释
         '/pages/user/profile/index'
       ]
       uni.reLaunch({

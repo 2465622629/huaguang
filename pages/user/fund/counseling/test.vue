@@ -16,15 +16,7 @@
       <text class="intro-text-2">让我们一起进行一个<text style="color: #FA5353;">小测试</text>吧</text>
     </view>
     
-    <!-- 装饰几何图形 -->
-    <view class="decorative-shapes">
-      <view class="shape shape-1"></view>
-      <view class="shape shape-2"></view>
-      <view class="shape shape-3">
-        <view class="shape-line"></view>
-        <view class="shape-line"></view>
-      </view>
-    </view>
+
     
     <!-- 测试卡片 -->
     <view class="test-card">
@@ -255,7 +247,7 @@ export default {
 <style lang="scss" scoped>
 .counseling-test-page {
   min-height: 100vh;
-  background: linear-gradient(to bottom, rgb(255, 115, 115), rgb(255, 248, 248));
+  background: url('http://localhost:3000/static/bg6.png') no-repeat center center / cover;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -349,62 +341,7 @@ export default {
     }
   }
   
-  // 装饰几何图形
-  .decorative-shapes {
-    position: absolute;
-    top: 200rpx;
-    right: 0;
-    z-index: 0;
-    
-    .shape {
-      position: absolute;
-      border-radius: 20rpx;
-      
-      &-1 {
-        width: 240rpx;
-        height: 240rpx;
-        background-color: rgba(255, 218, 185, 0.6);
-        right: -50rpx;
-        top: 0;
-        transform: rotate(15deg);
-      }
-      
-      &-2 {
-        width: 200rpx;
-        height: 200rpx;
-        background-color: rgba(255, 200, 212, 0.5);
-        right: 50rpx;
-        top: 100rpx;
-        transform: rotate(30deg);
-      }
-      
-      &-3 {
-        width: 180rpx;
-        height: 180rpx;
-        background-color: rgba(255, 235, 240, 0.7);
-        right: 100rpx;
-        top: 150rpx;
-        transform: rotate(45deg);
-        position: relative;
-        overflow: hidden;
-        
-        .shape-line {
-          position: absolute;
-          width: 100%;
-          height: 2rpx;
-          background-color: rgba(255, 255, 255, 0.7);
-          
-          &:first-child {
-            top: 60rpx;
-          }
-          
-          &:last-child {
-            top: 90rpx;
-          }
-        }
-      }
-    }
-  }
+
   
   // 测试卡片
   .test-card {

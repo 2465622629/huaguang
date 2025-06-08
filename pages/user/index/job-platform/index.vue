@@ -1,12 +1,12 @@
 <template>
-  <view class="job-platform-page">
+  <view class="job-platform-page" :style="{ background: `url('${config.staticBaseUrl}/bg3.png')` }">
    
 
     <!-- 主内容区域 -->
     <view class="main-content">
       <!-- Banner区域 -->
       <view class="banner-section">
-        <image class="banner-full-img" src="http://localhost:3000/static/jobs_banner.png" mode="aspectFill"></image>
+        <image class="banner-full-img" :src="`${config.staticBaseUrl}/jobs_banner.png`" mode="aspectFill"></image>
       </view>
 
       <!-- 推荐企业模块 -->
@@ -71,6 +71,7 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import config from '@/config/index.js'
 
 export default {
   name: 'JobPlatform',
@@ -79,6 +80,7 @@ export default {
   },
   data() {
     return {
+      config,
       // 推荐企业数据
       companies: [
         {
@@ -244,7 +246,6 @@ export default {
 <style lang="scss" scoped>
 .job-platform-page {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg3.png')
 }
 
 /* 自定义导航栏 */

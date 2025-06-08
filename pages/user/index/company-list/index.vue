@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg9.png')` }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -125,10 +125,12 @@
 <script>
 // 导入企业API
 import { enterpriseApi } from '@/api/index.js'
+import config from '@/config/index.js'
 
 export default {
   data() {
     return {
+      config,
       // 排序相关
       showSort: false,
       currentSort: {
@@ -346,7 +348,6 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-image: url('http://localhost:3000/static/bg9.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

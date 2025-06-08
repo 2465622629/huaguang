@@ -1,5 +1,5 @@
 <template>
-	<view class="about-page">
+	<view class="about-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -70,11 +70,14 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
 	data() {
 		return {
 			statusBarHeight: 0,
-			scrollHeight: 0
+			scrollHeight: 0,
+			backgroundImage: staticBaseUrl + '/bg10.png'
 		}
 	},
 	onLoad() {
@@ -123,7 +126,9 @@ export default {
 .about-page {
 	width: 100%;
 	height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
+	background-repeat: no-repeat;
+	background-position: center center;
+	background-size: cover;
 }
 
 .status-bar {

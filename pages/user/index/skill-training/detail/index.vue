@@ -1,5 +1,5 @@
 <template>
-  <view class="skill-detail-container">
+  <view class="skill-detail-container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg3.png')` }">
     <!-- 自定义导航栏 -->
     <uv-navbar 
       :safeAreaInsetTop="true"
@@ -25,7 +25,7 @@
       <view class="banner-section">
         <image 
           class="banner-image" 
-          src="http://localhost:3000/static/skill.png" 
+          :src="`${config.staticBaseUrl}/skill.png`" 
           mode="aspectFill"
         ></image>
         
@@ -68,9 +68,12 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   data() {
     return {
+      config,
       // 导航栏配色
       navbarBgColor: '#bae1ff',
       navIconColor: '#467bff',
@@ -173,7 +176,6 @@ export default {
 
 .skill-detail-container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg3.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

@@ -1,5 +1,5 @@
 <template>
-  <view class="lawyer-consultation-page">
+  <view class="lawyer-consultation-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg7.png')` }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -72,7 +72,7 @@
                       :key="sIndex"
                       class="service-item"
                     >
-                      <image :src="`http://localhost:3000/static/icons/${service.icon}.png`" style="width: 12px; height: 12px;" mode="aspectFit"></image>
+                      <image :src="`${config.staticBaseUrl}/icons/${service.icon}.png`" style="width: 12px; height: 12px;" mode="aspectFit"></image>
                       <text class="service-name">{{ service.type }}</text>
                       <view class="service-price-container">
                         <text class="service-price">¥{{ service.price }}</text>
@@ -110,6 +110,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import { getHotLawyers } from '@/api/modules/home.js'
+import config from '@/config/index.js'
 
 export default {
   name: 'LawyerConsultationPage',
@@ -118,6 +119,7 @@ export default {
   },
   data() {
     return {
+      config,
       scrollHeight: '100vh',
       loading: false,
       // 筛选标签数据
@@ -245,7 +247,6 @@ export default {
 
 <style lang="scss" scoped>
 .lawyer-consultation-page {
-  background-image: url('http://localhost:3000/static/bg7.png');
   background-size: cover;
   background-position: unset;
   background-repeat: no-repeat;

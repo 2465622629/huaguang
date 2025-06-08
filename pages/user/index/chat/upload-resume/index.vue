@@ -1,5 +1,5 @@
 <template>
-    <view class="upload-resume-page">
+    <view class="upload-resume-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg9.png')` }">
         <!-- iOS状态栏占位 -->
         <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -8,7 +8,7 @@
             <view class="navbar-content">
                 <!-- 返回按钮 -->
                 <view class="back-button" @click="goBack">
-                    <uv-icon name="http://localhost:3000/static/icons/back.png" size="32" color="#4A90E2"></uv-icon>
+                    <uv-icon :name="`${config.staticBaseUrl}/icons/back.png`" size="32" color="#4A90E2"></uv-icon>
                 </view>
             </view>
         </view>
@@ -18,7 +18,7 @@
             <!-- 简历上传卡片 -->
             <view class="upload-card" @click="chooseFile">
                 <!-- 简历图片 -->
-                <image src="http://localhost:3000/static/jianli.png" class="resume-image" mode="aspectFit"></image>
+                <image :src="`${config.staticBaseUrl}/jianli.png`" class="resume-image" mode="aspectFit"></image>
 
                 <!-- 上传文本 -->
                 <text class="upload-text">+ 上传简历</text>
@@ -36,12 +36,15 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
     name: 'UploadResume',
     data() {
         return {
             statusBarHeight: 0,
-            selectedFile: null
+            selectedFile: null,
+            config
         }
     },
     onLoad() {
@@ -140,7 +143,6 @@ export default {
 .upload-resume-page {
     width: 100%;
     height: 100vh;
-    background-image: url('http://localhost:3000/static/bg9.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

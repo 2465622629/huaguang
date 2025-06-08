@@ -1,5 +1,5 @@
 <template>
-  <view class="credit-recovery-page">
+  <view class="credit-recovery-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -146,6 +146,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { staticBaseUrl } from '@/config/index.js'
 import { uploadFile } from '@/utils/file.js'
 
 export default {
@@ -153,6 +154,7 @@ export default {
   data() {
     return {
       config: config,
+      backgroundImage: staticBaseUrl + '/apply-bg.png',
       formData: {
         loanInfo: {
           bank: '',
@@ -331,7 +333,8 @@ export default {
   min-height: 100vh;
   background-color: #EBF4FA;
   position: relative;
-  background: url('http://localhost:3000/static/apply-bg.png') no-repeat center center;
+  background-repeat: no-repeat;
+  background-position: center center;
   background-size: 100% 100%;
   
   .status-bar {

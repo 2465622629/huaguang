@@ -1,5 +1,5 @@
 <template>
-  <view class="consultation-records-page">
+  <view class="consultation-records-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
     <!-- 自定义状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -61,12 +61,15 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
   name: 'ConsultationRecords',
   data() {
     return {
       statusBarHeight: 0,
       scrollHeight: 0,
+      backgroundImage: staticBaseUrl + '/bg10.png',
       consultationRecords: [
         {
           id: 1,
@@ -147,7 +150,9 @@ export default {
 <style lang="scss" scoped>
 .consultation-records-page {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   position: relative;
 }
 

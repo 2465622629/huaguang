@@ -1,5 +1,5 @@
 <template>
-  <view class="case-page">
+  <view class="case-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
     <!-- iOS 状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -62,12 +62,14 @@
 
 <script>
 import request from '@/utils/request.js'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'CasePage',
   data() {
     return {
       statusBarHeight: 0,
+      backgroundImage: staticBaseUrl + '/bg12.png',
       scrollHeight: 0,
       currentFilter: 'all',
       filterOptions: [
@@ -415,7 +417,6 @@ export default {
 .case-page {
   width: 100%;
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg12.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

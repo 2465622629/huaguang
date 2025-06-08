@@ -1,12 +1,12 @@
 <template>
-	<view class="security-page">
+	<view class="security-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
 		<!-- 导航栏 -->
 		<view class="nav-bar">
 			<view class="nav-back" @click="goBack">
-				<uv-icon name="http://localhost:3000/static/icons/back.png" color="#2979FF" size="32"></uv-icon>
+				<uv-icon :name="config.staticBaseUrl + '/icons/back.png'" color="#2979FF" size="32"></uv-icon>
 				<text class="nav-back-text">返回</text>
 			</view>
 		</view>
@@ -56,11 +56,14 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
 	data() {
 		return {
 			statusBarHeight: 0,
 			scrollHeight: 0,
+			config: config,
 			phoneNumber: '135****8666',
 			passwordStatus: '已设置'
 		}
@@ -129,7 +132,6 @@ export default {
 .security-page {
 	width: 100%;
 	height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
 }
 
 .status-bar {

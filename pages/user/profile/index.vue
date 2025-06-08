@@ -36,14 +36,14 @@
 						hover-class="action-item-hover"
 					>
 						<view class="action-icon">
-							<uv-image :src="`http://localhost:3000/static/icons/${item.icon}.png`" width="50rpx" height="50rpx" mode="aspectFit"></uv-image>
+							<uv-image :src="`${config.staticBaseUrl}/icons/${item.icon}.png`" width="50rpx" height="50rpx" mode="aspectFit"></uv-image>
 						</view>
 						<text class="action-text">{{ item.text }}</text>
 					</view>
 				</view>
 			</view>
 			
-			<!-- 设置卡片 -->
+							<!-- 设置卡片 -->
 			<view class="settings-card">
 				<text class="card-title">设置</text>
 				<view class="settings-list">
@@ -55,7 +55,7 @@
 						hover-class="list-item-hover"
 					>
 						<view class="item-left">
-							<uv-image :src="`http://localhost:3000/static/icons/${item.icon}.png`" width="32rpx" height="32rpx"  mode="aspectFit"></uv-image>
+							<uv-image :src="`${config.staticBaseUrl}/icons/${item.icon}.png`" width="32rpx" height="32rpx"  mode="aspectFit"></uv-image>
 							<text class="item-text">{{ item.text }}</text>
 						</view>
 						<text class="arrow-icon">></text>
@@ -75,7 +75,7 @@
 						hover-class="list-item-hover"
 					>
 						<view class="item-left">
-							<uv-image :src="`http://localhost:3000/static/icons/${item.icon}.png`" width="32rpx" height="32rpx"  mode="aspectFit"></uv-image>
+							<uv-image :src="`${config.staticBaseUrl}/icons/${item.icon}.png`" width="32rpx" height="32rpx"  mode="aspectFit"></uv-image>
 							<text class="item-text">{{ item.text }}</text>
 						</view>
 						<text class="arrow-icon">></text>
@@ -92,6 +92,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import { personalCenterApi } from '@/api/index.js'
+import config from '@/config/index.js'
 
 export default {
 	components: {
@@ -102,6 +103,7 @@ export default {
 			statusBarHeight: 0,
 			scrollHeight: 0,
 			loading: false,
+			config: config,
 			userInfo: {
 				avatar: '',
 				nickname: '昵称',

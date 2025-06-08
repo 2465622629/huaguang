@@ -1,12 +1,12 @@
 <template>
-	<view class="invitation-poster-page">
+	<view class="invitation-poster-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
 		<!-- 导航栏 -->
 		<view class="nav-bar">
 			<view class="nav-back" @click="goBack">
-				<image class="back-icon" src="http://localhost:3000/static/icons/back.png" mode="aspectFit"></image>
+				<image class="back-icon" :src="config.staticBaseUrl + '/icons/back.png'" mode="aspectFit"></image>
 				<text class="back-text">返回</text>
 			</view>
 		</view>
@@ -14,7 +14,7 @@
 		<!-- 滚动容器 -->
 		<scroll-view class="scroll-container" scroll-y :style="{ height: scrollHeight + 'px' }" enable-flex>
 			<!-- 主内容卡片 -->
-			<view class="main-card">
+			<view class="main-card" :style="{ background: `url('${config.staticBaseUrl}/share.png') no-repeat center center / cover` }">
 				<!-- 二维码容器 -->
 				<view class="qr-container">
 					<view class="qr-code-area">
@@ -40,11 +40,14 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
 	data() {
 		return {
 			statusBarHeight: 0,
 			scrollHeight: 0,
+			config: config,
 			invitationCode: 'ABC123',
 			qrCodeData: 'https://example.com/invite?code=ABC123',
 			qrCodeSize: 156,
@@ -111,7 +114,6 @@ export default {
 .invitation-poster-page {
 	width: 100%;
 	height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center / cover;
 	position: relative;
 }
 
@@ -153,7 +155,6 @@ export default {
 }
 
 .main-card {
-	background: url('http://localhost:3000/static/share.png') no-repeat center center / cover;
 	border-radius: 20px;
 	width: 620rpx;
 	height: 900rpx;

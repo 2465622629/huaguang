@@ -13,29 +13,32 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'PsychologistTabbar',
   data() {
     return {
+      config,
       currentPath: '',
       tabbarList: [
         {
           pagePath: '/pages/psychologist/index/dashboard/index',
           text: '首页',
-          iconPath: 'http://localhost:3000/static/icons/home.png',
-          selectedIconPath: 'http://localhost:3000/static/icons/home-acitve-red.png'
+          iconPath: `${config.staticBaseUrl}/icons/home.png`,
+          selectedIconPath: `${config.staticBaseUrl}/icons/home-acitve-red.png`
         },
         {
           pagePath: '/pages/psychologist/consultation/consultation',
           text: '信息',
-          iconPath: 'http://localhost:3000/static/icons/info.png',
-          selectedIconPath: 'http://localhost:3000/static/icons/chat-active-red.png'
+          iconPath: `${config.staticBaseUrl}/icons/info.png`,
+          selectedIconPath: `${config.staticBaseUrl}/icons/chat-active-red.png`
         },
         {
           pagePath: '/pages/psychologist/profile/index/index',
           text: '我的',
-          iconPath: 'http://localhost:3000/static/icons/profile.png',
-          selectedIconPath: 'http://localhost:3000/static/icons/profile-acitve-red.png'
+          iconPath: `${config.staticBaseUrl}/icons/profile.png`,
+          selectedIconPath: `${config.staticBaseUrl}/icons/profile-acitve-red.png`
         }
       ]
     }

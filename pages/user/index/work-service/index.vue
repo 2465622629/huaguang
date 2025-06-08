@@ -1,17 +1,17 @@
 <template>
-  <view class="work-service-page">
+  <view class="work-service-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg3.png')` }">
 
 
     <!-- 主内容区域 -->
     <view class="main-content">
       <!-- 我要找工作卡片 -->
       <view class="service-card job-search-card" @click="handleJobSearch">
-        <image src="http://localhost:3000/static/find_jobs.png" mode="aspectFit" class="card-replacement-image"></image>
+        <image :src="`${config.staticBaseUrl}/find_jobs.png`" mode="aspectFit" class="card-replacement-image"></image>
       </view>
 
       <!-- 我要招人卡片 -->
       <view class="service-card recruitment-card" @click="handleRecruitment">
-        <image src="http://localhost:3000/static/find_peop.png" mode="aspectFit" class="card-replacement-image"></image>
+        <image :src="`${config.staticBaseUrl}/find_peop.png`" mode="aspectFit" class="card-replacement-image"></image>
       </view>
     </view>
 
@@ -22,6 +22,7 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import config from '@/config/index.js'
 
 export default {
   name: 'WorkService',
@@ -30,7 +31,7 @@ export default {
   },
   data() {
     return {
-      // 页面数据
+      config
     }
   },
   onLoad() {
@@ -71,7 +72,6 @@ export default {
 <style lang="scss" scoped>
 .work-service-page {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg3.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

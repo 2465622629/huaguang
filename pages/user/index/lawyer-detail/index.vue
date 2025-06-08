@@ -59,7 +59,7 @@
         <!-- 执业背景 -->
         <view class="detail-section">
           <view class="section-header">
-            <image class="section-icon" src="http://localhost:3000/static/icons/zhiye.png" mode="aspectFit"></image>
+            <image class="section-icon" :src="`${config.staticBaseUrl}/icons/zhiye.png`" mode="aspectFit"></image>
             <text class="section-title">执业背景</text>
           </view>
           <text class="section-content">{{ lawyerInfo.background }}</text>
@@ -68,7 +68,7 @@
         <!-- 服务优势 -->
         <view class="detail-section">
           <view class="section-header">
-            <image class="section-icon" src="http://localhost:3000/static/icons/fuwu.png" mode="aspectFit"></image>
+            <image class="section-icon" :src="`${config.staticBaseUrl}/icons/fuwu.png`" mode="aspectFit"></image>
             <text class="section-title">服务优势</text>
           </view>
           <view class="list-content">
@@ -82,7 +82,7 @@
         <!-- 成功案例 -->
         <view class="detail-section">
           <view class="section-header">
-            <image class="section-icon" src="http://localhost:3000/static/icons/chenggong.png" mode="aspectFit"></image>
+            <image class="section-icon" :src="`${config.staticBaseUrl}/icons/chenggong.png`" mode="aspectFit"></image>
             <text class="section-title">成功案例</text>
           </view>
           <view class="list-content">
@@ -96,7 +96,7 @@
         <!-- 咨询范围 -->
         <view class="detail-section">
           <view class="section-header">
-            <image class="section-icon" src="http://localhost:3000/static/icons/zixun.png" mode="aspectFit"></image>
+            <image class="section-icon" :src="`${config.staticBaseUrl}/icons/zixun.png`" mode="aspectFit"></image>
             <text class="section-title">咨询范围</text>
           </view>
           <view class="list-content">

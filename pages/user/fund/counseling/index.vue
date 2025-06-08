@@ -9,7 +9,7 @@
     </view>
     
     <!-- Banner区域 -->
-    <view class="banner">
+    <view class="banner" :style="{ backgroundImage: `url(${backgroundImage})` }">
       <view class="banner-content">
         <view class="banner-title">Hi, 这是你的专属导师</view>
         <view class="banner-subtitle">无需预约，专属你的心理倾听老师</view>
@@ -186,6 +186,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { staticBaseUrl } from '@/config/index.js'
 import request from '@/utils/request.js'
 import { getPsychologistList } from '@/api/modules/legal-service.js'
 
@@ -194,6 +195,7 @@ export default {
   data() {
     return {
       config,
+      backgroundImage: staticBaseUrl + '/bg6.png',
       isRefreshing: false,
       isLoading: true,
       isLoadingMore: false,
@@ -489,7 +491,6 @@ export default {
   .banner {
     position: relative;
     height: 300rpx;
-    background: url('http://localhost:3000/static/bg6.png');
     background-size: cover;
     
     padding: 140rpx 40rpx 40rpx;

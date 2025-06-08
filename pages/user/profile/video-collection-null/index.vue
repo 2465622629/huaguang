@@ -1,5 +1,5 @@
 <template>
-    <view class="assistance-page">
+    <view class="assistance-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg10.png')` }">
       <!-- 自定义状态栏 -->
       <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
       
@@ -15,14 +15,14 @@
       <!-- 主内容区域 -->
       <view class="main-content">
         <!-- 帮扶图标 -->
-        <image class="bangfu-icon" src="http://localhost:3000/static/bangfu.png" mode="aspectFit"></image>
+        <image class="bangfu-icon" :src="config.staticBaseUrl + '/bangfu.png'" mode="aspectFit"></image>
         
         <!-- 标题文本 -->
-        <text class="title-text">暂无帮扶记录</text>
+        <text class="title-text">暂无收藏视频</text>
         
         <!-- 描述文本 -->
-        <text class="description-text">你暂时还没有接受过帮扶，
-  有需要可前往首页提交申请。</text>
+        <text class="description-text">你暂时还没有收藏过视频，
+  有需要可前往技能培训收藏视频。</text>
       </view>
       
       <!-- iOS Home Indicator -->
@@ -31,10 +31,13 @@
   </template>
   
   <script>
+  import config from '@/config/index.js'
+  
   export default {
     data() {
       return {
-        statusBarHeight: 0
+        statusBarHeight: 0,
+        config: config
       }
     },
     onLoad() {
@@ -59,7 +62,6 @@
   .assistance-page {
     width: 100%;
     height: 100vh;
-    background-image: url('http://localhost:3000/static/bg10.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

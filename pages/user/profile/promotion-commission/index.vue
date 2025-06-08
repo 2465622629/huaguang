@@ -1,5 +1,5 @@
 <template>
-	<view class="promotion-commission-page">
+	<view class="promotion-commission-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
@@ -7,7 +7,7 @@
 		<view class="custom-navbar">
 			<view class="navbar-content">
 				<view class="back-button" @click="goBack">
-					<uv-icon name="http://localhost:3000/static/icons/back.png" size="32" color="#4A90E2"></uv-icon>
+					<uv-icon :name="backIconPath" size="32" color="#4A90E2"></uv-icon>
 					<text class="back-text">返回</text>
 				</view>
 			</view>
@@ -77,11 +77,15 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
 	name: 'PromotionCommission',
 	data() {
 		return {
 			statusBarHeight: 0,
+			backgroundImage: staticBaseUrl + '/bg10.png',
+			backIconPath: staticBaseUrl + '/icons/back.png',
 			// 佣金数据
 			commissionData: {
 				totalAmount: '3,560.00',
@@ -153,7 +157,6 @@ export default {
 .promotion-commission-page {
 	width: 100%;
 	height: 100vh;
-	background-image: url('http://localhost:3000/static/bg10.png');
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;
