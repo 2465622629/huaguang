@@ -1,5 +1,5 @@
 <template>
-  <view class="job-detail-container">
+  <view class="job-detail-container" :style="{ backgroundImage: `url(${backgroundImageUrl})` }">
     <!-- iOS状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -94,14 +94,9 @@
         
         <!-- 操作按钮 -->
         <view class="action-button-container">
-          <uv-button 
-            class="save-button"
-            text="点击保存"
-            color="#82C0F9"
-            shape="circle"
-            :customStyle="buttonCustomStyle"
-            @click="handleSave"
-          ></uv-button>
+          <view class="custom-save-button" @click="handleSave">
+            <text class="button-text">点击保存</text>
+          </view>
         </view>
       </view>
     </scroll-view>
@@ -110,6 +105,7 @@
 
 <script>
 import { enterpriseApi } from '@/api/index.js'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'JobDetails',
@@ -158,12 +154,7 @@ export default {
         '具备良好的职业道德，严谨细致',
         '有律师资格证者优先'
       ],
-      buttonCustomStyle: {
-        width: '90%',
-        height: '50px',
-        fontSize: '18px',
-        fontWeight: 'normal'
-      },
+
       inputCustomStyle: {
         backgroundColor: '#eaf5fa',
         borderRadius: '4px',
@@ -196,6 +187,12 @@ export default {
     }
   },
   
+  computed: {
+    // 动态生成背景图片URL
+    backgroundImageUrl() {
+      return `${staticBaseUrl}/bg9.png`
+    }
+  },
   onLoad(options) {
     // 获取路由参数
     if (options.jobId) {
@@ -273,7 +270,6 @@ export default {
 <style lang="scss" scoped>
 .job-detail-container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg9.png');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
@@ -442,15 +438,25 @@ export default {
     justify-content: center;
     padding-bottom: 20px;
     
-    :deep(.uv-button) {
-      background-color: #82C0F9 !important;
-      border: none !important;
+    .custom-save-button {
+      width: 90%;
+      height: 50px;
+      background-color: #82C0F9;
+      border-radius: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s ease;
       
-      .uv-button__text {
-        color: #FFFFFF !important;
-        font-size: 18px !important;
-        font-weight: normal !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif !important;
+      &:active {
+        opacity: 0.8;
+      }
+      
+      .button-text {
+        color: #000;
+        font-size: 18px;
+        font-weight: normal;
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
       }
     }
   }

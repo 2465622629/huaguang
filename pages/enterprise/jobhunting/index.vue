@@ -1,5 +1,5 @@
 <template>
-  <view class="enterprise-page">
+  <view class="enterprise-page" :style="{ backgroundImage: `url(${backgroundImageUrl})` }">
     <!-- iOS 状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -109,6 +109,7 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'EnterpriseJobHunting',
@@ -143,6 +144,12 @@ export default {
       ]
     }
   },
+  computed: {
+    // 动态生成背景图片URL
+    backgroundImageUrl() {
+      return `${staticBaseUrl}/bg3.png`
+    }
+  },
   onLoad() {
     // 获取系统状态栏高度
     const systemInfo = uni.getSystemInfoSync()
@@ -174,7 +181,6 @@ export default {
 <style lang="scss" scoped>
 .enterprise-page {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg3.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

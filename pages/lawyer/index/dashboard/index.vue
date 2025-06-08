@@ -1,8 +1,8 @@
 <template>
-  <view class="container">
+  <view class="container" :style="backgroundStyle">
     <!-- 顶部插画区域 -->
     <view class="header-illustration">
-      <uv-image :src="`http://localhost:3000/static/lawyer_banner.png`" width="100%" height="500rpx"
+      <uv-image :src="`${staticBaseUrl}/lawyer_banner.png`" width="100%" height="500rpx"
         mode="aspectFill"></uv-image>
     </view>
 
@@ -26,19 +26,19 @@
         <view class="action-buttons">
           <view class="action-button" @click="handleViewDocuments">
             <view class="button-icon view-icon">
-              <uv-icon name="http://localhost:3000/static/icons/check.png" color="#FFFFFF" size="64"></uv-icon>
+              				<uv-icon :name="`${staticBaseUrl}/icons/check.png`" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">查看</text>
           </view>
           <view class="action-button" @click="handleReviewDocuments">
             <view class="button-icon review-icon">
-              <uv-icon name="http://localhost:3000/static/icons/shenhe.png" color="#FFFFFF" size="64"></uv-icon>
+              				<uv-icon :name="`${staticBaseUrl}/icons/shenhe.png`" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">审核</text>
           </view>
           <view class="action-button" @click="handleDownloadDocuments">
             <view class="button-icon download-icon">
-              <uv-icon name="http://localhost:3000/static/icons/download.png" color="#FFFFFF" size="64"></uv-icon>
+              				<uv-icon :name="`${staticBaseUrl}/icons/download.png`" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">下载</text>
           </view>
@@ -53,7 +53,7 @@
 
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
-import config from '@/config/index.js'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'LawyerDashboard',
@@ -62,7 +62,7 @@ export default {
   },
   data() {
     return {
-      config,
+      staticBaseUrl,
       consultationListHeight: '300rpx',
       consultationList: [
         {
@@ -93,6 +93,13 @@ export default {
       ]
     }
   },
+  computed: {
+    backgroundStyle() {
+      return {
+        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      }
+    }
+  },
   methods: {
     handleViewDocuments() {
       uni.navigateTo({
@@ -116,7 +123,7 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center center;

@@ -1,5 +1,5 @@
 <template>
-	<view class="lawyer-profile-page">
+	<view class="lawyer-profile-page" :style="backgroundStyle">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
@@ -36,7 +36,7 @@
 			</view>
 			
 			<!-- 服务统计卡片 -->
-			<view class="service-stats-card">
+			<view class="service-stats-card" @click="handleIncomeClick">
 				<text class="stats-line">我的服务单数: 累计咨询23次</text>
 				<text class="stats-line">今日收入: ¥128.00</text>
 			</view>
@@ -53,7 +53,7 @@
 						hover-class="setting-item-hover"
 					>
 						<view class="item-left">
-							<uv-icon :name="'http://localhost:3000/static/icons/' + item.icon + '.png'" size="40" color="#888888"></uv-icon>
+							<uv-icon :name="`${staticBaseUrl}/icons/${item.icon}.png`" size="40" color="#888888"></uv-icon>
 							<text class="item-text">{{ item.text }}</text>
 						</view>
 						<text class="arrow-icon">></text>
@@ -69,6 +69,7 @@
 
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
 	components: {
@@ -76,6 +77,7 @@ export default {
 	},
 	data() {
 		return {
+			staticBaseUrl,
 			statusBarHeight: 0,
 			scrollHeight: 0,
 			settingsItems: [
@@ -141,6 +143,22 @@ export default {
 			uni.navigateTo({
 				url: '/pages/lawyer/index/online-status/index'
 			});
+		},
+		
+		// 处理收入统计卡片点击
+		handleIncomeClick() {
+			console.log('收入统计卡片点击');
+			// 跳转到收入管理页面
+			uni.navigateTo({
+				url: '/pages/lawyer/index/income-management/index'
+			});
+		}
+	},
+	computed: {
+		backgroundStyle() {
+			return {
+				backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+			}
 		}
 	}
 }
@@ -150,7 +168,7 @@ export default {
 .lawyer-profile-page {
 	width: 100%;
 	height: 100vh;
-	background-image: url('http://localhost:3000/static/bg10.png');
+
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;

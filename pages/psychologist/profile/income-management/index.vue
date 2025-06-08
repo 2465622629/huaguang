@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
     <!-- 自定义导航栏 -->
     <view class="custom-navbar">
       <view class="navbar-content">
@@ -50,10 +50,13 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'IncomeManagement',
   data() {
     return {
+      config,
       totalIncome: '8,550',
       todayIncome: '256.00',
       scrollViewHeight: 400,
@@ -139,7 +142,6 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg11.png');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center center;

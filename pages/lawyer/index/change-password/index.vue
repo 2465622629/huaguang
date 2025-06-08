@@ -1,5 +1,5 @@
 <template>
-	<view class="change-password-page">
+	<view class="change-password-page" :style="backgroundStyle">
 		<!-- 状态栏占位 -->
 		<view class="status-bar" :style="{height: statusBarHeight + 'px'}"></view>
 		
@@ -106,6 +106,8 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
 	data() {
 		return {
@@ -196,6 +198,16 @@ export default {
 				uni.navigateBack()
 			}, 1500)
 		}
+	},
+	computed: {
+		backgroundStyle() {
+			return {
+				backgroundImage: `url('${staticBaseUrl}/bg10.png')`,
+				backgroundSize: '100% 100%',
+				backgroundRepeat: 'no-repeat',
+				backgroundPosition: 'center center'
+			}
+		}
 	}
 }
 </script>
@@ -203,8 +215,6 @@ export default {
 <style lang="scss" scoped>
 .change-password-page {
 	min-height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center;
-	background-size: 100% 100%;
 }
 
 .status-bar {

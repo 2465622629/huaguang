@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -13,7 +13,7 @@
 
     <!-- 插画区域 -->
     <view class="illustration-area">
-      <image src="http://localhost:3000/static/xinlistatus.png" class="lawyer-image" mode="aspectFit" />
+      <image :src="config.staticBaseUrl + '/xinlistatus.png'" class="lawyer-image" mode="aspectFit" />
     </view>
 
     <!-- 设置卡片区域 -->
@@ -51,15 +51,18 @@
     </view>
 
     <!-- iOS Home Indicator -->
-    <view class="home-indicator"></view>
+    <!-- <view class="home-indicator"></view> -->
   </view>
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'LawyerOnlineStatus',
   data() {
     return {
+      config,
       statusBarHeight: 0,
       // 开关设置
       settings: { 
@@ -148,7 +151,6 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg11.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

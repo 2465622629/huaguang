@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="backgroundStyle">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -86,6 +86,8 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
   data() {
     return {
@@ -155,6 +157,11 @@ export default {
         return this.documentList
       }
       return this.documentList.filter(doc => doc.status === currentFilter)
+    },
+    backgroundStyle() {
+      return {
+        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      }
     }
   },
   
@@ -250,7 +257,7 @@ export default {
 <style lang="scss" scoped>
 .container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

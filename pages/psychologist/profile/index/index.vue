@@ -1,5 +1,5 @@
 <template>
-	<view class="lawyer-profile-page">
+	<view class="lawyer-profile-page" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 		
@@ -53,7 +53,7 @@
 						hover-class="setting-item-hover"
 					>
 						<view class="item-left">
-							<uv-icon :name="'http://localhost:3000/static/icons/' + item.icon + '.png'" size="40" color="#888888"></uv-icon>
+							<uv-icon :name="config.staticBaseUrl + '/icons/' + item.icon + '.png'" size="40" color="#888888"></uv-icon>
 							<text class="item-text">{{ item.text }}</text>
 						</view>
 						<text class="arrow-icon">></text>
@@ -69,6 +69,7 @@
 
 <script>
 import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
+import config from '@/config/index.js'
 
 export default {
 	components: {
@@ -76,6 +77,7 @@ export default {
 	},
 	data() {
 		return {
+			config,
 			statusBarHeight: 0,
 			scrollHeight: 0,
 			settingsItems: [
@@ -146,7 +148,6 @@ export default {
 .lawyer-profile-page {
 	width: 100%;
 	height: 100vh;
-	background-image: url('http://localhost:3000/static/bg11.png');
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;

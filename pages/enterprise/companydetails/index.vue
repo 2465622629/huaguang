@@ -1,5 +1,5 @@
 <template>
-  <view class="company-details-page">
+  <view class="company-details-page" :style="{ backgroundImage: `url(${backgroundImageUrl})` }">
     <!-- iOS 状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -88,7 +88,8 @@
             borderRadius: '25px',
             height: '50px',
             fontSize: '16px',
-            width: '100%'
+            width: '100%',
+            color: '#000'
           }"
           @click="saveCompanyInfo"
         ></uv-button>
@@ -96,7 +97,7 @@
     </view>
     
     <!-- iOS Home Indicator -->
-    <view class="home-indicator"></view>
+    <!-- <view class="home-indicator"></view> -->
     
     <!-- 公司类型选择器 -->
     <uv-picker
@@ -121,6 +122,8 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
   name: 'CompanyDetails',
   data() {
@@ -155,6 +158,12 @@ export default {
         '501-1000人',
         '1000人以上'
       ]
+    }
+  },
+  computed: {
+    // 动态生成背景图片URL
+    backgroundImageUrl() {
+      return `${staticBaseUrl}/bg9.png`
     }
   },
   onLoad() {
@@ -273,7 +282,6 @@ export default {
 .company-details-page {
   min-height: 100vh;
   background-color: #F8F9FA;
-  background-image: url('http://localhost:3000/static/bg9.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -425,7 +433,7 @@ export default {
 }
 
 .save-button-container {
-  margin: 48px 0 32px;
+  margin: 0px 0 32px;
 }
 
 .home-indicator {

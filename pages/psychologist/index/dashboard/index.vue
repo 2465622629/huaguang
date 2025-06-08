@@ -1,9 +1,9 @@
 <template>
-	<view class="container">
+	<view class="container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
 	  <!-- 顶部插画区域 -->
 	  <view class="header-illustration">
 		<uv-image 
-		  :src="`http://localhost:3000/static/xinli_banner.png`" 
+		  :src="config.staticBaseUrl + '/xinli_banner.png'" 
 		  width="90%" 
 		  height="500rpx" 
 		  mode="aspectFill"
@@ -37,19 +37,19 @@
 		  <view class="action-buttons">
 			<view class="action-button" @click="handleViewDocuments">
 			  <view class="button-icon view-icon">
-				<uv-icon name="http://localhost:3000/static/icons/xinli_huifu.png" color="#FFFFFF" size="54"></uv-icon>
+				<uv-icon :name="config.staticBaseUrl + '/icons/xinli_huifu.png'" color="#FFFFFF" size="54"></uv-icon>
 			  </view>
 			  <text class="button-text">回复</text>
 			</view>
 			<view class="action-button" @click="handleReviewDocuments">
 			  <view class="button-icon review-icon">
-				<uv-icon name="http://localhost:3000/static/icons/jieshao.png" color="#FFFFFF" size="54"></uv-icon>
+				<uv-icon :name="config.staticBaseUrl + '/icons/jieshao.png'" color="#FFFFFF" size="54"></uv-icon>
 			  </view>
 			  <text class="button-text">修改介绍</text>
 			</view>
 			<view class="action-button" @click="handleDownloadDocuments">
 			  <view class="button-icon download-icon">
-				<uv-icon name="http://localhost:3000/static/icons/miam_change.png" color="#FFFFFF" size="54"></uv-icon>
+				<uv-icon :name="config.staticBaseUrl + '/icons/miam_change.png'" color="#FFFFFF" size="54"></uv-icon>
 			  </view>
 			  <text class="button-text">密码修改</text>
 			</view>
@@ -136,7 +136,6 @@
   <style scoped>
   .container {
 	min-height: 100vh;
-	background-image: url('http://localhost:3000/static/bg11.png');
 	background-size: cover;
 	background-repeat: no-repeat;
 	background-position: center center;

@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg9.png')` }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -355,7 +355,6 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-image: url('http://localhost:3000/static/bg9.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

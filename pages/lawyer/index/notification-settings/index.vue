@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="backgroundStyle">
    
     
     <!-- 导航栏 -->
@@ -70,6 +70,8 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
   name: 'NotificationSettings',
   data() {
@@ -128,6 +130,14 @@ export default {
   onLoad() {
     // 页面加载时读取保存的设置
     this.loadNotificationSettings()
+  },
+
+  computed: {
+    backgroundStyle() {
+      return {
+        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      }
+    }
   }
 }
 </script>
@@ -135,7 +145,7 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

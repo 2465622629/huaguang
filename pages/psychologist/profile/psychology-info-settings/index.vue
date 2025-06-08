@@ -1,5 +1,5 @@
 <template>
-    <view class="lawyer-profile-page">
+    <view class="lawyer-profile-page" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
         <!-- 状态栏占位 -->
         <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -80,6 +80,7 @@
 
 <script>
 import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
+import config from '@/config/index.js'
 
 export default {
     name: 'PsychologistProfile',
@@ -88,6 +89,7 @@ export default {
     },
     data() {
         return {
+            config,
             statusBarHeight: 0,
             scrollHeight: 0
         }
@@ -154,7 +156,6 @@ export default {
 .lawyer-profile-page {
     width: 100%;
     height: 100vh;
-    background-image: url('http://localhost:3000/static/bg11.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

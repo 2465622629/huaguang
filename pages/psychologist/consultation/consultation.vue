@@ -1,5 +1,5 @@
 <template>
-	<view class="container">
+	<view class="container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
 	  <!-- 状态栏占位 -->
 	  <view class="status-bar"></view>
 	  
@@ -91,6 +91,7 @@
   
   <script>
   import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
+  import config from '@/config/index.js'
   
   export default {
 	components: {
@@ -98,6 +99,7 @@
 	},
 	data() {
 	  return {
+		config,
 		// 标签列表
 		tabsList: [
 		  { name: '待回复' },
@@ -219,7 +221,6 @@
   .container {
 	width: 100%;
 	height: 100vh;
-	background-image: url('http://localhost:3000/static/bg11.png');
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;

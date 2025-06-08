@@ -16,7 +16,7 @@
           <text class="lawyer-name">李律师</text>
           <text class="lawyer-desc">劳动仲裁方向专业律师</text>
           <view class="timer-container">
-            <uv-icon name="http://localhost:3000/static/icons/shalou.png" color="#FFFFFF" size="32"></uv-icon>
+            <uv-icon :name="`${staticBaseUrl}/icons/shalou.png`" color="#FFFFFF" size="32"></uv-icon>
             <text class="timer-text">19:58</text>
           </view>
         </view>
@@ -67,7 +67,7 @@
         :style="{ backgroundColor: themeColors.cardBg, borderColor: themeColors.cardBorder }">
         <view class="invitation-info">
           <view class="video-icon" :style="{ backgroundColor: themeColors.iconColor }">
-            <uv-icon name="http://localhost:3000/static/icons/video.png" color="#FFFFFF" size="32"></uv-icon>
+            <uv-icon :name="`${staticBaseUrl}/icons/video.png`" color="#FFFFFF" size="32"></uv-icon>
           </view>
           <view class="invitation-text">
             <text class="invitation-line1">对方给你发送了视频邀请，你是否同意</text>
@@ -100,7 +100,7 @@
 
       <view class="action-item" @click="openAlbum">
         <view class="action-icon">
-          <uv-icon name="http://localhost:3000/static/icons/photo-blue.png" color="#FFFFFF" size="64"></uv-icon>
+          <uv-icon :name="`${staticBaseUrl}/icons/photo-blue.png`" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">相册</text>
       </view>
@@ -109,10 +109,13 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
   name: 'ChatPage',
   data() {
     return {
+      staticBaseUrl,
       chatHeight: '100vh',
       scrollTop: 0,
       inputMessage: '',

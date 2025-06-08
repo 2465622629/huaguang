@@ -1,5 +1,5 @@
 <template>
-	<view class="change-password-page">
+	<view class="change-password-page" :style="backgroundStyle">
 		<!-- 状态栏占位 -->
 		<view class="status-bar" :style="{height: statusBarHeight + 'px'}"></view>
 		
@@ -80,6 +80,8 @@
 </template>
 
 <script>
+import { staticBaseUrl } from '@/config/index.js'
+
 export default {
 	data() {
 		return {
@@ -101,6 +103,11 @@ export default {
 				return `${this.countdown}秒后重新获取`
 			}
 			return this.isGettingCode ? '获取中...' : '获取验证码'
+		},
+		backgroundStyle() {
+			return {
+				background: `url('${staticBaseUrl}/bg10.png') no-repeat center center`
+			}
 		}
 	},
 	onLoad() {
@@ -219,7 +226,7 @@ export default {
 <style lang="scss" scoped>
 .change-password-page {
 	min-height: 100vh;
-	background: url('http://localhost:3000/static/bg10.png') no-repeat center center;
+
     background-size: 100% 100%;
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <view class="arbitration-review">
+  <view class="arbitration-review" :style="backgroundStyle">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -91,7 +91,7 @@
       <!-- 附件材料区域 -->
       <view class="attachment-card">
         <view class="attachment-content">
-          <uv-icon name="http://localhost:3000/static/icons/cailiao.png" color="#409EFF" size="66"></uv-icon>
+          				<uv-icon :name="`${staticBaseUrl}/icons/cailiao.png`" color="#409EFF" size="66"></uv-icon>
           <text class="attachment-name">证据材料.pdf</text>
         </view>
       </view>
@@ -126,6 +126,7 @@
 
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'ArbitrationReview',
@@ -134,6 +135,7 @@ export default {
   },
   data() {
     return {
+      staticBaseUrl,
       statusBarHeight: 0,
       scrollViewHeight: 0
     }
@@ -188,6 +190,13 @@ export default {
         }
       })
     }
+  },
+  computed: {
+    backgroundStyle() {
+      return {
+        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      }
+    }
   }
 }
 </script>
@@ -195,7 +204,7 @@ export default {
 <style lang="scss" scoped>
 .arbitration-review {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

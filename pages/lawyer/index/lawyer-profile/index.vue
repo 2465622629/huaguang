@@ -1,5 +1,5 @@
 <template>
-  <view class="lawyer-profile-page">
+  <view class="lawyer-profile-page" :style="backgroundStyle">
     <!-- 状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -100,6 +100,7 @@
 
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'LawyerProfile',
@@ -110,6 +111,13 @@ export default {
     return {
       statusBarHeight: 0,
       scrollHeight: 0
+    }
+  },
+  computed: {
+    backgroundStyle() {
+      return {
+        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      }
     }
   },
   onLoad() {
@@ -151,7 +159,7 @@ export default {
 .lawyer-profile-page {
   width: 100%;
   height: 100vh;
-  background-image: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

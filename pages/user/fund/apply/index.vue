@@ -153,7 +153,7 @@
     </view>
     
     <!-- iOS Home Indicator -->
-    <view class="home-indicator"></view>
+    <!-- <view class="home-indicator"></view> -->
   </view>
 </template>
 

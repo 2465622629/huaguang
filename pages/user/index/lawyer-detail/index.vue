@@ -1,5 +1,5 @@
 <template>
-  <view class="lawyer-detail-container">
+  <view class="lawyer-detail-container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg8.png')` }">
     <!-- 自定义导航栏 -->
     <view class="custom-navbar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="navbar-content">
@@ -269,7 +269,6 @@ export default {
   height: 100vh;
   position: relative;
   overflow-y: auto;
-  background-image: url('http://localhost:3000/static/bg8.png');
   background-size: cover;
   background-position: unset;
   background-repeat: no-repeat;

@@ -1,5 +1,5 @@
 <template>
-  <view class="counseling-test-page">
+  <view class="counseling-test-page" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg6.png')` }">
    
     
     <!-- 导航返回区 -->
@@ -50,17 +50,20 @@
     </view>
     
     <!-- iOS Home Indicator -->
-    <view class="home-indicator">
+    <!-- <view class="home-indicator">
       <view class="indicator-line"></view>
-    </view>
+    </view> -->
   </view>
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'CounselingTestPage',
   data() {
     return {
+      config,
       currentQuestionIndex: 0,
       answers: [],
       counselor: null, // 咨询师信息
@@ -247,7 +250,9 @@ export default {
 <style lang="scss" scoped>
 .counseling-test-page {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg6.png') no-repeat center center / cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   position: relative;
   display: flex;
   flex-direction: column;

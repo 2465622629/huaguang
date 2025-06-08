@@ -1,5 +1,5 @@
 <template>
-	<view class="change-password-page">
+	<view class="change-password-page" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
 		<!-- 状态栏占位 -->
 		<view class="status-bar" :style="{height: statusBarHeight + 'px'}"></view>
 		
@@ -101,9 +101,12 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
 	data() {
 		return {
+			config,
 			statusBarHeight: 0,
 			// 表单数据
 			formData: {
@@ -198,7 +201,6 @@ export default {
 <style lang="scss" scoped>
 .change-password-page {
 	min-height: 100vh;
-	background: url('http://localhost:3000/static/bg11.png') no-repeat center center;
 	background-size: cover;
 }
 

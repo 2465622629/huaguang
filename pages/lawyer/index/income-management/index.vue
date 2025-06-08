@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="backgroundStyle">
     <!-- 自定义导航栏 -->
     <view class="custom-navbar">
       <view class="navbar-content">
@@ -51,6 +51,7 @@
 
 <script>
 import { getIncomeStatistics } from '@/api/modules/lawyer-workspace.js'
+import { staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'IncomeManagement',
@@ -164,6 +165,13 @@ export default {
       console.log('滚动到底部')
       // 这里可以实现加载更多数据的逻辑
     }
+  },
+  computed: {
+    backgroundStyle() {
+      return {
+        background: `url('${staticBaseUrl}/bg10.png')`
+      }
+    }
   }
 }
 </script>
@@ -171,7 +179,7 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background: url('http://localhost:3000/static/bg10.png');
+  
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center center;

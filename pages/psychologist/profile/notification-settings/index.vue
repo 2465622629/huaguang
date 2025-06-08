@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg11.png)' }">
    
     
     <!-- 导航栏 -->
@@ -58,10 +58,13 @@
 </template>
 
 <script>
+import config from '@/config/index.js'
+
 export default {
   name: 'NotificationSettings',
   data() {
     return {
+      config,
       // 通知设置状态
       notificationSettings: {
         consultation: true,    // 咨询通知
@@ -122,7 +125,6 @@ export default {
 <style scoped>
 .container {
   min-height: 100vh;
-  background-image: url('http://localhost:3000/static/bg11.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
