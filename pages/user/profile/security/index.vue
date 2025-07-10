@@ -57,7 +57,7 @@
 
 <script>
 import config from '@/config/index.js'
-import { getCurrentUser, changePassword, bindPhone, logout } from '@/api/modules/user.js'
+import { getCurrentUser, bindPhone, logout } from '@/api/modules/user.js'
 
 export default {
 	data() {
@@ -462,135 +462,13 @@ export default {
 		
 		// 处理密码点击
 		handlePasswordClick() {
-			// 显示修改密码弹窗
-			this.showChangePasswordModal();
+			// 跳转到修改密码页面
+			uni.navigateTo({
+				url: '/pages/user/profile/security/change-pwd/index'
+			});
 		},
 
-		// 显示修改密码弹窗
-		showChangePasswordModal() {
-			// 显示旧密码输入弹窗
-			uni.showModal({
-				title: '修改密码',
-				content: '请输入当前密码',
-				editable: true,
-				placeholderText: '请输入当前密码',
-				success: (res) => {
-					if (res.confirm && res.content) {
-						const oldPassword = res.content.trim();
-						if (oldPassword.length >= 6) {
-							this.showNewPasswordModal(oldPassword);
-						} else {
-							uni.showToast({
-								title: '密码长度至少6位',
-								icon: 'none'
-							});
-						}
-					}
-				}
-			});
-		},
-		
-		// 显示新密码输入弹窗
-		showNewPasswordModal(oldPassword) {
-			uni.showModal({
-				title: '设置新密码',
-				content: '请输入新密码（至少6位，建议包含字母和数字）',
-				editable: true,
-				placeholderText: '请输入新密码',
-				success: (res) => {
-					if (res.confirm && res.content) {
-						const newPassword = res.content.trim();
-						if (this.validatePassword(newPassword)) {
-							this.showConfirmPasswordModal(oldPassword, newPassword);
-						} else {
-							uni.showToast({
-								title: '密码格式不符合要求',
-								icon: 'none'
-							});
-						}
-					}
-				}
-			});
-		},
-		
-		// 显示确认新密码弹窗
-		showConfirmPasswordModal(oldPassword, newPassword) {
-			uni.showModal({
-				title: '确认新密码',
-				content: '请再次输入新密码',
-				editable: true,
-				placeholderText: '请再次输入新密码',
-				success: (res) => {
-					if (res.confirm && res.content) {
-						const confirmPassword = res.content.trim();
-						if (confirmPassword === newPassword) {
-							this.requestChangePassword(oldPassword, newPassword);
-						} else {
-							uni.showToast({
-								title: '两次输入的密码不一致',
-								icon: 'none'
-							});
-						}
-					}
-				}
-			});
-		},
-		
-		// 验证密码强度
-		validatePassword(password) {
-			// 至少6位，包含字母和数字
-			const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,}$/;
-			return password.length >= 6 && passwordRegex.test(password);
-		},
 
-		// 请求修改密码
-		async requestChangePassword(oldPassword, newPassword) {
-			let retryCount = 0;
-			const maxRetries = 3;
-			
-			while (retryCount < maxRetries) {
-				try {
-					uni.showLoading({ title: '修改密码中...' });
-					
-					const response = await changePassword({
-						oldPassword: oldPassword,
-						newPassword: newPassword
-					});
-					
-					uni.hideLoading();
-					uni.showToast({
-						title: '密码修改成功',
-						icon: 'success'
-					});
-					
-					console.log('[安全设置] 密码修改成功:', response);
-					
-					// 更新密码状态
-					this.passwordStatus = '已设置';
-					
-					break; // 成功后跳出重试循环
-					
-				} catch (error) {
-					retryCount++;
-					uni.hideLoading();
-					console.error(`[安全设置] 第${retryCount}次修改密码失败:`, error);
-					
-					if (retryCount >= maxRetries) {
-						const errorMsg = this.getErrorMessage(error);
-						uni.showToast({
-							title: errorMsg,
-							icon: 'none',
-							duration: 3000
-						});
-						break;
-					} else {
-						// 指数退避重试策略
-						const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 3000);
-						await new Promise(resolve => setTimeout(resolve, delay));
-					}
-				}
-			}
-		},
 		
 		// 处理退出登录
 		async handleLogout() {

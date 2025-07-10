@@ -19,7 +19,7 @@
 				<view class="input-item">
 					<uv-input
 						v-model="formData.currentPassword"
-						type="password"
+						type="text"
 						:password="!showCurrentPassword"
 						placeholder="当前密码"
 						placeholderStyle="color: #8A8A8E"
@@ -41,7 +41,7 @@
 				<view class="input-item">
 					<uv-input
 						v-model="formData.newPassword"
-						type="password"
+						type="text"
 						:password="!showNewPassword"
 						placeholder="新密码（6-20位）"
 						placeholderStyle="color: #8A8A8E"
@@ -70,7 +70,7 @@
 				<view class="input-item">
 					<uv-input
 						v-model="formData.confirmPassword"
-						type="password"
+						type="text"
 						:password="!showConfirmPassword"
 						placeholder="确认新密码"
 						placeholderStyle="color: #8A8A8E"

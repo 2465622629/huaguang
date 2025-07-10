@@ -31,12 +31,13 @@ export const updateProfile = (data) => {
 /**
  * 修改密码
  * @param {Object} data 密码数据
- * @param {string} data.oldPassword 旧密码
+ * @param {string} data.currentPassword 当前密码
  * @param {string} data.newPassword 新密码
+ * @param {string} data.confirmPassword 确认新密码
  * @returns {Promise} 修改结果
  */
 export const changePassword = (data) => {
-  return put('/user/password', data)
+  return post('/user/change-password', data)
 }
 
 /**
@@ -195,7 +196,7 @@ export const deleteAccount = (data) => {
  * @returns {Promise} 退出结果
  */
 export const logout = () => {
-  return post('/user/logout')
+  return post('/auth/logout')
 }
 
 /**

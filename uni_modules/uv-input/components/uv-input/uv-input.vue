@@ -56,7 +56,7 @@
             customStyle="line-height: 12px"
           ></uv-icon>
         </view>
-        <view class="uv-input__content__subfix-icon">
+        <view class="uv-input__content__subfix-icon" @tap="onSuffixIconClick">
           <slot name="suffix">
             <uv-icon
 							v-if="suffixIcon"
@@ -265,6 +265,10 @@
 					this.$emit("clear");
 					this.valueChange();
 				});
+			},
+			// 点击后置图标
+			onSuffixIconClick() {
+				this.$emit("click-suffix-icon");
 			},
 			/**
 			 * 在安卓nvue上，事件无法冒泡

@@ -224,10 +224,20 @@ export default {
 				return false
 			}
 			
-			// 密码强度验证
-			if (this.formData.newPassword.length < 6) {
+			// 密码强度验证（与服务器要求保持一致）
+			if (this.formData.newPassword.length < 8) {
 				uni.showToast({
-					title: '新密码长度不能少于6位',
+					title: '新密码长度不能少于8位',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			// 检查密码是否包含大小写字母和数字
+			const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/
+			if (!passwordRegex.test(this.formData.newPassword)) {
+				uni.showToast({
+					title: '新密码必须包含大小写字母和数字',
 					icon: 'none'
 				})
 				return false
@@ -253,8 +263,9 @@ export default {
 					console.log(`修改密码API调用 - 第${attempt}次尝试`)
 					
 					const response = await changePassword({
-						oldPassword: this.formData.currentPassword,
-						newPassword: this.formData.newPassword
+						currentPassword: this.formData.currentPassword,
+						newPassword: this.formData.newPassword,
+						confirmPassword: this.formData.confirmPassword
 					})
 					
 					console.log('密码修改成功：', response)
@@ -280,27 +291,57 @@ export default {
 		handleChangeError(error) {
 			let errorMessage = '密码修改失败，请稍后重试'
 			
+			console.log('处理修改密码错误：', error)
+			
+			// 多层次解析错误信息
 			if (error && error.message) {
-				// 根据错误类型提供具体提示
-				if (error.message.includes('当前密码错误') || error.message.includes('password incorrect')) {
-					errorMessage = '当前密码输入错误，请重新输入'
-				} else if (error.message.includes('密码格式') || error.message.includes('password format')) {
-					errorMessage = '新密码格式不符合要求'
-				} else if (error.message.includes('网络') || error.message.includes('network')) {
-					errorMessage = '网络连接异常，请检查网络后重试'
-				} else if (error.message.includes('权限') || error.message.includes('permission')) {
-					errorMessage = '权限不足，请重新登录后重试'
-				} else if (error.message.includes('频繁') || error.message.includes('frequent')) {
-					errorMessage = '操作过于频繁，请稍后再试'
-				} else if (error.message.includes('服务器') || error.message.includes('server')) {
-					errorMessage = '服务器繁忙，请稍后重试'
+				// 第一层：直接检查error.message
+				errorMessage = error.message
+			} else if (error && error.data && error.data.message) {
+				// 第二层：检查error.data.message（响应拦截器格式）
+				errorMessage = error.data.message
+			} else if (error && typeof error === 'string') {
+				// 第三层：error本身就是字符串
+				errorMessage = error
+			} else if (error && error.code) {
+				// 第四层：根据错误码提供通用提示
+				switch (error.code) {
+					case 400:
+						errorMessage = '请求参数错误，请检查输入信息'
+						break
+					case 401:
+						errorMessage = '登录已过期，请重新登录'
+						break
+					case 403:
+						errorMessage = '权限不足，无法修改密码'
+						break
+					case 500:
+						errorMessage = '服务器错误，请稍后重试'
+						break
+					default:
+						errorMessage = `操作失败 (错误码: ${error.code})`
 				}
 			}
+			
+			// 如果error是响应拦截器处理后的格式，可能包含真实的服务器错误信息
+			// 尝试从不同的属性中提取错误信息
+			const possibleMessages = [
+				error?.message,
+				error?.data?.message,
+				error?.response?.data?.message,
+				error?.response?.message
+			].filter(Boolean)
+			
+			if (possibleMessages.length > 0) {
+				errorMessage = possibleMessages[0]
+			}
+			
+			console.log('最终错误信息：', errorMessage)
 			
 			uni.showToast({
 				title: errorMessage,
 				icon: 'none',
-				duration: 3000
+				duration: 4000
 			})
 		},
 		

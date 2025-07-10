@@ -297,6 +297,13 @@
 					}
 				},
 				{
+					"path": "profile/security/change-pwd/index",
+					"style": {
+						"navigationBarTitleText": "修改密码",
+						"navigationStyle": "custom"
+					}
+				},
+				{
 					"path": "profile/invitation/index",
 					"style": {
 						"navigationBarTitleText": "邀请管理",

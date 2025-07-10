@@ -197,13 +197,15 @@ export default {
 			
 			try {
 				const response = await getCommissionInfo()
+				// 修复数据解析路径：处理新的API响应格式 response.data.commissionOverview
 				const data = response.data || response
+				const overview = data.commissionOverview || data
 				
 				this.commissionData = {
-					totalAmount: data.totalAmount || 0,
-					withdrawnAmount: data.withdrawnAmount || 0,
-					pendingAmount: data.pendingAmount || 0,
-					availableAmount: data.availableAmount || 0
+					totalAmount: overview.totalCommission || overview.totalAmount || 0,
+					withdrawnAmount: overview.withdrawnAmount || 0,
+					pendingAmount: overview.availableAmount || overview.pendingAmount || 0,
+					availableAmount: overview.availableAmount || 0
 				}
 				
 				console.log('佣金信息加载成功:', this.commissionData)
@@ -246,15 +248,16 @@ export default {
 					pageSize: this.recordsPageSize
 				})
 				
+				// 修复数据解析路径：处理新的API响应格式 response.data.records
 				const recordsData = response.data || response
-				const records = recordsData.list || recordsData.records || []
+				const records = recordsData.records || recordsData.list || recordsData || []
 				
-				// 处理数据格式
+				// 处理数据格式：正确映射新API响应字段
 				const formattedRecords = records.map(record => ({
 					id: record.id,
-					type: record.type || record.commissionType || '推广分成',
-					time: record.createdAt || record.time,
-					amount: record.amount,
+					type: record.commissionSource || record.type || record.commissionType || '推广分成',
+					time: record.recordTime || record.createdAt || record.time,
+					amount: record.commissionAmount || record.amount,
 					status: record.status,
 					description: record.description || record.remark
 				}))
