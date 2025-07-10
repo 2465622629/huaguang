@@ -7,7 +7,23 @@
 
     <!-- 可滚动的页面内容 -->
     <scroll-view class="scroll-container" scroll-y="true">
-      <view class="page-content">
+      <!-- 加载状态 -->
+      <view v-if="loading" class="loading-container">
+        <uv-loading-icon mode="circle" color="#20B2AA" size="40"></uv-loading-icon>
+        <text class="loading-text">正在加载职位详情...</text>
+      </view>
+      
+      <!-- 错误状态 -->
+      <view v-else-if="error" class="error-container">
+        <uv-icon name="error-circle" size="60" color="#FF6B6B"></uv-icon>
+        <text class="error-text">{{ error }}</text>
+        <view class="retry-btn" @click="loadJobDetail(jobId)">
+          <text class="retry-text">重新加载</text>
+        </view>
+      </view>
+      
+      <!-- 正常内容 -->
+      <view v-else class="page-content">
         <!-- 职位标题与薪资区域 -->
         <view class="job-header">
           <view class="job-title-salary">
@@ -16,15 +32,15 @@
           </view>
           <view class="job-tags">
             <view class="tag-item">
-              <uv-icon :name="`${config.staticBaseUrl}/icons/location.png`" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="config.staticBaseUrl + '/icons/location.png'" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.location }}</text>
             </view>
             <view class="tag-item">
-              <uv-icon :name="`${config.staticBaseUrl}/icons/experience.png`" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="config.staticBaseUrl + '/icons/experience.png'" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.experience }}</text>
             </view>
             <view class="tag-item">
-              <uv-icon :name="`${config.staticBaseUrl}/icons/graduation.png`" size="24" color="#888888"></uv-icon>
+              <uv-icon :name="config.staticBaseUrl + '/icons/graduation.png'" size="24" color="#888888"></uv-icon>
               <text class="tag-text">{{ jobInfo.education }}</text>
             </view>
           </view>
@@ -108,6 +124,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { getJobDetail, applyJob } from '@/api/modules/enterprise.js'
 
 export default {
   data() {
@@ -116,35 +133,25 @@ export default {
       safeAreaBottom: 0,
       navbarBgColor: 'transparent',
       navbarTextColor: '#3F3F3F',
+      loading: false,
+      error: null,
+      jobId: null,
       jobInfo: {
-        title: '法务专员',
-        salary: '6k-9k',
-        location: '上海市·浦东新区',
-        experience: '1-3年',
-        education: '本科',
-        companyName: 'XX科技有限公司',
-        companyDesc: '互联网 · 软件开发 ',
-        companySize: '500-999人',
-        description: '本岗位主要负责公司合同审核、法律咨询支持、风险防控管理及法律文书处理等相关事务，确保公司经营活动合法合规。',
-        responsibilities: [
-          '负责各类合同、协议的起草与审核；',
-          '提供日常法律咨询服务，出具法律意见书；',
-          '参与处理劳动人事、商业合作等相关法律事务；',
-          '协助进行公司合规体系建设，培训业务部门员工；',
-          '配合处理公司重大突发法律事务。'
-        ],
+        title: '职位加载中...',
+        salary: '薪资面议',
+        location: '工作地点',
+        experience: '经验要求',
+        education: '学历要求',
+        companyName: '企业名称',
+        companyDesc: '企业描述',
+        companySize: '企业规模',
+        description: '职位描述加载中...',
+        responsibilities: [],
         requirements: {
-          education: '本科及以上 (法律相关专业优先)',
-          experience: '1-3年相关工作经验',
-          skills: [
-            '熟悉合同法、劳动法、公司法等相关法律法规',
-            '能独立起草、审核法律文件'
-          ],
-          others: [
-            '具备较强的沟通协调能力与逻辑分析能力',
-            '具备良好的职业道德，严谨细致',
-            '有律师资格证者优先'
-          ]
+          education: '学历要求',
+          experience: '经验要求',
+          skills: [],
+          others: []
         }
       }
     }
@@ -153,7 +160,10 @@ export default {
     this.getSystemInfo()
     // 接收传递的职位ID参数
     if (options.id) {
+      this.jobId = options.id
       this.loadJobDetail(options.id)
+    } else {
+      this.error = '职位ID参数缺失'
     }
   },
   methods: {
@@ -176,112 +186,137 @@ export default {
     },
 
     // 投递简历
-    submitResume() {
-      uni.showToast({
-        title: '简历投递成功',
-        icon: 'success'
-      })
+    async submitResume() {
+      if (!this.jobId) {
+        uni.showToast({
+          title: '职位信息错误',
+          icon: 'none'
+        })
+        return
+      }
+
+      try {
+        uni.showLoading({
+          title: '投递中...'
+        })
+
+        const response = await applyJob({
+          jobId: this.jobId,
+          coverLetter: '我对这个职位很感兴趣，希望能够加入贵公司。'
+        })
+
+        uni.hideLoading()
+        
+        if (response) {
+          uni.showToast({
+            title: '简历投递成功',
+            icon: 'success'
+          })
+        } else {
+          throw new Error('投递失败')
+        }
+      } catch (error) {
+        uni.hideLoading()
+        console.error('投递简历失败:', error)
+        uni.showToast({
+          title: error.message || '投递失败，请稍后重试',
+          icon: 'none'
+        })
+      }
     },
 
     // 根据职位ID加载职位详情
-    loadJobDetail(jobId) {
-      // 模拟不同职位的数据
-      const jobData = {
-        1: {
-          title: '法务专员',
-          salary: '6k-9k',
-          location: '上海市·浦东新区',
-          experience: '1-3年',
-          education: '本科',
-          companyName: 'XX科技有限公司',
-          companyDesc: '互联网 · 软件开发 500-999人',
-          description: '本岗位主要负责公司合同审核、法律咨询支持、风险防控管理及法律文书处理等相关事务，确保公司经营活动合法合规。',
-          responsibilities: [
-            '负责各类合同、协议的起草与审核；',
-            '提供日常法律咨询服务，出具法律意见书；',
-            '参与处理劳动人事、商业合作等相关法律事务；',
-            '协助进行公司合规体系建设，培训业务部门员工；',
-            '配合处理公司重大突发法律事务。'
-          ],
-          requirements: {
-            education: '本科及以上 (法律相关专业优先)',
-            experience: '1-3年相关工作经验',
-            skills: [
-              '熟悉合同法、劳动法、公司法等相关法律法规',
-              '能独立起草、审核法律文件'
-            ],
-            others: [
-              '具备较强的沟通协调能力与逻辑分析能力',
-              '具备良好的职业道德，严谨细致',
-              '有律师资格证者优先'
-            ]
-          }
-        },
-        2: {
-          title: '心理咨询师',
-          salary: '8k-12k',
-          location: '北京市·朝阳区',
-          experience: '2-5年',
-          education: '本科',
-          companyName: 'YY心理健康中心',
-          companyDesc: '医疗健康 · 心理服务 100-499人',
-          description: '负责为来访者提供专业的心理咨询服务，包括个体咨询、团体咨询等，帮助来访者解决心理困扰，提升心理健康水平。',
-          responsibilities: [
-            '为来访者提供个体心理咨询服务；',
-            '开展团体心理咨询和心理健康讲座；',
-            '制定个性化的心理干预方案；',
-            '撰写心理评估报告和咨询记录；',
-            '参与心理危机干预和应急处理。'
-          ],
-          requirements: {
-            education: '本科及以上 (心理学相关专业)',
-            experience: '2-5年心理咨询工作经验',
-            skills: [
-              '具备国家心理咨询师资格证书',
-              '熟练掌握各种心理咨询技术和方法'
-            ],
-            others: [
-              '具备良好的沟通能力和共情能力',
-              '有较强的心理承受能力和职业操守',
-              '有团体咨询经验者优先'
-            ]
-          }
-        },
-        3: {
-          title: '软件工程师',
-          salary: '10k-18k',
-          location: '深圳市·南山区',
-          experience: '3-5年',
-          education: '本科',
-          companyName: 'ZZ互联网公司',
-          companyDesc: '互联网 · 软件开发 1000+人',
-          description: '负责公司核心产品的后端开发工作，参与系统架构设计，确保系统的稳定性和可扩展性。',
-          responsibilities: [
-            '负责后端系统的设计和开发；',
-            '参与产品需求分析和技术方案设计；',
-            '优化系统性能，提升用户体验；',
-            '编写技术文档和代码注释；',
-            '参与代码审查和技术分享。'
-          ],
-          requirements: {
-            education: '本科及以上 (计算机相关专业)',
-            experience: '3-5年软件开发经验',
-            skills: [
-              '熟练掌握Java、Python等编程语言',
-              '熟悉Spring、MyBatis等开发框架'
-            ],
-            others: [
-              '具备良好的编程习惯和代码规范意识',
-              '有分布式系统开发经验者优先',
-              '具备良好的团队协作能力'
-            ]
-          }
-        }
+    async loadJobDetail(jobId) {
+      if (!jobId) {
+        this.error = '职位ID无效'
+        return
       }
 
-      // 根据ID获取对应的职位数据，如果没有找到则使用默认数据
-      const selectedJob = jobData[jobId] || jobData[1]
-      this.jobInfo = selectedJob
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await getJobDetail(jobId)
+        console.log('职位详情数据:', response)
+
+        if (response && response.job) {
+          const job = response.job
+          const enterprise = response.enterprise || {}
+          
+          // 处理薪资格式
+          let salary = '面议'
+          if (job.salaryMin && job.salaryMax) {
+            const minK = Math.floor(job.salaryMin / 1000)
+            const maxK = Math.floor(job.salaryMax / 1000)
+            salary = `${minK}k-${maxK}k`
+          } else if (job.salary) {
+            salary = job.salary
+          }
+
+          // 处理职责列表
+          let responsibilities = []
+          if (job.responsibilities) {
+            if (Array.isArray(job.responsibilities)) {
+              responsibilities = job.responsibilities
+            } else if (typeof job.responsibilities === 'string') {
+              responsibilities = job.responsibilities.split('\n').filter(item => item.trim())
+            }
+          }
+
+          // 处理技能要求
+          let skills = []
+          if (job.skillRequirements) {
+            if (Array.isArray(job.skillRequirements)) {
+              skills = job.skillRequirements
+            } else if (typeof job.skillRequirements === 'string') {
+              skills = job.skillRequirements.split('\n').filter(item => item.trim())
+            }
+          }
+
+          // 处理其他要求
+          let others = []
+          if (job.otherRequirements) {
+            if (Array.isArray(job.otherRequirements)) {
+              others = job.otherRequirements
+            } else if (typeof job.otherRequirements === 'string') {
+              others = job.otherRequirements.split('\n').filter(item => item.trim())
+            }
+          }
+
+          this.jobInfo = {
+            title: job.title || '职位名称',
+            salary: salary,
+            location: job.location || '工作地点',
+            experience: job.workExperience || job.experienceRequirement || '经验要求',
+            education: job.educationRequirement || '学历要求',
+            companyName: enterprise.companyName || job.companyName || '企业名称',
+            companyDesc: `${enterprise.industry || '行业'} · ${enterprise.companyType || '企业类型'}`,
+            companySize: enterprise.companySize || enterprise.scale || '企业规模',
+            description: job.description || '职位描述',
+            responsibilities: responsibilities,
+            requirements: {
+              education: job.educationRequirement || '学历要求',
+              experience: job.workExperience || job.experienceRequirement || '经验要求',
+              skills: skills,
+              others: others
+            }
+          }
+        } else {
+          throw new Error('职位信息不存在')
+        }
+      } catch (error) {
+        console.error('加载职位详情失败:', error)
+        this.error = error.message || '加载职位详情失败，请稍后重试'
+        
+        // 显示错误提示
+        uni.showToast({
+          title: this.error,
+          icon: 'none',
+          duration: 2000
+        })
+      } finally {
+        this.loading = false
+      }
     }
   }
 }
@@ -538,5 +573,49 @@ export default {
       transform: scale(0.98);
     }
   }
+}
+
+// 加载状态样式
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+// 错误状态样式
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #FF6B6B;
+  text-align: center;
+  padding: 0 40rpx;
+}
+
+.retry-btn {
+  background-color: #88c5ff;
+  border-radius: 20rpx;
+  padding: 10rpx 30rpx;
+  margin-top: 20rpx;
+}
+
+.retry-text {
+  font-size: 28rpx;
+  color: #000000;
 }
 </style>

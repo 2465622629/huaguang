@@ -117,6 +117,59 @@ export const getConsultationManagementList = (params) => {
   return get('/lawyer/workspace/consultations/management', params)
 }
 
+/**
+ * 提交法律文书审核结果
+ * @param {Object} data 审核数据
+ * @param {string} data.documentId 文档ID
+ * @param {string} data.reviewResult 审核结果 (approved, rejected)
+ * @param {string} [data.reviewComment] 审核意见
+ * @returns {Promise} 审核结果
+ */
+export const submitDocumentReview = (data) => {
+  return post('/legal/documents/review', data)
+}
+
+/**
+ * 获取法律文书详情
+ * @param {string} documentId 文档ID
+ * @returns {Promise} 文档详情
+ */
+export const getDocumentDetail = (documentId) => {
+  return get(`/lawyer/workspace/documents/${documentId}/detail`)
+}
+
+/**
+ * 获取法律文书列表
+ * @param {Object} params 查询参数
+ * @param {string} [params.status] 文书状态筛选 (all, draft, pending, approved, rejected)
+ * @param {string} [params.type] 文书类型筛选
+ * @param {string} [params.keyword] 搜索关键词
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=10] 每页大小
+ * @returns {Promise} 法律文书列表
+ */
+export const getLegalDocumentList = (params) => {
+  return get('/user/application-record/legal-documents', params)
+}
+
+/**
+ * 下载法律文书
+ * @param {string} documentId 文档ID
+ * @returns {Promise} 下载结果
+ */
+export const downloadLegalDocument = (documentId) => {
+  return post(`/lawyer/workspace/documents/${documentId}/download`)
+}
+
+/**
+ * 记录法律文书查看
+ * @param {string} documentId 文档ID
+ * @returns {Promise} 记录结果
+ */
+export const recordLegalDocumentView = (documentId) => {
+  return post(`/lawyer/workspace/documents/${documentId}/view`)
+}
+
 // 导出所有律师工作台相关API
 export default {
   getOrderSettings,
@@ -129,5 +182,10 @@ export default {
   getIncomeDetailList,
   getWorkspaceHome,
   getDocumentReviewList,
-  getConsultationManagementList
+  getConsultationManagementList,
+  submitDocumentReview,
+  getDocumentDetail,
+  getLegalDocumentList,
+  downloadLegalDocument,
+  recordLegalDocumentView
 }

@@ -3,35 +3,35 @@
     <uv-tabbar :value="current" @change="onChange">
       <uv-tabbar-item text="首页">
         <template v-slot:active-icon>
-          <image class="icon" :src="`${staticBaseUrl}/home-active.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/home-active.png'"></image>
         </template>
         <template v-slot:inactive-icon>
-          <image class="icon" :src="`${staticBaseUrl}/home.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/home.png'"></image>
         </template>
       </uv-tabbar-item>
       <uv-tabbar-item text="青年帮扶基金">
         <template v-slot:active-icon>
-          <image class="icon" :src="`${staticBaseUrl}/fund-active.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/fund-active.png'"></image>
         </template>
         <template v-slot:inactive-icon>
-          <image class="icon" :src="`${staticBaseUrl}/fund.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/fund.png'"></image>
         </template>
       </uv-tabbar-item>
       <!-- 信息页面功能已注释 -->
       <!-- <uv-tabbar-item text="信息">
         <template v-slot:active-icon>
-          <image class="icon" :src="`${staticBaseUrl}/icons/info-active.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/icons/info-active.png'"></image>
         </template>
         <template v-slot:inactive-icon>
-          <image class="icon" :src="`${staticBaseUrl}/info.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/info.png'"></image>
         </template>
       </uv-tabbar-item> -->
       <uv-tabbar-item text="我的">
         <template v-slot:active-icon>
-          <image class="icon" :src="`${staticBaseUrl}/icons/profile-active.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/icons/profile-active.png'"></image>
         </template>
         <template v-slot:inactive-icon>
-          <image class="icon" :src="`${staticBaseUrl}/profile.png`"></image>
+          <image class="icon" :src="staticBaseUrl + '/profile.png'"></image>
         </template>
       </uv-tabbar-item>
     </uv-tabbar>

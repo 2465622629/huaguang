@@ -257,6 +257,60 @@ export const deleteLawyerAccount = (data) => {
   return del('/lawyer/account', data)
 }
 
+/**
+ * 获取律师端咨询列表（律师查看自己的咨询）
+ * @param {Object} params 查询参数
+ * @param {number} [params.page] 页码
+ * @param {number} [params.pageSize] 每页数量
+ * @param {string} [params.status] 状态筛选（pending, replied, closed）
+ * @param {string} [params.keyword] 搜索关键词
+ * @param {string} [params.category] 法律类别
+ * @param {string} [params.sortBy] 排序方式
+ * @param {string} [params.sortOrder] 排序顺序
+ * @returns {Promise} 咨询列表
+ */
+export const getLawyerConsultations = (params) => {
+  return get('/lawyer/consultations', params)
+}
+
+/**
+ * 回复用户咨询
+ * @param {string} consultationId 咨询ID
+ * @param {Object} data 回复数据
+ * @param {string} data.content 回复内容
+ * @param {Array} [data.images] 回复图片
+ * @param {Array} [data.attachments] 附件列表
+ * @param {string} [data.replyType] 回复类型（text, voice, video）
+ * @returns {Promise} 回复结果
+ */
+export const replyConsultation = (consultationId, data) => {
+  return post(`/lawyer/consultations/${consultationId}/reply`, data)
+}
+
+/**
+ * 更新咨询状态
+ * @param {string} consultationId 咨询ID
+ * @param {Object} data 状态数据
+ * @param {string} data.status 新状态（pending, replied, closed）
+ * @param {string} [data.note] 状态更新说明
+ * @returns {Promise} 更新结果
+ */
+export const updateConsultationStatus = (consultationId, data) => {
+  return put(`/lawyer/consultations/${consultationId}/status`, data)
+}
+
+/**
+ * 获取律师咨询统计数据
+ * @param {Object} params 查询参数
+ * @param {string} [params.period] 统计周期（day, week, month, year）
+ * @param {string} [params.startDate] 开始日期
+ * @param {string} [params.endDate] 结束日期
+ * @returns {Promise} 统计数据
+ */
+export const getLawyerConsultationStats = (params) => {
+  return get('/lawyer/consultations/stats', params)
+}
+
 // 导出所有律师相关API
 export default {
   getLawyers,
@@ -279,5 +333,10 @@ export default {
   updateLawyerInfo,
   updateLawyerOnlineStatus,
   registerLawyer,
-  deleteLawyerAccount
+  deleteLawyerAccount,
+  // 律师端咨询管理接口
+  getLawyerConsultations,
+  replyConsultation,
+  updateConsultationStatus,
+  getLawyerConsultationStats
 }

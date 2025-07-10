@@ -20,7 +20,7 @@ const responseInterceptor = (response) => {
     // 检查业务状态码 (支持200和0两种成功状态码)
     if (data.code === errorCodes.SUCCESS || data.code === 200) {
       console.log('✅ 业务状态码检查通过，返回data.data')
-      return data.data
+      return data
     } else {
       console.log('❌ 业务状态码检查失败，进入错误处理')
       // 业务错误处理

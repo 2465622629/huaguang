@@ -1,69 +1,190 @@
 <template>
-  <view class="skill-detail-container" :style="{ backgroundImage: `url('${config.staticBaseUrl}/bg3.png')` }">
+  <view class="skill-detail-container" :style="{ backgroundImage: 'url(' + config.staticBaseUrl + '/bg3.png)' }">
     <!-- 自定义导航栏 -->
     <uv-navbar 
-      :safeAreaInsetTop="true"
-      placeholder
-      :bgColor="navbarBgColor"
-      :border="false"
-    >
-      <template #left>
-        <view class="nav-back-btn" @click="goBack">
-          <uv-icon 
-            name="arrow-left" 
-            size="18" 
-            :color="navIconColor"
-          ></uv-icon>
-          <text class="back-text">返回</text>
-        </view>
-      </template>
-    </uv-navbar>
+      :background="{ background: 'transparent' }"
+      left-icon="arrow-left"
+      left-text=""
+      title="课程详情"
+      title-color="#FFFFFF"
+      @left-click="goBack"
+    ></uv-navbar>
 
     <!-- 页面内容 -->
-    <view class="page-content">
+    <scroll-view 
+      class="page-content" 
+      scroll-y="true"
+      :style="{ height: scrollViewHeight + 'px' }"
+      :refresher-enabled="true"
+      :refresher-triggered="isRefreshing"
+      @refresherrefresh="onRefresh"
+    >
       <!-- 横幅插画区域 -->
       <view class="banner-section">
         <image 
           class="banner-image" 
-          :src="`${config.staticBaseUrl}/skill.png`" 
+          :src="courseInfo.thumbnail || config.staticBaseUrl + '/skill.png'" 
           mode="aspectFill"
+          @error="onImageError"
         ></image>
         
-      </view>
-
-      <!-- 课程标题区域 -->
-      <view class="course-title-section">
-        <text class="course-title">{{ courseInfo.title }}</text>
-      </view>
-
-      <!-- 统计数据区域 -->
-      <view class="statistics-section">
-        <view class="stat-item">
-          <uv-icon name="eye" size="14" :color="statIconColor"></uv-icon>
-          <text class="stat-text">{{ courseInfo.viewCount }}次观看</text>
+        <!-- 价格信息 -->
+        <view v-if="courseInfo.price !== undefined" class="price-overlay">
+          <view v-if="courseInfo.price > 0" class="price-tag">
+            <text class="price">¥{{ courseInfo.price }}</text>
+            <text v-if="courseInfo.originalPrice > courseInfo.price" class="original-price">¥{{ courseInfo.originalPrice }}</text>
+          </view>
+          <view v-else class="free-tag">免费</view>
         </view>
-        <view class="stat-right-group">
-          <view class="stat-item" @click="toggleFavorite">
-            <uv-icon 
-              name="star-fill" 
-              size="32" 
-              :color="favoriteIconColor"
-            ></uv-icon>
-            <text class="stat-text">{{ courseInfo.favoriteCount }}</text>
-          </view>
-          <view class="stat-item" @click="handleShare">
-            <uv-icon name="share-fill" size="32" :color="statIconColor"></uv-icon>
-            <text class="stat-text">{{ courseInfo.shareCount }}</text>
-          </view>
+        
+        <!-- 时长信息 -->
+        <view v-if="courseInfo.duration" class="duration-overlay">
+          <uv-icon name="clock" size="24" color="#FFFFFF"></uv-icon>
+          <text class="duration-text">{{ courseInfo.duration }}</text>
         </view>
       </view>
 
-      <!-- 课程简介区域 -->
-      <view class="introduction-section">
-        <text class="intro-title">课程简介</text>
-        <text class="intro-content">{{ courseInfo.introduction }}</text>
+      <!-- 加载状态 -->
+      <view v-if="isLoading && !courseInfo.title" class="loading-section">
+        <uv-loading-icon mode="flower" size="60"></uv-loading-icon>
+        <text class="loading-text">正在加载课程详情...</text>
       </view>
-    </view>
+
+      <!-- 错误状态 -->
+      <view v-else-if="errorState.hasError && !courseInfo.title" class="error-section">
+        <uv-icon name="wifi-off" size="120" color="#cccccc"></uv-icon>
+        <text class="error-text">{{ errorState.errorMessage }}</text>
+        <uv-button 
+          v-if="errorState.canRetry"
+          text="重试" 
+          type="primary" 
+          size="small"
+          @click="retryLoad"
+          :loading="isLoading"
+          class="retry-button"
+        />
+      </view>
+
+      <!-- 课程内容 -->
+      <view v-else class="course-content">
+        <!-- 课程标题区域 -->
+        <view class="course-title-section">
+          <text class="course-title">{{ courseInfo.title || '课程标题' }}</text>
+          
+          <!-- 课程标签 -->
+          <view v-if="courseInfo.category || courseInfo.level || courseInfo.tags" class="course-tags">
+            <text v-if="courseInfo.category" class="course-tag">{{ courseInfo.category }}</text>
+            <text v-if="courseInfo.level" class="course-tag level-tag">{{ courseInfo.level }}</text>
+            <text v-for="tag in (courseInfo.tags || [])" :key="tag" class="course-tag">{{ tag }}</text>
+          </view>
+          
+          <!-- 评分信息 -->
+          <view v-if="courseInfo.rating > 0" class="rating-section">
+            <view class="stars">
+              <uv-icon 
+                v-for="star in 5" 
+                :key="star"
+                name="star-fill" 
+                size="28" 
+                :color="star <= Math.floor(courseInfo.rating) ? '#FFB020' : '#E0E0E0'"
+              ></uv-icon>
+            </view>
+            <text class="rating-text">{{ courseInfo.rating.toFixed(1) }}</text>
+            <text class="rating-count">({{ courseInfo.reviewCount || 0 }}人评价)</text>
+          </view>
+        </view>
+
+        <!-- 统计数据区域 -->
+        <view class="statistics-section">
+          <view class="stat-item">
+            <uv-icon name="eye" size="32" color="#1890ff"></uv-icon>
+            <text class="stat-text">{{ formatViewCount(courseInfo.viewCount) }}次观看</text>
+          </view>
+          <view class="stat-right-group">
+            <view class="stat-item" @click="toggleFavorite">
+              <uv-icon
+                :name="courseInfo.isFavorited ? 'heart-fill' : 'heart'"
+                size="32"
+                :color="courseInfo.isFavorited ? '#FF4D4F' : '#888888'"
+              ></uv-icon>
+              <text class="stat-text">{{ courseInfo.favoriteCount || 0 }}</text>
+            </view>
+            <view class="stat-item" @click="handleShare">
+              <uv-icon name="share-fill" size="32" color="#52C41A"></uv-icon>
+              <text class="stat-text">{{ courseInfo.shareCount || 0 }}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 讲师信息区域 -->
+        <view v-if="courseInfo.instructor" class="instructor-section">
+          <text class="section-title">讲师介绍</text>
+          <view class="instructor-info">
+            <image
+              v-if="courseInfo.instructor.avatar"
+              class="instructor-avatar"
+              :src="courseInfo.instructor.avatar"
+              mode="aspectFill"
+              @error="onInstructorImageError"
+            ></image>
+            <view v-else class="instructor-avatar-placeholder">
+              <uv-icon name="account" size="48" color="#CCCCCC"></uv-icon>
+            </view>
+            <view class="instructor-details">
+              <text class="instructor-name">{{ courseInfo.instructor.name || '未知讲师' }}</text>
+              <text v-if="courseInfo.instructor.title" class="instructor-title">{{ courseInfo.instructor.title }}</text>
+              <text v-if="courseInfo.instructor.experience" class="instructor-experience">{{ courseInfo.instructor.experience }}年经验</text>
+              <view v-if="courseInfo.instructor.rating > 0" class="instructor-rating">
+                <uv-icon name="star-fill" size="24" color="#FFB020"></uv-icon>
+                <text class="instructor-rating-text">{{ courseInfo.instructor.rating.toFixed(1) }}</text>
+              </view>
+            </view>
+          </view>
+          <text v-if="courseInfo.instructor.bio" class="instructor-bio">{{ courseInfo.instructor.bio }}</text>
+        </view>
+
+        <!-- 课程简介区域 -->
+        <view class="introduction-section">
+          <text class="section-title">课程简介</text>
+          <text class="intro-content">{{ courseInfo.introduction || courseInfo.description || '暂无课程简介' }}</text>
+        </view>
+
+        <!-- 课程信息区域 -->
+        <view class="course-info-section">
+          <text class="section-title">课程信息</text>
+          <view class="info-grid">
+            <view v-if="courseInfo.duration" class="info-item">
+              <uv-icon name="clock" size="32" color="#1890ff"></uv-icon>
+              <view class="info-content">
+                <text class="info-label">课程时长</text>
+                <text class="info-value">{{ courseInfo.duration }}</text>
+              </view>
+            </view>
+            <view v-if="courseInfo.difficulty" class="info-item">
+              <uv-icon name="bookmark" size="32" color="#52C41A"></uv-icon>
+              <view class="info-content">
+                <text class="info-label">难度等级</text>
+                <text class="info-value">{{ courseInfo.difficulty }}</text>
+              </view>
+            </view>
+            <view v-if="courseInfo.language" class="info-item">
+              <uv-icon name="chat" size="32" color="#FA8C16"></uv-icon>
+              <view class="info-content">
+                <text class="info-label">授课语言</text>
+                <text class="info-value">{{ courseInfo.language }}</text>
+              </view>
+            </view>
+            <view v-if="courseInfo.updateTime" class="info-item">
+              <uv-icon name="calendar" size="32" color="#722ED1"></uv-icon>
+              <view class="info-content">
+                <text class="info-label">更新时间</text>
+                <text class="info-value">{{ formatDate(courseInfo.updateTime) }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -71,219 +192,479 @@
 import config from '@/config/index.js'
 
 export default {
+  name: 'SkillTrainingDetail',
   data() {
     return {
       config,
-      // 导航栏配色
-      navbarBgColor: '#bae1ff',
-      navIconColor: '#467bff',
-      statIconColor: '#888',
-      
-      // 课程信息
+      scrollViewHeight: 600,
+      isRefreshing: false,
+      isLoading: false,
+      errorState: {
+        hasError: false,
+        errorMessage: '',
+        canRetry: false
+      },
       courseInfo: {
-        title: '从零开始学Python编程',
-        viewCount: '1.2万',
-        favoriteCount: 108,
-        shareCount: 108,
-        introduction: '本课程专为Python零基础学员打造，全面讲解Python语言的基础语法与核心概念，配合大量案例和练习，帮助学员从零掌握编程思维，具备独立编写Python程序的能力。',
-        isFavorited: false
+        title: '',
+        thumbnail: '',
+        price: 0,
+        originalPrice: 0,
+        duration: '',
+        rating: 0,
+        reviewCount: 0,
+        viewCount: 0,
+        favoriteCount: 0,
+        shareCount: 0,
+        isFavorited: false,
+        category: '',
+        level: '',
+        tags: [],
+        instructor: null,
+        introduction: '',
+        description: '',
+        difficulty: '',
+        language: '',
+        updateTime: ''
       }
     }
   },
-  computed: {
-    favoriteIconColor() {
-      return this.courseInfo.isFavorited ? '#FFA500' : '#888888'
-    }
-  },
   onLoad(options) {
-    // 接收从列表页传递的课程信息
-    if (options.courseId) {
-      this.loadCourseDetail(options.courseId)
-    }
+    console.log('课程详情页加载参数:', options)
+    this.initializePage()
   },
   methods: {
     goBack() {
       uni.navigateBack()
     },
     
+    initializePage() {
+      this.calculateScrollViewHeight()
+      this.loadCourseData()
+    },
+    
+    calculateScrollViewHeight() {
+      const systemInfo = uni.getSystemInfoSync()
+      const statusBarHeight = systemInfo.statusBarHeight || 44
+      const navBarHeight = 88
+      
+      this.scrollViewHeight = systemInfo.windowHeight - statusBarHeight - navBarHeight
+    },
+    
+    async loadCourseData() {
+      try {
+        this.isLoading = true
+        console.log('加载课程数据')
+        // 模拟数据加载
+        setTimeout(() => {
+          this.courseInfo = {
+            title: '技能训练课程',
+            description: '这是一个技能训练课程的详细介绍...',
+            duration: '2小时30分钟',
+            rating: 4.5,
+            reviewCount: 128,
+            viewCount: 1520,
+            favoriteCount: 85,
+            shareCount: 32,
+            isFavorited: false,
+            category: '职业技能',
+            level: '初级',
+            tags: ['实用', '热门'],
+            difficulty: '初级',
+            language: '中文',
+            updateTime: new Date().toISOString()
+          }
+          this.isLoading = false
+        }, 1000)
+      } catch (error) {
+        console.error('加载课程数据失败:', error)
+        this.errorState = {
+          hasError: true,
+          errorMessage: '加载失败，请稍后重试',
+          canRetry: true
+        }
+      } finally {
+        this.isLoading = false
+      }
+    },
+    
+    onRefresh() {
+      this.isRefreshing = true
+      setTimeout(() => {
+        this.isRefreshing = false
+      }, 1000)
+    },
+    
+    retryLoad() {
+      this.errorState.hasError = false
+      this.loadCourseData()
+    },
+    
+    onImageError() {
+      console.log('图片加载失败')
+    },
+    
+    onInstructorImageError() {
+      console.log('讲师头像加载失败')
+    },
+    
+    formatViewCount(count) {
+      if (!count) return '0'
+      if (count >= 10000) {
+        return (count / 10000).toFixed(1) + '万'
+      }
+      if (count >= 1000) {
+        return (count / 1000).toFixed(1) + 'k'
+      }
+      return count.toString()
+    },
+    
     toggleFavorite() {
       this.courseInfo.isFavorited = !this.courseInfo.isFavorited
-      // 这里可以调用API更新收藏状态
-      uni.showToast({
-        title: this.courseInfo.isFavorited ? '已收藏' : '已取消收藏',
-        icon: 'none',
-        duration: 1500
-      })
+      if (this.courseInfo.isFavorited) {
+        this.courseInfo.favoriteCount++
+      } else {
+        this.courseInfo.favoriteCount--
+      }
     },
     
     handleShare() {
-      uni.showToast({
-        title: '分享功能',
-        icon: 'none',
-        duration: 1500
-      })
+      console.log('分享课程')
     },
     
-    loadCourseDetail(courseId) {
-      // 根据courseId加载具体的课程详情
-      console.log('加载课程详情:', courseId)
-      
-      // 模拟不同课程的数据
-      const courseData = {
-        '新媒体营销策略精讲': {
-          title: '新媒体营销策略精讲',
-          viewCount: '1.9万',
-          favoriteCount: 156,
-          shareCount: 89,
-          introduction: '本课程深入讲解新媒体营销的核心策略和实战技巧，涵盖内容营销、社交媒体运营、数据分析等关键领域，帮助学员掌握现代营销的精髓，提升品牌影响力和转化效果。'
-        },
-        '从零开始学Python编程': {
-          title: '从零开始学Python编程',
-          viewCount: '1.2万',
-          favoriteCount: 108,
-          shareCount: 108,
-          introduction: '本课程专为Python零基础学员打造，全面讲解Python语言的基础语法与核心概念，配合大量案例和练习，帮助学员从零掌握编程思维，具备独立编写Python程序的能力。'
-        }
-      }
-      
-      // 如果找到对应的课程数据，则更新
-      if (courseData[courseId]) {
-        this.courseInfo = {
-          ...this.courseInfo,
-          ...courseData[courseId]
-        }
-      }
+    formatDate(dateString) {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-// CSS变量定义
-:root {
-  --primary-blue: #2563EB;
-  --light-blue: #E0F2FF;
-  --gradient-start: #60A5FA;
-  --gradient-end: #93C5FD;
-  --dark-gray: #333333;
-  --medium-gray: #555555;
-  --light-gray: #888888;
-  --orange: #FFA500;
-  --white: #FFFFFF;
-  --page-bg-start: #EBF5FF;
-  --page-bg-end: #F8FBFF;
-}
-
 .skill-detail-container {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
 }
 
-// 导航栏样式
-.nav-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.page-content {
+  flex: 1;
+}
+
+.banner-section {
+  position: relative;
+  height: 200px;
+  margin: 20px;
+  border-radius: 12px;
+  overflow: hidden;
   
-  .back-text {
-    font-size: 16px;
-    color: var(--primary-blue);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  .banner-image {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .price-overlay {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    
+    .price-tag {
+      background-color: rgba(255, 0, 0, 0.8);
+      color: #FFFFFF;
+      padding: 4px 8px;
+      border-radius: 4px;
+      
+      .price {
+        font-size: 14px;
+        font-weight: bold;
+      }
+      
+      .original-price {
+        font-size: 12px;
+        text-decoration: line-through;
+        margin-left: 4px;
+      }
+    }
+    
+    .free-tag {
+      background-color: rgba(0, 255, 0, 0.8);
+      color: #FFFFFF;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  }
+  
+  .duration-overlay {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    display: flex;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+    
+    .duration-text {
+      color: #FFFFFF;
+      font-size: 12px;
+      margin-left: 4px;
+    }
   }
 }
 
-// 页面内容
-.page-content {
-  padding: 0;
+.loading-section {
+  text-align: center;
+  padding: 60px 20px;
+  
+  .loading-text {
+    color: #999999;
+    font-size: 14px;
+    margin-top: 20px;
+  }
 }
 
-// 横幅插画区域
-.banner-section {
-  position: relative;
-  width: 100%;
-  height: 280px;
-  overflow: hidden;
+.error-section {
+  text-align: center;
+  padding: 60px 20px;
+  
+  .error-text {
+    color: #999999;
+    font-size: 14px;
+    margin: 20px 0;
+  }
+  
+  .retry-button {
+    margin-top: 20px;
+  }
 }
 
-.banner-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.course-content {
+  padding: 20px;
 }
 
-// 横幅标题
-.banner-title {
-  position: absolute;
-  top: 30px;
-  right: 30px;
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--white);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  transform: perspective(100px) rotateX(5deg);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-// 课程标题区域
 .course-title-section {
-  padding: 20px 16px 0;
+  margin-bottom: 20px;
+  
+  .course-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333333;
+    margin-bottom: 10px;
+  }
+  
+  .course-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+    
+    .course-tag {
+      background-color: #F0F0F0;
+      color: #666666;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      
+      &.level-tag {
+        background-color: #E6F7FF;
+        color: #1890FF;
+      }
+    }
+  }
+  
+  .rating-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .stars {
+      display: flex;
+      gap: 2px;
+    }
+    
+    .rating-text {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333333;
+    }
+    
+    .rating-count {
+      font-size: 12px;
+      color: #999999;
+    }
+  }
 }
 
-.course-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: var(--dark-gray);
-  line-height: 1.4;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-// 统计数据区域
 .statistics-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 15px 0;
+  border-top: 1px solid #F0F0F0;
+  border-bottom: 1px solid #F0F0F0;
+  margin-bottom: 20px;
+  
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    
+    .stat-text {
+      font-size: 12px;
+      color: #666666;
+    }
+  }
+  
+  .stat-right-group {
+    display: flex;
+    gap: 20px;
+  }
 }
 
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.instructor-section {
+  margin-bottom: 20px;
+  
+  .section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333333;
+    margin-bottom: 15px;
+  }
+  
+  .instructor-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    
+    .instructor-avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      margin-right: 15px;
+    }
+    
+    .instructor-avatar-placeholder {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: #F0F0F0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 15px;
+    }
+    
+    .instructor-details {
+      flex: 1;
+      
+      .instructor-name {
+        display: block;
+        font-size: 16px;
+        font-weight: bold;
+        color: #333333;
+        margin-bottom: 4px;
+      }
+      
+      .instructor-title {
+        display: block;
+        font-size: 14px;
+        color: #666666;
+        margin-bottom: 2px;
+      }
+      
+      .instructor-experience {
+        display: block;
+        font-size: 12px;
+        color: #999999;
+        margin-bottom: 4px;
+      }
+      
+      .instructor-rating {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        
+        .instructor-rating-text {
+          font-size: 12px;
+          color: #FFB020;
+          font-weight: bold;
+        }
+      }
+    }
+  }
+  
+  .instructor-bio {
+    font-size: 14px;
+    color: #666666;
+    line-height: 1.5;
+  }
 }
 
-.stat-text {
-  font-size: 12px;
-  color: var(--light-gray);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-.stat-right-group {
-  display: flex;
-  gap: 15px;
-}
-
-// 课程简介区域
 .introduction-section {
-  padding: 20px 16px;
+  margin-bottom: 20px;
+  
+  .section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333333;
+    margin-bottom: 15px;
+  }
+  
+  .intro-content {
+    font-size: 14px;
+    color: #666666;
+    line-height: 1.6;
+  }
 }
 
-.intro-title {
-  display: block;
-  font-size: 16px;
-  font-weight: bold;
-  color: var(--dark-gray);
-  margin-bottom: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+.course-info-section {
+  margin-bottom: 20px;
+  
+  .section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333333;
+    margin-bottom: 15px;
+  }
+  
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background-color: #F9F9F9;
+      border-radius: 8px;
+      
+      .info-content {
+        flex: 1;
+        
+        .info-label {
+          display: block;
+          font-size: 12px;
+          color: #999999;
+          margin-bottom: 2px;
+        }
+        
+        .info-value {
+          font-size: 14px;
+          color: #333333;
+          font-weight: 500;
+        }
+      }
+    }
+  }
 }
-
-.intro-content {
-  display: block;
-  font-size: 14px;
-  color: var(--medium-gray);
-  line-height: 1.6;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-align: justify;
-}
-</style>
+</style> 

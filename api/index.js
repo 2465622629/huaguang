@@ -36,6 +36,10 @@ import aboutApi from './modules/about.js'
 import adminContentApi from './modules/admin-content.js'
 import lawyerWorkspaceApi from './modules/lawyer-workspace.js'
 import fileManagementApi from './modules/file-management.js'
+// 新增模块导入
+import psychologicalTestsApi from './modules/psychological-tests.js'
+import adminUsersApi from './modules/admin-users.js'
+import adminOrdersApi from './modules/admin-orders.js'
 
 // 统一导出所有API
 export {
@@ -65,7 +69,11 @@ export {
   // adminOrderApi,
   adminContentApi,
   lawyerWorkspaceApi,
-  fileManagementApi
+  fileManagementApi,
+  // 新增模块导出
+  psychologicalTestsApi,
+  adminUsersApi,
+  adminOrdersApi
 }
 
 // 默认导出
@@ -98,5 +106,9 @@ export default {
   // adminOrder: adminOrderApi,
   adminContent: adminContentApi,
   lawyerWorkspace: lawyerWorkspaceApi,
-  fileManagement: fileManagementApi
+  fileManagement: fileManagementApi,
+  // 新增模块
+  psychologicalTests: psychologicalTestsApi,
+  adminUsers: adminUsersApi,
+  adminOrders: adminOrdersApi
 }

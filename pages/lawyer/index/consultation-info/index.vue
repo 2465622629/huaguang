@@ -91,6 +91,7 @@
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
 import { staticBaseUrl } from '@/config/index.js'
+import { getUserConsultations, getConsultationDetail } from '@/api/modules/lawyer.js'
 
 export default {
   components: {
@@ -171,9 +172,73 @@ export default {
   
   mounted() {
     this.calculateScrollHeight()
+    this.loadConsultationData()
   },
   
   methods: {
+    // 加载咨询数据
+    async loadConsultationData() {
+      try {
+        this.loading = true
+        
+        const response = await getUserConsultations({
+          page: 1,
+          pageSize: 20
+        })
+        
+        if (response && response.data) {
+          // 转换API数据格式
+          this.consultationList = response.data.map(item => ({
+            id: item.id,
+            userName: item.clientName || '匿名用户',
+            caseType: item.category || '一般咨询',
+            description: item.content ? item.content.substring(0, 30) + '...' : '暂无描述',
+            timeStamp: this.formatTimeAgo(item.createdAt),
+            status: this.mapConsultationStatus(item.status)
+          }))
+        }
+      } catch (error) {
+        console.error('加载咨询数据失败:', error)
+        uni.showToast({
+          title: '加载数据失败',
+          icon: 'none',
+          duration: 2000
+        })
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 映射咨询状态
+    mapConsultationStatus(apiStatus) {
+      const statusMap = {
+        'pending': 0,    // 待回复
+        'ongoing': 1,    // 咨询中
+        'completed': 2   // 已完成
+      }
+      return statusMap[apiStatus] || 0
+    },
+    
+    // 格式化时间显示
+    formatTimeAgo(dateString) {
+      if (!dateString) return '刚刚'
+      
+      const now = new Date()
+      const date = new Date(dateString)
+      const diff = now - date
+      
+      const minutes = Math.floor(diff / (1000 * 60))
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      
+      if (minutes < 1) return '刚刚'
+      if (minutes < 60) return `${minutes}分钟前`
+      if (hours < 24) return `${hours}小时前`
+      if (days < 7) return `${days}天前`
+      
+      return date.toLocaleDateString()
+    },
+    
     // 计算滚动区域高度
     calculateScrollHeight() {
       const systemInfo = uni.getSystemInfoSync()
@@ -197,9 +262,27 @@ export default {
     },
     
     // 处理查看按钮点击
-    handleViewClick(item) {
-      console.log('点击查看按钮:', item)
-      // 这里可以跳转到咨询详情或聊天页面
+    async handleViewClick(item) {
+      try {
+        console.log('点击查看按钮:', item)
+        
+        // 获取咨询详情
+        const response = await getConsultationDetail(item.id)
+        
+        if (response) {
+          // 跳转到咨询详情或聊天页面
+          uni.navigateTo({
+            url: `/pages/lawyer/chat/index?consultationId=${item.id}`
+          })
+        }
+      } catch (error) {
+        console.error('获取咨询详情失败:', error)
+        uni.showToast({
+          title: '获取详情失败',
+          icon: 'none',
+          duration: 2000
+        })
+      }
     },
     
     // 加载更多数据

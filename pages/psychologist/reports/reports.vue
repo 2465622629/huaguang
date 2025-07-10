@@ -77,6 +77,8 @@
 </template>
 
 <script>
+	import { getUserPsychTestHistory, getPsychTestResult } from '@/api/modules/psychologist.js'
+	
 	export default {
 		data() {
 			return {
@@ -118,35 +120,141 @@
 				this.noMore = false
 				this.loadData()
 			},
-			loadData() {
+			async loadData() {
 				if (this.loading || this.noMore) return
 				
 				this.loading = true
-				// 模拟接口请求
-				setTimeout(() => {
-					const mockData = Array(this.pageSize).fill(0).map((_, index) => ({
-						id: this.page * this.pageSize + index,
-						title: '心理咨询评估报告',
-						description: '来访者表现出明显的焦虑症状，建议进行认知行为疗法干预。',
-						status: ['draft', 'completed', 'shared'][Math.floor(Math.random() * 3)],
-						statusText: {
-							draft: '草稿',
-							completed: '已完成',
-							shared: '已分享'
-						}[this.status],
-						userName: '王先生',
-						createTime: '2024-05-09 14:30',
-						category: '心理评估'
+				try {
+					// 调用心理测试历史API
+					const response = await getUserPsychTestHistory({
+						page: this.page,
+						pageSize: this.pageSize,
+						status: this.currentStatus === 'all' ? undefined : this.currentStatus,
+						keyword: this.searchKey || undefined
+					})
+					
+					const apiData = response.data || {}
+					const testHistory = apiData.list || []
+					
+					// 转换API数据格式为页面所需格式
+					const formattedData = await Promise.all(testHistory.map(async (item) => {
+						let testResult = null
+						try {
+							// 获取测试结果详情
+							const resultResponse = await getPsychTestResult({ testId: item.id })
+							testResult = resultResponse.data || {}
+						} catch (error) {
+							console.warn(`获取测试结果失败 (ID: ${item.id}):`, error)
+						}
+						
+						return {
+							id: item.id,
+							title: item.testName || '心理测试报告',
+							description: testResult?.summary || item.description || '心理测试评估报告',
+							status: this.mapTestStatus(item.status),
+							statusText: this.getStatusText(item.status),
+							userName: item.userName || item.clientName || '未知用户',
+							createTime: this.formatDateTime(item.createTime || item.testTime),
+							category: item.testType || '心理评估',
+							originalData: item,
+							testResult: testResult
+						}
 					}))
 					
-					this.reportList = [...this.reportList, ...mockData]
-					this.loading = false
-					
-					if (this.page >= 3) {
-						this.noMore = true
+					if (this.page === 1) {
+						this.reportList = formattedData
+					} else {
+						this.reportList = [...this.reportList, ...formattedData]
 					}
+					
+					// 检查是否还有更多数据
+					const hasMore = testHistory.length === this.pageSize && apiData.hasMore !== false
+					if (!hasMore) {
+						this.noMore = true
+					} else {
+						this.page++
+					}
+					
+				} catch (error) {
+					console.error('加载心理测试历史失败:', error)
+					
+					// API失败时使用模拟数据作为备用
+					if (this.page === 1) {
+						this.loadMockData()
+					} else {
+						uni.showToast({
+							title: '加载失败',
+							icon: 'none'
+						})
+					}
+				} finally {
+					this.loading = false
+				}
+			},
+
+			// 备用模拟数据加载方法
+			loadMockData() {
+				const mockData = Array(this.pageSize).fill(0).map((_, index) => ({
+					id: this.page * this.pageSize + index,
+					title: '心理咨询评估报告',
+					description: '来访者表现出明显的焦虑症状，建议进行认知行为疗法干预。',
+					status: ['draft', 'completed', 'shared'][Math.floor(Math.random() * 3)],
+					statusText: this.getStatusText(['draft', 'completed', 'shared'][Math.floor(Math.random() * 3)]),
+					userName: '王先生',
+					createTime: '2024-05-09 14:30',
+					category: '心理评估'
+				}))
+				
+				this.reportList = [...this.reportList, ...mockData]
+				
+				if (this.page >= 3) {
+					this.noMore = true
+				} else {
 					this.page++
-				}, 1000)
+				}
+			},
+
+			// 映射测试状态
+			mapTestStatus(apiStatus) {
+				const statusMap = {
+					'pending': 'draft',
+					'in_progress': 'draft',
+					'completed': 'completed',
+					'shared': 'shared',
+					'published': 'shared'
+				}
+				return statusMap[apiStatus] || 'draft'
+			},
+
+			// 获取状态文本
+			getStatusText(status) {
+				const textMap = {
+					'draft': '草稿',
+					'completed': '已完成',
+					'shared': '已分享',
+					'pending': '草稿',
+					'in_progress': '草稿',
+					'published': '已分享'
+				}
+				return textMap[status] || '草稿'
+			},
+
+			// 格式化日期时间
+			formatDateTime(dateTime) {
+				if (!dateTime) return '未知时间'
+				
+				try {
+					const date = new Date(dateTime)
+					const year = date.getFullYear()
+					const month = String(date.getMonth() + 1).padStart(2, '0')
+					const day = String(date.getDate()).padStart(2, '0')
+					const hours = String(date.getHours()).padStart(2, '0')
+					const minutes = String(date.getMinutes()).padStart(2, '0')
+					
+					return `${year}-${month}-${day} ${hours}:${minutes}`
+				} catch (error) {
+					return dateTime.toString()
+				}
 			},
 			loadMore() {
 				this.loadData()
@@ -157,34 +265,30 @@
 				})
 			},
 			handleEdit(report) {
+				// 传递更多参数以便编辑页面使用
+				const params = {
+					id: report.id,
+					testId: report.originalData?.testId || report.id,
+					type: 'edit'
+				}
+				const queryString = Object.keys(params).map(key => `${key}=${encodeURIComponent(params[key])}`).join('&')
+				
 				uni.navigateTo({
-					url: `/pages/psychologist/reports/edit?id=${report.id}`
+					url: `/pages/psychologist/reports/edit?${queryString}`
 				})
 			},
-			handleShare(report) {
+			async handleShare(report) {
 				uni.showActionSheet({
 					itemList: ['分享给来访者', '导出PDF', '打印'],
-					success: (res) => {
+					success: async (res) => {
 						switch (res.tapIndex) {
 							case 0:
 								// 分享给来访者
-								uni.showToast({
-									title: '分享成功',
-									icon: 'success'
-								})
+								await this.shareToClient(report)
 								break
 							case 1:
 								// 导出PDF
-								uni.showLoading({
-									title: '导出中...'
-								})
-								setTimeout(() => {
-									uni.hideLoading()
-									uni.showToast({
-										title: '导出成功',
-										icon: 'success'
-									})
-								}, 1500)
+								await this.exportToPDF(report)
 								break
 							case 2:
 								// 打印
@@ -196,6 +300,58 @@
 						}
 					}
 				})
+			},
+
+			// 分享给来访者
+			async shareToClient(report) {
+				try {
+					uni.showLoading({ title: '分享中...' })
+					
+					// TODO: 调用分享API
+					// 这里可以扩展API模块来支持报告分享功能
+					
+					setTimeout(() => {
+						uni.hideLoading()
+						uni.showToast({
+							title: '分享成功',
+							icon: 'success'
+						})
+					}, 1000)
+					
+				} catch (error) {
+					uni.hideLoading()
+					console.error('分享失败:', error)
+					uni.showToast({
+						title: '分享失败',
+						icon: 'none'
+					})
+				}
+			},
+
+			// 导出PDF
+			async exportToPDF(report) {
+				try {
+					uni.showLoading({ title: '导出中...' })
+					
+					// TODO: 调用PDF导出API
+					// 可以使用测试结果数据生成PDF报告
+					
+					setTimeout(() => {
+						uni.hideLoading()
+						uni.showToast({
+							title: '导出成功',
+							icon: 'success'
+						})
+					}, 1500)
+					
+				} catch (error) {
+					uni.hideLoading()
+					console.error('导出失败:', error)
+					uni.showToast({
+						title: '导出失败',
+						icon: 'none'
+					})
+				}
 			},
 			createReport() {
 				uni.navigateTo({

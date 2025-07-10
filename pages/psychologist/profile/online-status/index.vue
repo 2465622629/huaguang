@@ -45,8 +45,8 @@
 
     <!-- 操作按钮区域 -->
     <view class="action-area">
-      <view class="save-button" @click="saveSettings">
-        <text class="save-button-text">点击保存</text>
+      <view class="save-button" @click="saveSettings" :class="{ disabled: loading }">
+        <text class="save-button-text">{{ loading ? '保存中...' : '点击保存' }}</text>
       </view>
     </view>
 
@@ -57,18 +57,21 @@
 
 <script>
 import config from '@/config/index.js'
+import { updatePsychologistOnlineStatus, getPsychologistProfile } from '@/api/modules/psychologist.js'
 
 export default {
-  name: 'LawyerOnlineStatus',
+  name: 'PsychologistOnlineStatus',
   data() {
     return {
       config,
       statusBarHeight: 0,
       // 开关设置
-      settings: { 
+      settings: {
         acceptNewConsultation: true,  // 接受新咨询 - 默认开启
         temporarilyUnavailable: false // 暂不接单 - 默认关闭
       },
+      loading: false,
+      psychologistInfo: {},
       // 开关样式配置
       switchActiveColor: '#FF4646',
       switchInactiveColor: '#CCCCCC',
@@ -80,6 +83,8 @@ export default {
     this.getSystemInfo()
     // 加载保存的设置
     this.loadSettings()
+    // 加载服务器状态
+    this.loadServerStatus()
   },
   methods: {
     // 获取系统信息
@@ -109,11 +114,37 @@ export default {
       }
     },
 
-    // 保存设置
-    saveSettings() {
+    // 加载服务器状态
+    async loadServerStatus() {
       try {
+        const response = await getPsychologistProfile()
+        this.psychologistInfo = response.data || {}
+        
+        // 从服务器数据同步状态
+        if (this.psychologistInfo.onlineStatus !== undefined) {
+          this.settings.acceptNewConsultation = this.psychologistInfo.onlineStatus
+          this.settings.temporarilyUnavailable = !this.psychologistInfo.onlineStatus
+        }
+        
+        console.log('服务器状态加载成功:', this.psychologistInfo)
+      } catch (error) {
+        console.error('服务器状态加载失败:', error)
+        // 如果服务器加载失败，使用本地存储的设置
+      }
+    },
+
+    // 保存设置
+    async saveSettings() {
+      if (this.loading) return
+      
+      this.loading = true
+      try {
+        // 同步到服务器
+        const isOnline = this.settings.acceptNewConsultation && !this.settings.temporarilyUnavailable
+        await updatePsychologistOnlineStatus(isOnline)
+        
         // 保存到本地存储
-        uni.setStorageSync('lawyer_online_status', this.settings)
+        uni.setStorageSync('psychologist_online_status', this.settings)
 
         uni.showToast({
           title: '设置已保存',
@@ -125,17 +156,19 @@ export default {
       } catch (error) {
         console.error('保存设置失败:', error)
         uni.showToast({
-          title: '保存失败',
-          icon: 'error',
+          title: '保存失败，请重试',
+          icon: 'none',
           duration: 2000
         })
+      } finally {
+        this.loading = false
       }
     },
 
     // 加载保存的设置
     loadSettings() {
       try {
-        const savedSettings = uni.getStorageSync('lawyer_online_status')
+        const savedSettings = uni.getStorageSync('psychologist_online_status')
         if (savedSettings) {
           this.settings = { ...this.settings, ...savedSettings }
           console.log('已加载保存的设置:', this.settings)

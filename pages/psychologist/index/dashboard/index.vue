@@ -65,69 +65,199 @@
   <script>
   import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
   import config from '@/config/index.js'
+  import { getPsychologistProfile, getUserPsychConsultations } from '@/api/modules/psychologist.js'
+  import { getChatSessions } from '@/api/modules/chat.js'
   
   export default {
-	name: 'PsychologistDashboard',
-	components: {
-	  PsychologistTabbar
-	},
-	data() {
-	  return {
-		config,
-		consultationListHeight: '300rpx',
-		consultationList: [
-		  {
-			clientName: '李小明',
-			summary: '公司拖欠工资三个月, 当...',
-			timeAgo: '10分钟前'
-		  },
-		  {
-			clientName: '王小红',
-			summary: '房屋租赁合同纠纷, 需要...',
-			timeAgo: '25分钟前'
-		  },
-		  {
-			clientName: '张小华',
-			summary: '交通事故责任认定, 对方...',
-			timeAgo: '1小时前'
-		  },
-		  {
-			clientName: '刘小强',
-			summary: '劳动合同解除争议, 公司...',
-			timeAgo: '2小时前'
-		  },
-		  {
-			clientName: '陈小美',
-			summary: '婚姻财产分割问题, 涉及...',
-			timeAgo: '3小时前'
-		  }
-		]
-	  }
-	},
+    name: 'PsychologistDashboard',
+    components: {
+      PsychologistTabbar
+    },
+    data() {
+      return {
+        config,
+        consultationListHeight: '300rpx',
+        consultationList: [],
+        loading: false,
+        psychologistInfo: {}
+      }
+    },
+    onLoad() {
+      this.loadDashboardData()
+    },
 	methods: {
+	  // 加载工作台数据
+	  async loadDashboardData() {
+	    this.loading = true
+	    try {
+	      // 并行加载心理师信息和咨询列表
+	      const [profileResult, consultationsResult] = await Promise.all([
+	        this.loadPsychologistProfile(),
+	        this.loadConsultations()
+	      ])
+	      
+	      console.log('工作台数据加载完成')
+	    } catch (error) {
+	      console.error('工作台数据加载失败:', error)
+	      uni.showToast({
+	        title: '数据加载失败',
+	        icon: 'none'
+	      })
+	    } finally {
+	      this.loading = false
+	    }
+	  },
+
+	  // 加载心理师信息
+	  async loadPsychologistProfile() {
+	    try {
+	      const response = await getPsychologistProfile()
+	      this.psychologistInfo = response.data || {}
+	      console.log('心理师信息加载成功:', this.psychologistInfo)
+	      return response
+	    } catch (error) {
+	      console.error('心理师信息加载失败:', error)
+	      throw error
+	    }
+	  },
+
+	  // 加载咨询列表
+	  async loadConsultations() {
+	    try {
+	      // 尝试获取心理咨询列表
+	      const response = await getUserPsychConsultations({
+	        page: 1,
+	        pageSize: 10,
+	        status: 'active'
+	      })
+	      
+	      if (response.data && response.data.list) {
+	        this.consultationList = response.data.list.map(item => ({
+	          clientName: item.clientName || item.userName || '匿名用户',
+	          summary: this.truncateText(item.content || item.title || '心理咨询', 15),
+	          timeAgo: this.formatTimeAgo(item.createTime || item.updatedAt),
+	          consultationId: item.id
+	        }))
+	      } else {
+	        // 如果心理咨询API没有数据，尝试获取聊天会话
+	        await this.loadChatSessions()
+	      }
+	      
+	      console.log('咨询列表加载成功:', this.consultationList)
+	      return response
+	    } catch (error) {
+	      console.error('咨询列表加载失败:', error)
+	      // 尝试备用方案：获取聊天会话
+	      try {
+	        await this.loadChatSessions()
+	      } catch (chatError) {
+	        console.error('聊天会话加载也失败:', chatError)
+	        // 使用默认数据作为最终降级方案
+	        this.consultationList = [
+	          {
+	            clientName: '李小明',
+	            summary: '焦虑情绪调节咨询...',
+	            timeAgo: '10分钟前'
+	          },
+	          {
+	            clientName: '王小红',
+	            summary: '职场压力管理咨询...',
+	            timeAgo: '25分钟前'
+	          },
+	          {
+	            clientName: '张小华',
+	            summary: '人际关系困扰咨询...',
+	            timeAgo: '1小时前'
+	          }
+	        ]
+	      }
+	      throw error
+	    }
+	  },
+	
+	  // 加载聊天会话作为备用数据源
+	  async loadChatSessions() {
+	    try {
+	      const response = await getChatSessions({
+	        page: 1,
+	        pageSize: 10,
+	        type: 'psychologist'
+	      })
+	      
+	      if (response.data && response.data.list) {
+	        this.consultationList = response.data.list.map(item => ({
+	          clientName: item.targetName || item.userName || '匿名用户',
+	          summary: this.truncateText(item.lastMessage || item.title || '心理咨询会话', 15),
+	          timeAgo: this.formatTimeAgo(item.lastMessageTime || item.updatedAt),
+	          consultationId: item.id,
+	          isChat: true
+	        }))
+	        console.log('聊天会话加载成功:', this.consultationList)
+	      }
+	      
+	      return response
+	    } catch (error) {
+	      console.error('聊天会话加载失败:', error)
+	      throw error
+	    }
+	  },
+
+	  // 截断文本
+	  truncateText(text, maxLength) {
+	    if (!text) return ''
+	    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+	  },
+
+	  // 格式化时间
+	  formatTimeAgo(dateString) {
+	    if (!dateString) return '刚刚'
+	    
+	    try {
+	      const date = new Date(dateString)
+	      const now = new Date()
+	      const diff = now - date
+	      
+	      const minutes = Math.floor(diff / (1000 * 60))
+	      const hours = Math.floor(diff / (1000 * 60 * 60))
+	      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+	      
+	      if (minutes < 1) return '刚刚'
+	      if (minutes < 60) return `${minutes}分钟前`
+	      if (hours < 24) return `${hours}小时前`
+	      if (days < 7) return `${days}天前`
+	      
+	      return date.toLocaleDateString('zh-CN')
+	    } catch (error) {
+	      return '刚刚'
+	    }
+	  },
+
 	  handleViewDocuments() {
-		uni.showToast({
-		  title: '查看文书功能',
-		  icon: 'none'
-		})
+	    // 跳转到咨询消息页面
+	    uni.navigateTo({
+	      url: '/pages/psychologist/consultation/consultation'
+	    })
 	  },
+	  
 	  handleReviewDocuments() {
-		uni.showToast({
-		  title: '审核文书功能',
-		  icon: 'none'
-		})
+	    // 跳转到心理师信息设置页面
+	    uni.navigateTo({
+	      url: '/pages/psychologist/profile/psychology-info-settings/index'
+	    })
 	  },
+	  
 	  handleDownloadDocuments() {
-		uni.showToast({
-		  title: '下载文书功能',
-		  icon: 'none'
-		})
+	    // 跳转到修改密码页面
+	    uni.navigateTo({
+	      url: '/pages/psychologist/profile/changepwd/index'
+	    })
 	  },
+	  
 	  handleInfoCardClick() {
-		// 跳转到收入管理页面
-		uni.navigateTo({
-		  url: '/pages/psychologist/consultation/consultation'
-		})
+	    // 跳转到心理咨询页面
+	    uni.navigateTo({
+	      url: '/pages/psychologist/consultation/consultation'
+	    })
 	  }
 	}
   }

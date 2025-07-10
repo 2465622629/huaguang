@@ -20,32 +20,83 @@
     
     <!-- 测试卡片 -->
     <view class="test-card">
-      <!-- 问题文本 -->
-      <view class="question-section">
-        <template v-for="(line, index) in currentQuestion.question.split('\n')">
-          <text :key="index" class="question-text">{{ line }}</text>
-        </template>
+      <!-- 加载状态 -->
+      <view v-if="isLoadingQuestions" class="loading-section">
+        <view class="loading-spinner"></view>
+        <text class="loading-text">正在加载测试问题...</text>
       </view>
       
-      <!-- 答案选项 -->
-      <view class="options-section">
-        <view 
-          v-for="(option, index) in currentQuestion.options" 
-          :key="index"
-          class="option-btn" 
-          @click="selectAnswer(index + 1)"
-        >
-          <text>{{ option }}</text>
+      <!-- 测试内容 -->
+      <template v-else-if="questions.length > 0 && currentQuestion">
+        <!-- 进度指示器 -->
+        <view class="progress-section">
+          <view class="progress-bar">
+            <view
+              class="progress-fill"
+              :style="{ width: ((currentQuestionIndex + 1) / questions.length * 100) + '%' }"
+            ></view>
+          </view>
+          <text class="progress-text">{{ currentQuestionIndex + 1 }} / {{ questions.length }}</text>
         </view>
-      </view>
+        
+        <!-- 问题文本 -->
+        <view class="question-section">
+          <view v-for="(line, index) in currentQuestion.question.split('\n')" :key="index" class="question-line">
+            <text class="question-text">{{ line }}</text>
+          </view>
+        </view>
+        
+        <!-- 答案选项 -->
+        <view class="options-section">
+          <view
+            v-for="(option, index) in currentQuestion.options"
+            :key="index"
+            class="option-btn"
+            :class="{ 
+              'option-selected': currentQuestion.type === 'multiple_choice' 
+                ? (Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value))
+                : answers[currentQuestionIndex] === option.value 
+            }"
+            @click="selectAnswer(option.value)"
+          >
+            <uv-icon v-if="currentQuestion.type === 'multiple_choice'" 
+              :name="(Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value)) ? 'checkbox-fill' : 'checkbox'" 
+              :color="(Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value)) ? '#FA5353' : '#CCCCCC'"
+              size="18"
+              style="margin-right: 8px;"
+            ></uv-icon>
+            <uv-icon v-else 
+              :name="answers[currentQuestionIndex] === option.value ? 'radiobox-fill' : 'radiobox-blank'" 
+              :color="answers[currentQuestionIndex] === option.value ? '#FA5353' : '#CCCCCC'"
+              size="18"
+              style="margin-right: 8px;"
+            ></uv-icon>
+            <text>{{ option.text }}</text>
+          </view>
+        </view>
+        
+        <!-- 导航按钮 -->
+        <view class="navigation-section">
+          <view
+            class="prev-question"
+            :class="{'prev-disabled': isFirstQuestion}"
+            @click="goToPrevQuestion"
+          >
+            <text>回到上一题</text>
+          </view>
+          
+          <view v-if="isLastQuestion && answers[currentQuestionIndex]" class="finish-btn" @click="finishTest">
+            <text>完成测试</text>
+          </view>
+        </view>
+      </template>
       
-      <!-- 回到上一题 -->
-      <view 
-        class="prev-question" 
-        :class="{'prev-disabled': isFirstQuestion}"
-        @click="goToPrevQuestion"
-      >
-        <text>回到上一题</text>
+      <!-- 错误状态 -->
+      <view v-else class="error-section">
+        <text class="error-text">加载测试失败</text>
+        <view class="retry-btn" @click="loadTestQuestions">
+          <text>重试</text>
+        </view>
       </view>
     </view>
     
@@ -58,107 +109,223 @@
 
 <script>
 import config from '@/config/index.js'
+// 使用心理师模块的API
+import { getPsychTestDetail, submitPsychTestAnswers, getPsychTests } from '@/api/modules/psychologist.js'
 
 export default {
-  name: 'CounselingTestPage',
+  name: 'PsychologicalTestPage',
   data() {
     return {
       config,
       currentQuestionIndex: 0,
       answers: [],
       counselor: null, // 咨询师信息
-      questions: [
+      
+      // API数据
+      testId: 'default_psychological_test', // 默认测试ID
+      testSession: null, // 测试会话信息
+      testDetail: null,
+      questions: [],
+      
+      // 企业级状态管理
+      isLoading: false,
+      isSubmitting: false,
+      isLoadingQuestions: true,
+      
+      // 智能缓存系统
+      cacheKey: 'psychological_test_progress',
+      cacheExpiry: 30 * 60 * 1000, // 30分钟缓存
+      
+      // 测试计时
+      testStartTime: null,
+      testDuration: 0,
+      
+      // 重试机制配置
+      retryConfig: {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 8000,
+        backoffFactor: 2
+      },
+      
+      // 错误处理状态
+      errorState: {
+        hasError: false,
+        errorType: '',
+        errorMessage: '',
+        canRetry: false
+      },
+      
+      // 默认问题数据（作为降级方案）
+      defaultQuestions: [
         {
+          id: '1',
           question: '最近一周，你出现以下情绪的频率是？\n烦躁易怒',
-          options: ['经常', '偶尔', '很少']
+          options: [
+            { value: 1, text: '经常' },
+            { value: 2, text: '偶尔' },
+            { value: 3, text: '很少' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '2',
           question: '最近一周，你出现以下情绪的频率是？\n情绪低落',
-          options: ['经常', '偶尔', '很少']
+          options: [
+            { value: 1, text: '经常' },
+            { value: 2, text: '偶尔' },
+            { value: 3, text: '很少' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '3',
           question: '最近一周，你出现以下情绪的频率是？\n焦虑不安',
-          options: ['经常', '偶尔', '很少']
+          options: [
+            { value: 1, text: '经常' },
+            { value: 2, text: '偶尔' },
+            { value: 3, text: '很少' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '4',
           question: '最近一周，你出现以下情绪的频率是？\n愉悦平静',
-          options: ['经常', '偶尔', '很少']
+          options: [
+            { value: 1, text: '经常' },
+            { value: 2, text: '偶尔' },
+            { value: 3, text: '很少' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '5',
           question: '这些情绪是否影响你的日常生活？',
-          options: ['严重影响', '有些影响', '几乎不影响']
+          options: [
+            { value: 1, text: '严重影响' },
+            { value: 2, text: '有些影响' },
+            { value: 3, text: '几乎不影响' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '6',
           question: '你当前的压力主要来自？',
           options: [
-            '工作/学业',
-            '经济问题',
-            '人际关系',
-            '家庭关系',
-            '健康问题',
-            '未来规划',
-            '其他'
+            { value: 1, text: '工作/学业' },
+            { value: 2, text: '经济问题' },
+            { value: 3, text: '人际关系' },
+            { value: 4, text: '家庭关系' },
+            { value: 5, text: '健康问题' },
+            { value: 6, text: '未来规划' },
+            { value: 7, text: '其他' }
           ],
-          multiSelect: true
+          type: 'multiple_choice',
+          required: true
         },
         {
+          id: '7',
           question: '面对压力时，你通常如何应对？',
           options: [
-            '独自消化',
-            '向亲友倾诉',
-            '运动/娱乐',
-            '逃避拖延',
-            '寻求专业帮助',
-            '其他'
-          ]
+            { value: 1, text: '独自消化' },
+            { value: 2, text: '向亲友倾诉' },
+            { value: 3, text: '运动/娱乐' },
+            { value: 4, text: '逃避拖延' },
+            { value: 5, text: '寻求专业帮助' },
+            { value: 6, text: '其他' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '8',
           question: '最近是否经常出现失眠/早醒？',
-          options: ['是', '否']
+          options: [
+            { value: 1, text: '是' },
+            { value: 2, text: '否' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '9',
           question: '最近是否经常出现食欲异常（暴食/没胃口）？',
-          options: ['是', '否']
+          options: [
+            { value: 1, text: '是' },
+            { value: 2, text: '否' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '10',
           question: '最近是否经常出现身体疲惫（无明确原因）？',
-          options: ['是', '否']
+          options: [
+            { value: 1, text: '是' },
+            { value: 2, text: '否' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '11',
           question: '近期社交意愿如何？',
           options: [
-            '主动联系他人',
-            '等人联系我',
-            '不想接触任何人'
-          ]
+            { value: 1, text: '主动联系他人' },
+            { value: 2, text: '等人联系我' },
+            { value: 3, text: '不想接触任何人' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '12',
           question: '和他人相处时，你更常感到：',
           options: [
-            '放松愉快',
-            '疲惫勉强', 
-            '无所谓'
-          ]
+            { value: 1, text: '放松愉快' },
+            { value: 2, text: '疲惫勉强' },
+            { value: 3, text: '无所谓' }
+          ],
+          type: 'single_choice',
+          required: true
         },
         {
+          id: '13',
           question: '你希望获得哪方面的支持？',
           options: [
-            '情绪调节',
-            '压力管理',
-            '人际关系指导',
-            '自我认知',
-            '其他'
-          ]
+            { value: 1, text: '情绪调节' },
+            { value: 2, text: '压力管理' },
+            { value: 3, text: '人际关系指导' },
+            { value: 4, text: '自我认知' },
+            { value: 5, text: '其他' }
+          ],
+          type: 'multiple_choice',
+          required: true
         }
       ]
     }
   },
-  onLoad() {
+  async onLoad(options) {
+    // 获取传递的测试ID
+    if (options.testId) {
+      this.testId = options.testId
+    }
+    
     // 获取上一页面传递的咨询师数据
     const eventChannel = this.getOpenerEventChannel()
-    eventChannel.on('counselorData', (data) => {
-      this.counselor = data.counselor
-    })
+    if (eventChannel) {
+      eventChannel.on('counselorData', (data) => {
+        this.counselor = data.counselor
+      })
+    }
+    
+    // 初始化测试
+    await this.initializeTest()
   },
   computed: {
     currentQuestion() {
@@ -172,77 +339,626 @@ export default {
     }
   },
   methods: {
+    // 页面导航
     goBack() {
+      // 保存测试进度
+      this.saveTestProgress()
       uni.navigateBack()
     },
-    selectAnswer(optionIndex) {
-      // 记录答案
-      this.answers[this.currentQuestionIndex] = optionIndex
+
+    // 测试初始化 - 企业级优化版本
+    async initializeTest() {
+      this.testStartTime = Date.now()
       
-      // 如果不是最后一题，前进到下一题
-      if (!this.isLastQuestion) {
-        this.currentQuestionIndex++
-      } else {
-        // 是最后一题，完成测试，进入咨询
-        this.finishTest()
+      // 尝试加载缓存的测试进度
+      this.loadTestProgress()
+      
+      // 加载测试问题
+      await this.loadTestQuestions()
+    },
+
+    // 加载测试问题 - 企业级API集成
+    async loadTestQuestions() {
+      this.isLoadingQuestions = true
+      this.errorState.hasError = false
+
+      try {
+        console.log('开始加载心理测试问题, testId:', this.testId)
+        
+        // 使用智能重试机制获取测试详情
+        const response = await this.callApiWithRetry(async () => {
+          return await getPsychTestDetail(this.testId)
+        })
+
+        if (response && response.data) {
+          this.testDetail = response.data
+          
+          // 格式化问题数据
+          this.questions = this.formatQuestions(response.data.questions || [])
+          
+          // 初始化答案数组
+          this.answers = new Array(this.questions.length).fill(null)
+          
+          console.log('心理测试问题加载成功:', this.questions.length, '个问题')
+          
+          // 缓存测试数据
+          this.setCachedTestData(response.data)
+          
+        } else {
+          throw new Error('测试数据格式错误')
+        }
+
+      } catch (error) {
+        console.warn('API加载失败，尝试缓存和降级方案:', error)
+        
+        // 尝试获取缓存数据
+        const cachedData = this.getCachedTestData()
+        if (cachedData && cachedData.questions) {
+          console.log('使用缓存的测试数据')
+          this.testDetail = cachedData
+          this.questions = this.formatQuestions(cachedData.questions)
+          this.answers = new Array(this.questions.length).fill(null)
+        } else {
+          console.log('使用默认问题作为降级方案')
+          // 使用默认问题作为最终降级方案
+          this.questions = this.defaultQuestions
+          this.answers = new Array(this.questions.length).fill(null)
+          this.testDetail = {
+            id: this.testId,
+            title: '心理健康评估',
+            description: '了解您的心理状态',
+            questions: this.defaultQuestions
+          }
+        }
+
+        const { errorMessage } = this.handleApiError(error)
+        
+        // 显示降级提示
+        uni.showToast({
+          title: errorMessage.includes('网络') ? '网络异常，已加载离线版本' : '已加载离线版本',
+          icon: 'none',
+          duration: 2000
+        })
+      } finally {
+        this.isLoadingQuestions = false
       }
     },
+
+    // 格式化问题数据
+    formatQuestions(apiQuestions) {
+      return apiQuestions.map((q, index) => ({
+        id: q.id || `q_${index + 1}`,
+        question: q.question || q.title,
+        options: this.formatOptions(q.options || []),
+        type: q.type || 'single_choice',
+        required: q.required !== false,
+        category: q.category || 'general'
+      }))
+    },
+
+    // 格式化选项数据
+    formatOptions(apiOptions) {
+      return apiOptions.map((opt, index) => ({
+        value: opt.value || (index + 1),
+        text: opt.text || opt.label || opt
+      }))
+    },
+
+    // 智能缓存系统
+    setCachedTestData(data) {
+      try {
+        const cacheItem = {
+          data: data,
+          timestamp: Date.now(),
+          expiry: this.cacheExpiry
+        }
+        uni.setStorageSync(`test_data_${this.testId}`, JSON.stringify(cacheItem))
+      } catch (error) {
+        console.warn('测试数据缓存失败:', error)
+      }
+    },
+
+    getCachedTestData() {
+      try {
+        const cacheStr = uni.getStorageSync(`test_data_${this.testId}`)
+        if (cacheStr) {
+          const cacheItem = JSON.parse(cacheStr)
+          const isExpired = Date.now() - cacheItem.timestamp > cacheItem.expiry
+          
+          if (!isExpired) {
+            return cacheItem.data
+          } else {
+            // 清除过期缓存
+            uni.removeStorageSync(`test_data_${this.testId}`)
+          }
+        }
+      } catch (error) {
+        console.warn('获取缓存测试数据失败:', error)
+      }
+      return null
+    },
+
+    saveTestProgress() {
+      try {
+        const progressData = {
+          testId: this.testId,
+          currentQuestionIndex: this.currentQuestionIndex,
+          answers: this.answers,
+          testStartTime: this.testStartTime,
+          timestamp: Date.now()
+        }
+        uni.setStorageSync(this.cacheKey, JSON.stringify(progressData))
+      } catch (error) {
+        console.warn('测试进度保存失败:', error)
+      }
+    },
+
+    loadTestProgress() {
+      try {
+        const progressStr = uni.getStorageSync(this.cacheKey)
+        if (progressStr) {
+          const progressData = JSON.parse(progressStr)
+          const isExpired = Date.now() - progressData.timestamp > this.cacheExpiry
+          
+          if (!isExpired && progressData.testId === this.testId) {
+            this.currentQuestionIndex = progressData.currentQuestionIndex || 0
+            this.answers = progressData.answers || []
+            this.testStartTime = progressData.testStartTime || Date.now()
+            
+            if (this.currentQuestionIndex > 0) {
+              uni.showModal({
+                title: '恢复测试进度',
+                content: `检测到未完成的测试，是否继续？当前进度：${this.currentQuestionIndex + 1}/${this.questions.length || 13}`,
+                confirmText: '继续',
+                cancelText: '重新开始',
+                success: (res) => {
+                  if (!res.confirm) {
+                    this.resetTest()
+                  }
+                }
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('测试进度加载失败:', error)
+      }
+    },
+
+    clearTestProgress() {
+      try {
+        uni.removeStorageSync(this.cacheKey)
+        uni.removeStorageSync(`test_data_${this.testId}`)
+      } catch (error) {
+        console.warn('清除测试进度失败:', error)
+      }
+    },
+
+    resetTest() {
+      this.currentQuestionIndex = 0
+      this.answers = new Array(this.questions.length).fill(null)
+      this.testStartTime = Date.now()
+      this.clearTestProgress()
+    },
+
+    // 答题逻辑 - 增强版本
+    selectAnswer(optionIndex) {
+      const currentQ = this.currentQuestion
+      
+      if (currentQ.type === 'multiple_choice') {
+        // 多选题处理
+        if (!Array.isArray(this.answers[this.currentQuestionIndex])) {
+          this.answers[this.currentQuestionIndex] = []
+        }
+        
+        const answerArray = this.answers[this.currentQuestionIndex]
+        const index = answerArray.indexOf(optionIndex)
+        
+        if (index > -1) {
+          answerArray.splice(index, 1) // 取消选择
+        } else {
+          answerArray.push(optionIndex) // 添加选择
+        }
+      } else {
+        // 单选题处理
+        this.answers[this.currentQuestionIndex] = optionIndex
+      }
+      
+      // 实时保存进度
+      this.saveTestProgress()
+      
+      // 单选题自动前进到下一题
+      if (currentQ.type === 'single_choice' && !this.isLastQuestion) {
+        setTimeout(() => {
+          this.currentQuestionIndex++
+        }, 300) // 短暂延迟提供视觉反馈
+      }
+    },
+
     goToPrevQuestion() {
       if (!this.isFirstQuestion) {
         this.currentQuestionIndex--
+        // 保存进度
+        this.saveTestProgress()
       }
     },
-    finishTest() {
-      // 计算测试结果
-      const result = this.calculateTestResult()
-      
-      // 显示结果提示
-      uni.showToast({
-        title: '测试完成',
-        icon: 'none'
-      })
-      // 跳转到 chat 页面
-      uni.navigateTo({
-        url: '/pages/user/index/chat/index',
-      })
-      
-      // 延迟后跳转到咨询页面
-      setTimeout(() => {
-        if (!this.counselor) {
-          uni.showToast({
-            title: '获取咨询师信息失败',
-            icon: 'none'
-          })
-          return
+
+    // 智能指数退避重试机制
+    async callApiWithRetry(apiCall, retryCount = 0) {
+      try {
+        return await apiCall()
+      } catch (error) {
+        if (retryCount < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, retryCount) +
+            Math.random() * 1000, // 随机抖动避免雷群效应
+            this.retryConfig.maxDelay
+          )
+          
+          console.log(`API调用失败，${delay}ms后进行第${retryCount + 1}次重试`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return this.callApiWithRetry(apiCall, retryCount + 1)
         }
-        
-        uni.navigateTo({
-          url: '/pages/user/fund/counseling/chat',
+        throw error
+      }
+    },
+
+    // 企业级错误分类和处理
+    handleApiError(error) {
+      let errorType = 'unknown'
+      let errorMessage = '加载失败，请稍后重试'
+      let canRetry = true
+
+      // 根据错误类型分类处理
+      if (error.code || error.status) {
+        const code = error.code || error.status
+        switch (code) {
+          case 'NETWORK_ERROR':
+          case 'TIMEOUT':
+          case 'ERR_NETWORK':
+            errorType = 'network'
+            errorMessage = '网络连接异常，已加载离线版本'
+            break
+          case 401:
+          case 'AUTH_ERROR':
+          case 'UNAUTHORIZED':
+            errorType = 'auth'
+            errorMessage = '登录已过期，请重新登录'
+            canRetry = false
+            break
+          case 403:
+          case 'FORBIDDEN':
+            errorType = 'permission'
+            errorMessage = '访问权限不足'
+            canRetry = false
+            break
+          case 404:
+          case 'NOT_FOUND':
+            errorType = 'not_found'
+            errorMessage = '测试不存在或已下线'
+            canRetry = false
+            break
+          case 500:
+          case 502:
+          case 503:
+          case 'SERVER_ERROR':
+            errorType = 'server'
+            errorMessage = '服务器繁忙，已加载离线版本'
+            break
+          default:
+            errorMessage = error.message || error.msg || errorMessage
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
+      this.errorState = {
+        hasError: true,
+        errorType,
+        errorMessage,
+        canRetry
+      }
+
+      return { errorType, errorMessage, canRetry }
+    },
+
+    // 完成测试 - 企业级提交机制
+    async finishTest() {
+      if (this.isSubmitting) return
+
+      // 验证所有必填题是否已回答
+      const unansweredRequired = this.questions.filter((q, index) => 
+        q.required && (this.answers[index] === null || this.answers[index] === undefined)
+      )
+
+      if (unansweredRequired.length > 0) {
+        uni.showModal({
+          title: '测试未完成',
+          content: `还有 ${unansweredRequired.length} 道必答题未完成，是否继续？`,
+          confirmText: '继续答题',
+          cancelText: '强制提交',
           success: (res) => {
-            // 传递测试结果和咨询师信息到聊天页面
-            res.eventChannel.emit('counselData', {
-              counselor: this.counselor,
-              testResult: result,
-              answers: this.answers
+            if (res.confirm) {
+              // 跳转到第一个未回答的题目
+              const firstUnanswered = this.questions.findIndex((q, index) => 
+                q.required && (this.answers[index] === null || this.answers[index] === undefined)
+              )
+              if (firstUnanswered !== -1) {
+                this.currentQuestionIndex = firstUnanswered
+              }
+            } else {
+              this.submitTest()
+            }
+          }
+        })
+        return
+      }
+
+      await this.submitTest()
+    },
+
+    // 提交测试
+    async submitTest() {
+      this.isSubmitting = true
+      this.testDuration = Math.floor((Date.now() - this.testStartTime) / 1000)
+
+      try {
+        // 显示提交提示
+        uni.showLoading({
+          title: '分析中...',
+          mask: true
+        })
+
+        // 构建提交数据
+        const submitData = {
+          testId: this.testId,
+          answers: this.formatAnswersForSubmission(),
+          duration: this.testDuration,
+          metadata: {
+            questionsCount: this.questions.length,
+            completionRate: this.calculateCompletionRate(),
+            deviceInfo: this.getDeviceInfo(),
+            testVersion: this.testDetail?.version || '1.0',
+            timestamp: new Date().toISOString()
+          }
+        }
+
+        let testResult = null
+
+        try {
+          console.log('提交心理测试结果:', submitData)
+          
+          // 使用心理师模块API提交测试结果
+          const response = await this.callApiWithRetry(async () => {
+            return await submitPsychTestAnswers(submitData)
+          })
+          
+          testResult = response.data || response
+          console.log('测试结果提交成功:', testResult)
+          
+          // 缓存测试结果
+          this.cacheTestResult(testResult)
+          
+        } catch (error) {
+          console.warn('服务器提交失败，使用本地计算:', error)
+          // 使用本地计算作为降级方案
+          testResult = this.calculateLocalTestResult()
+          
+          // 标记为本地计算结果
+          testResult.isLocalCalculation = true
+          testResult.needsManualReview = true
+        }
+
+        uni.hideLoading()
+
+        // 清除测试进度缓存
+        this.clearTestProgress()
+
+        // 显示结果提示
+        this.showTestResult(testResult)
+
+      } catch (error) {
+        console.error('测试完成处理失败:', error)
+        uni.hideLoading()
+        
+        const { errorMessage } = this.handleApiError(error)
+        
+        uni.showModal({
+          title: '提交失败',
+          content: `${errorMessage}，是否重试？`,
+          confirmText: '重试',
+          cancelText: '继续',
+          success: (res) => {
+            if (res.confirm) {
+              setTimeout(() => this.submitTest(), 1000)
+            } else {
+              // 使用本地结果继续
+              const localResult = this.calculateLocalTestResult()
+              this.showTestResult(localResult)
+            }
+          }
+        })
+      } finally {
+        this.isSubmitting = false
+      }
+    },
+
+    // 格式化答案数据用于提交
+    formatAnswersForSubmission() {
+      return this.questions.map((question, index) => {
+        const answer = this.answers[index]
+        return {
+          questionId: question.id,
+          answer: answer,
+          type: question.type,
+          timestamp: Date.now()
+        }
+      }).filter(item => item.answer !== null && item.answer !== undefined)
+    },
+
+    // 计算完成率
+    calculateCompletionRate() {
+      const answeredCount = this.answers.filter(answer => 
+        answer !== null && answer !== undefined
+      ).length
+      return Math.round((answeredCount / this.questions.length) * 100)
+    },
+
+    // 获取设备信息
+    getDeviceInfo() {
+      const systemInfo = uni.getSystemInfoSync()
+      return {
+        platform: systemInfo.platform,
+        version: systemInfo.version,
+        model: systemInfo.model,
+        pixelRatio: systemInfo.pixelRatio,
+        windowWidth: systemInfo.windowWidth,
+        windowHeight: systemInfo.windowHeight
+      }
+    },
+
+    // 缓存测试结果
+    cacheTestResult(result) {
+      try {
+        const cacheData = {
+          result: result,
+          timestamp: Date.now(),
+          testId: this.testId
+        }
+        uni.setStorageSync(`test_result_${this.testId}`, JSON.stringify(cacheData))
+      } catch (error) {
+        console.warn('缓存测试结果失败:', error)
+      }
+    },
+
+    // 本地测试结果计算（降级方案）
+    calculateLocalTestResult() {
+      const validAnswers = this.answers.filter(answer => 
+        answer !== null && answer !== undefined
+      )
+      
+      if (validAnswers.length === 0) {
+        return {
+          summary: '测试数据不完整',
+          level: 'unknown',
+          score: 0,
+          recommendations: ['请重新完成测试'],
+          isLocalCalculation: true
+        }
+      }
+
+      // 计算平均分数（简化算法）
+      const scores = validAnswers.map(answer => {
+        if (Array.isArray(answer)) {
+          return answer.length > 0 ? answer.reduce((a, b) => a + b, 0) / answer.length : 0
+        }
+        return typeof answer === 'number' ? answer : 0
+      })
+
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length
+      const normalizedScore = Math.min(100, Math.max(0, avgScore * 20)) // 归一化到0-100
+
+      let level, summary, recommendations
+
+      if (normalizedScore <= 30) {
+        level = 'high_risk'
+        summary = '建议尽快寻求专业心理咨询'
+        recommendations = [
+          '建议尽快寻求专业心理咨询师帮助',
+          '关注情绪变化，避免独处',
+          '保持规律作息和饮食',
+          '适当进行放松训练'
+        ]
+      } else if (normalizedScore <= 60) {
+        level = 'medium_risk'
+        summary = '建议适当寻求心理支持'
+        recommendations = [
+          '可以考虑心理咨询',
+          '多与亲友交流分享',
+          '保持规律作息',
+          '适当进行运动锻炼',
+          '学习压力管理技巧'
+        ]
+      } else {
+        level = 'low_risk'
+        summary = '心理状态相对良好'
+        recommendations = [
+          '继续保持良好状态',
+          '适当关注心理健康',
+          '定期进行自我评估',
+          '保持良好的生活习惯',
+          '维护社交关系'
+        ]
+      }
+
+      return {
+        summary,
+        level,
+        score: Math.round(normalizedScore),
+        recommendations,
+        completionRate: this.calculateCompletionRate(),
+        isLocalCalculation: true,
+        calculationMethod: 'simplified_average'
+      }
+    },
+
+    // 显示测试结果
+    showTestResult(testResult) {
+      const resultText = `${testResult.summary}\n\n评分: ${testResult.score}${testResult.isLocalCalculation ? ' (离线计算)' : ''}\n完成率: ${testResult.completionRate || this.calculateCompletionRate()}%`
+      
+      uni.showModal({
+        title: '测试完成',
+        content: resultText,
+        showCancel: false,
+        confirmText: '继续咨询',
+        success: () => {
+          this.navigateToConsultation(testResult)
+        }
+      })
+    },
+
+    // 导航到咨询页面
+    navigateToConsultation(testResult) {
+      if (!this.counselor) {
+        // 如果没有咨询师信息，跳转到咨询师选择页面
+        uni.navigateTo({
+          url: '/pages/user/fund/counseling/index',
+          success: (res) => {
+            res.eventChannel.emit('testResultData', {
+              testResult: testResult,
+              answers: this.answers,
+              testDuration: this.testDuration
             })
           }
         })
-      }, 1500)
-    },
-    calculateTestResult() {
-      // 简单计算测试结果
-      // 实际项目中可能需要更复杂的计算逻辑
-      const sum = this.answers.reduce((total, answer) => total + answer, 0)
-      const avg = sum / this.answers.length
-      
-      if (avg <= 1.5) {
-        return '需要专业心理咨询'
-      } else if (avg <= 2.5) {
-        return '建议适当寻求心理支持'
-      } else {
-        return '心理状态良好'
+        return
       }
+      
+      // 跳转到聊天页面
+      uni.navigateTo({
+        url: '/pages/user/fund/counseling/chat',
+        success: (res) => {
+          // 传递测试结果和咨询师信息到聊天页面
+          res.eventChannel.emit('counselData', {
+            counselor: this.counselor,
+            testResult: testResult,
+            answers: this.answers,
+            testDuration: this.testDuration
+          })
+        }
+      })
     }
+  },
+
+  // 生命周期
+  onUnload() {
+    // 页面卸载时保存测试进度
+    this.saveTestProgress()
+  },
+  
+  onHide() {
+    // 页面隐藏时保存测试进度
+    this.saveTestProgress()
   }
 }
 </script>
@@ -352,7 +1068,7 @@ export default {
   .test-card {
     margin: 40rpx auto;
     width: 75%;
-    height: 55vh;
+    min-height: 55vh;
     background-color: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(10px);
     border-radius: 48rpx;
@@ -362,9 +1078,61 @@ export default {
     z-index: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     // 卡片背景渐变
     background: linear-gradient(to bottom right, rgb(255, 205, 205), rgb(255, 247, 247));
+    
+    // 加载状态
+    .loading-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      
+      .loading-spinner {
+        width: 80rpx;
+        height: 80rpx;
+        border: 6rpx solid #F3F3F3;
+        border-top: 6rpx solid #C8647A;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 40rpx;
+      }
+      
+      .loading-text {
+        font-size: 32rpx;
+        color: #C8647A;
+        text-align: center;
+      }
+    }
+    
+    // 进度指示器
+    .progress-section {
+      margin-bottom: 40rpx;
+      
+      .progress-bar {
+        width: 100%;
+        height: 8rpx;
+        background-color: #F0F0F0;
+        border-radius: 4rpx;
+        overflow: hidden;
+        margin-bottom: 20rpx;
+        
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #C8647A, #E8A5B8);
+          border-radius: 4rpx;
+          transition: width 0.3s ease;
+        }
+      }
+      
+      .progress-text {
+        font-size: 28rpx;
+        color: #C8647A;
+        text-align: center;
+        display: block;
+      }
+    }
     
     // 问题文本
     .question-section {
@@ -373,7 +1141,7 @@ export default {
       flex-direction: column;
       justify-content: center;
       text-align: center;
-      margin-bottom: 80rpx;
+      margin-bottom: 60rpx;
       
       .question-text {
         display: block;
@@ -390,23 +1158,36 @@ export default {
       flex: 2;
       display: flex;
       flex-direction: column;
-      gap: 60rpx;
-      margin-bottom: 80rpx;
+      gap: 40rpx;
+      margin-bottom: 60rpx;
       
       .option-btn {
-        height: 120rpx;
+        min-height: 100rpx;
         background-color: #FFF0F5;
-        border-radius: 60rpx;
+        border-radius: 50rpx;
         display: flex;
         align-items: center;
-        justify-content: center;
-        padding: 0 40rpx;
+        justify-content: flex-start;
+        padding: 20rpx 40rpx;
+        border: 3rpx solid transparent;
+        transition: all 0.3s ease;
         
         text {
-          font-size: 36rpx;
+          font-size: 32rpx;
           color: #C8647A;
-          text-align: center;
+          text-align: left;
           line-height: 1.4;
+          flex: 1;
+        }
+        
+        &.option-selected {
+          background-color: #E8A5B8;
+          border-color: #C8647A;
+          
+          text {
+            color: #FFFFFF;
+            font-weight: bold;
+          }
         }
         
         &:active {
@@ -416,25 +1197,86 @@ export default {
       }
     }
     
-    // 回到上一题
-    .prev-question {
-      text-align: center;
-      padding: 20rpx 0;
+    // 导航区域
+    .navigation-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       
-      text {
-        font-size: 32rpx;
-        color: #DDA0AF;
+      .prev-question {
+        padding: 20rpx 40rpx;
+        
+        text {
+          font-size: 28rpx;
+          color: #DDA0AF;
+        }
+        
+        &:active {
+          opacity: 0.8;
+        }
+        
+        &.prev-disabled {
+          opacity: 0.5;
+          pointer-events: none;
+        }
       }
       
-      &:active {
-        opacity: 0.8;
-      }
-      
-      &.prev-disabled {
-        opacity: 0.5;
-        pointer-events: none;
+      .finish-btn {
+        background-color: #C8647A;
+        border-radius: 40rpx;
+        padding: 20rpx 40rpx;
+        
+        text {
+          font-size: 28rpx;
+          color: #FFFFFF;
+          font-weight: bold;
+        }
+        
+        &:active {
+          opacity: 0.8;
+          transform: scale(0.98);
+        }
       }
     }
+    
+    // 错误状态
+    .error-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      
+      .error-text {
+        font-size: 32rpx;
+        color: #C8647A;
+        text-align: center;
+        margin-bottom: 40rpx;
+      }
+      
+      .retry-btn {
+        background-color: #C8647A;
+        border-radius: 40rpx;
+        padding: 20rpx 40rpx;
+        
+        text {
+          font-size: 28rpx;
+          color: #FFFFFF;
+          font-weight: bold;
+        }
+        
+        &:active {
+          opacity: 0.8;
+          transform: scale(0.98);
+        }
+      }
+    }
+  }
+  
+  // 加载动画
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   
   // iOS Home Indicator

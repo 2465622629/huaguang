@@ -131,6 +131,14 @@ export default {
   data() {
     return {
       config,
+      // 企业级数据管理
+      retryCount: 0,
+      maxRetries: 3,
+      searchDebounceTimer: null,
+      cacheKey: 'company_list_cache',
+      cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
+      lastUpdateTime: 0,
+      
       // 排序相关
       showSort: false,
       currentSort: {
@@ -141,84 +149,63 @@ export default {
         { label: '默认排序', value: 'default' },
         { label: '最新发布', value: 'newest' },
         { label: '薪资最高', value: 'salary_high' },
-        { label: '规模最大', value: 'scale_large' }
+        { label: '规模最大', value: 'scale_large' },
+        { label: '距离最近', value: 'distance' },
+        { label: '评分最高', value: 'rating' }
       ],
       
-      // 筛选标签
+      // 智能筛选标签
       filterTags: [
-        { label: '推荐', active: true },
-        { label: '附近', active: false },
-        { label: '无学历限制', active: false },
-        { label: '推荐', active: false },
-        { label: '附近', active: false },
-        { label: '无学历限制', active: false }
+        { label: '推荐', active: true, value: 'recommended' },
+        { label: '附近', active: false, value: 'nearby' },
+        { label: '无学历限制', active: false, value: 'no_education_limit' },
+        { label: '高薪', active: false, value: 'high_salary' },
+        { label: '大厂', active: false, value: 'big_company' },
+        { label: '福利好', active: false, value: 'good_benefits' }
       ],
+      
+      // 搜索相关
+      searchKeyword: '',
+      searchHistory: [],
       
       // 公司列表数据
-      companyList: [
-        {
-          id: 1,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        },
-        {
-          id: 2,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        },
-        {
-          id: 3,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        },
-        {
-          id: 4,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        },
-        {
-          id: 5,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        },
-        {
-          id: 6,
-          name: 'XX科技有限公司',
-          industry: '互联网',
-          type: '软件开发',
-          scale: '500-999人',
-          logo: ''
-        }
-      ],
+      companyList: [],
+      originalList: [], // 保存原始数据用于本地筛选
       
       // 加载状态
       loading: false,
       noMore: false,
       page: 1,
-      pageSize: 10
+      pageSize: 20,
+      totalCount: 0,
+      
+      // 收藏功能
+      favoriteCompanies: new Set()
     }
   },
   
   onLoad() {
-    this.loadCompanyList()
+    this.initializeData()
+  },
+  onShow() {
+    // 页面显示时检查收藏状态
+    this.loadFavoriteCompanies()
+  },
+  onPullDownRefresh() {
+    this.refreshWithCache()
+  },
+  onReachBottom() {
+    this.loadMore()
   },
   
   methods: {
+    // 初始化数据
+    async initializeData() {
+      this.loadFavoriteCompanies()
+      this.loadSearchHistory()
+      await this.loadCompanyListWithCache()
+    },
+    
     // 返回上一页
     goBack() {
       uni.navigateBack()
@@ -235,16 +222,24 @@ export default {
     selectSort(option) {
       this.currentSort = option
       this.showSort = false
-      this.refreshList()
+      this.applyFiltersAndSort()
     },
     
-    // 切换筛选标签
+    // 智能筛选标签切换
     toggleTag(index) {
       this.filterTags[index].active = !this.filterTags[index].active
-      this.refreshList()
+      
+      // 防抖处理，避免频繁请求
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer)
+      }
+      
+      this.searchDebounceTimer = setTimeout(() => {
+        this.applyFiltersAndSort()
+      }, 300)
     },
     
-    // 搜索
+    // 搜索功能增强
     handleSearch() {
       uni.navigateTo({
         url: '/pages/user/index/search/index'
@@ -254,90 +249,422 @@ export default {
     // 跳转到公司详情
     goToCompanyDetail(company) {
       console.log('点击公司卡片', company)
+      // 记录浏览历史
+      this.recordBrowseHistory(company)
       uni.navigateTo({
         url: `/pages/user/index/company-detail/index?id=${company.id}`
       })
     },
     
-    // 加载公司列表
-    async loadCompanyList() {
-      if (this.loading || this.noMore) return
-      
-      this.loading = true
-      
+    // 智能缓存加载公司列表
+    async loadCompanyListWithCache() {
       try {
-        // 调用真实API
-        const params = {
-          page: this.page,
-          size: this.pageSize
+        // 检查缓存
+        const cachedData = this.getCachedData()
+        if (cachedData && this.isCacheValid()) {
+          console.log('使用缓存数据加载公司列表')
+          this.companyList = cachedData.list
+          this.originalList = [...cachedData.list]
+          this.totalCount = cachedData.total
+          this.lastUpdateTime = cachedData.timestamp
+          return
         }
         
-        // 添加排序参数
-        if (this.currentSort.value !== 'default') {
-          params.sort = this.currentSort.value
-        }
-        
-        // 添加筛选参数
-        const activeFilters = this.filterTags.filter(tag => tag.active).map(tag => tag.label)
-        if (activeFilters.length > 0) {
-          params.filters = activeFilters.join(',')
-        }
-        
-        const response = await enterpriseApi.getEnterpriseList(params)
-        console.log('企业列表数据:', response);
-        
-        // 处理API返回数据
-        let newData = []
-        if (response) {
-          
-          const apiData = response.records 
-          newData = apiData.map(item => ({
-            id: item.id || item.enterpriseId,
-            name: item.companyName || item.name || '未知企业',
-            industry: item.industry || '未知行业',
-            type: item.companyType || item.type || '',
-            scale: item.scale || item.employeeCount || '',
-            logo: item.logo || item.logoUrl || ''
-          }))
-        }
-        
-        if (this.page === 1) {
-          this.companyList = newData
-        } else {
-          this.companyList.push(...newData)
-        }
-        
-        // 检查是否还有更多数据
-        if (newData.length < this.pageSize) {
-          this.noMore = true
-        } else {
-          this.page++
-        }
+        // 缓存无效，从API加载
+        await this.loadCompanyListFromApi()
         
       } catch (error) {
-        console.error('加载企业列表失败:', error)
-        uni.showToast({
-          title: error.message || '加载失败，请稍后重试',
-          icon: 'none',
-          duration: 2000
-        })
-      } finally {
-        this.loading = false
+        console.error('加载公司列表失败:', error)
+        // 尝试使用过期缓存
+        const expiredCache = this.getExpiredCache()
+        if (expiredCache) {
+          console.log('使用过期缓存作为降级方案')
+          this.companyList = expiredCache.list
+          this.originalList = [...expiredCache.list]
+          uni.showToast({
+            title: '数据可能不是最新的',
+            icon: 'none'
+          })
+        }
       }
     },
     
-    // 刷新列表
-    refreshList() {
-      this.page = 1
-      this.noMore = false
-      this.companyList = []
-      this.loading = false // 重置加载状态
-      this.loadCompanyList()
+    // 从API加载公司列表（带重试机制）
+    async loadCompanyListFromApi() {
+      if (this.loading || this.noMore) return
+      
+      this.loading = true
+      this.retryCount = 0
+      
+      while (this.retryCount < this.maxRetries) {
+        try {
+          if (this.retryCount === 0) {
+            uni.showLoading({ title: '加载中...' })
+          } else {
+            uni.showLoading({ title: `重试中(${this.retryCount}/${this.maxRetries})...` })
+          }
+          
+          const params = this.buildRequestParams()
+          const response = await this.callApiWithTimeout(params)
+          
+          if (response && response.records) {
+            const processedData = this.processCompanyData(response)
+            
+            if (this.page === 1) {
+              this.companyList = processedData
+              this.originalList = [...processedData]
+              // 保存到缓存
+              this.saveToCache({
+                list: processedData,
+                total: response.total || processedData.length,
+                timestamp: Date.now()
+              })
+            } else {
+              this.companyList.push(...processedData)
+              this.originalList.push(...processedData)
+            }
+            
+            this.totalCount = response.total || this.companyList.length
+            
+            // 检查是否还有更多数据
+            if (processedData.length < this.pageSize) {
+              this.noMore = true
+            } else {
+              this.page++
+            }
+            
+            uni.hideLoading()
+            this.loading = false
+            return
+            
+          } else {
+            throw new Error('API返回数据格式错误')
+          }
+          
+        } catch (error) {
+          this.retryCount++
+          console.error(`加载企业列表失败 (尝试 ${this.retryCount}/${this.maxRetries}):`, error)
+          
+          if (this.retryCount < this.maxRetries) {
+            // 指数退避重试策略
+            const delay = Math.min(1000 * Math.pow(2, this.retryCount - 1), 8000) + Math.random() * 1000
+            await this.delay(delay)
+          } else {
+            // 最终失败处理
+            uni.hideLoading()
+            this.loading = false
+            this.handleApiError(error)
+            throw error
+          }
+        }
+      }
+    },
+    
+    // 构建请求参数
+    buildRequestParams() {
+      const params = {
+        page: this.page,
+        size: this.pageSize
+      }
+      
+      // 添加排序参数
+      if (this.currentSort.value !== 'default') {
+        params.sort = this.currentSort.value
+      }
+      
+      // 添加筛选参数
+      const activeFilters = this.filterTags.filter(tag => tag.active)
+      if (activeFilters.length > 0) {
+        params.filters = activeFilters.map(tag => tag.value).join(',')
+      }
+      
+      // 添加搜索关键词
+      if (this.searchKeyword) {
+        params.keyword = this.searchKeyword
+      }
+      
+      return params
+    },
+    
+    // 带超时的API调用
+    async callApiWithTimeout(params, timeout = 10000) {
+      return Promise.race([
+        enterpriseApi.getEnterpriseList(params),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('请求超时')), timeout)
+        )
+      ])
+    },
+    
+    // 处理公司数据
+    processCompanyData(response) {
+      const apiData = response.records || []
+      return apiData.map(item => ({
+        id: item.id || item.enterpriseId,
+        name: this.validateString(item.companyName || item.name, '未知企业'),
+        industry: this.validateString(item.industry, '未知行业'),
+        type: this.validateString(item.companyType || item.type, ''),
+        scale: this.validateString(item.scale || item.employeeCount, ''),
+        logo: item.logo || item.logoUrl || '',
+        rating: item.rating || 0,
+        location: item.location || item.address || '',
+        jobCount: item.activeJobCount || 0,
+        isFavorite: this.favoriteCompanies.has(item.id || item.enterpriseId)
+      }))
+    },
+    
+    // 应用筛选和排序
+    applyFiltersAndSort() {
+      let filteredList = [...this.originalList]
+      
+      // 应用筛选
+      const activeFilters = this.filterTags.filter(tag => tag.active)
+      if (activeFilters.length > 0) {
+        filteredList = this.applyLocalFilters(filteredList, activeFilters)
+      }
+      
+      // 应用排序
+      filteredList = this.applySorting(filteredList)
+      
+      this.companyList = filteredList
+    },
+    
+    // 本地筛选逻辑
+    applyLocalFilters(list, filters) {
+      return list.filter(company => {
+        return filters.every(filter => {
+          switch (filter.value) {
+            case 'recommended':
+              return company.rating >= 4.0
+            case 'nearby':
+              return company.location && company.location.includes('上海')
+            case 'no_education_limit':
+              return true // 需要根据实际数据结构调整
+            case 'high_salary':
+              return company.jobCount > 5
+            case 'big_company':
+              return company.scale && (company.scale.includes('1000') || company.scale.includes('以上'))
+            case 'good_benefits':
+              return company.rating >= 4.5
+            default:
+              return true
+          }
+        })
+      })
+    },
+    
+    // 排序逻辑
+    applySorting(list) {
+      const sortedList = [...list]
+      
+      switch (this.currentSort.value) {
+        case 'newest':
+          return sortedList.sort((a, b) => (b.id || 0) - (a.id || 0))
+        case 'salary_high':
+          return sortedList.sort((a, b) => (b.jobCount || 0) - (a.jobCount || 0))
+        case 'scale_large':
+          return sortedList.sort((a, b) => this.compareScale(b.scale, a.scale))
+        case 'rating':
+          return sortedList.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        case 'distance':
+          return sortedList.sort((a, b) => a.name.localeCompare(b.name))
+        default:
+          return sortedList
+      }
+    },
+    
+    // 比较公司规模
+    compareScale(scaleA, scaleB) {
+      const getScaleValue = (scale) => {
+        if (!scale) return 0
+        if (scale.includes('1000以上')) return 1000
+        if (scale.includes('500-999')) return 750
+        if (scale.includes('100-499')) return 300
+        if (scale.includes('50-99')) return 75
+        return 25
+      }
+      return getScaleValue(scaleA) - getScaleValue(scaleB)
+    },
+    
+    // 下拉刷新（带缓存清理）
+    async refreshWithCache() {
+      try {
+        // 清除缓存
+        uni.removeStorageSync(this.cacheKey)
+        
+        // 重置状态
+        this.page = 1
+        this.noMore = false
+        this.companyList = []
+        this.originalList = []
+        this.loading = false
+        
+        // 重新加载
+        await this.loadCompanyListFromApi()
+        
+      } catch (error) {
+        console.error('刷新失败:', error)
+      } finally {
+        uni.stopPullDownRefresh()
+      }
     },
     
     // 加载更多
     loadMore() {
-      this.loadCompanyList()
+      this.loadCompanyListFromApi()
+    },
+    
+    // 缓存管理方法
+    getCachedData() {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        return cached ? JSON.parse(cached) : null
+      } catch (error) {
+        console.error('读取缓存失败:', error)
+        return null
+      }
+    },
+    
+    isCacheValid() {
+      try {
+        const cacheTime = uni.getStorageSync(`${this.cacheKey}_time`)
+        if (!cacheTime) return false
+        return (Date.now() - cacheTime) < this.cacheExpiry
+      } catch (error) {
+        return false
+      }
+    },
+    
+    getExpiredCache() {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        return cached ? JSON.parse(cached) : null
+      } catch (error) {
+        return null
+      }
+    },
+    
+    saveToCache(data) {
+      try {
+        uni.setStorageSync(this.cacheKey, JSON.stringify(data))
+        uni.setStorageSync(`${this.cacheKey}_time`, Date.now())
+      } catch (error) {
+        console.error('保存缓存失败:', error)
+      }
+    },
+    
+    // 收藏功能
+    loadFavoriteCompanies() {
+      try {
+        const favorites = uni.getStorageSync('favorite_companies') || []
+        this.favoriteCompanies = new Set(favorites)
+      } catch (error) {
+        console.error('加载收藏列表失败:', error)
+      }
+    },
+    
+    toggleFavorite(company) {
+      const companyId = company.id
+      if (this.favoriteCompanies.has(companyId)) {
+        this.favoriteCompanies.delete(companyId)
+        company.isFavorite = false
+        uni.showToast({ title: '已取消收藏', icon: 'none' })
+      } else {
+        this.favoriteCompanies.add(companyId)
+        company.isFavorite = true
+        uni.showToast({ title: '已收藏', icon: 'success' })
+      }
+      
+      // 保存到本地存储
+      try {
+        uni.setStorageSync('favorite_companies', Array.from(this.favoriteCompanies))
+      } catch (error) {
+        console.error('保存收藏状态失败:', error)
+      }
+    },
+    
+    // 搜索历史管理
+    loadSearchHistory() {
+      try {
+        this.searchHistory = uni.getStorageSync('company_search_history') || []
+      } catch (error) {
+        console.error('加载搜索历史失败:', error)
+      }
+    },
+    
+    saveSearchHistory(keyword) {
+      if (!keyword || keyword.trim() === '') return
+      
+      const trimmedKeyword = keyword.trim()
+      // 移除重复项并添加到开头
+      this.searchHistory = this.searchHistory.filter(item => item !== trimmedKeyword)
+      this.searchHistory.unshift(trimmedKeyword)
+      
+      // 只保留最近10条
+      if (this.searchHistory.length > 10) {
+        this.searchHistory = this.searchHistory.slice(0, 10)
+      }
+      
+      try {
+        uni.setStorageSync('company_search_history', this.searchHistory)
+      } catch (error) {
+        console.error('保存搜索历史失败:', error)
+      }
+    },
+    
+    // 浏览历史记录
+    recordBrowseHistory(company) {
+      try {
+        const history = uni.getStorageSync('company_browse_history') || []
+        const newRecord = {
+          ...company,
+          browsedAt: new Date().toISOString()
+        }
+        
+        // 移除重复项并添加到开头
+        const filteredHistory = history.filter(item => item.id !== company.id)
+        filteredHistory.unshift(newRecord)
+        
+        // 只保留最近20条
+        if (filteredHistory.length > 20) {
+          filteredHistory.splice(20)
+        }
+        
+        uni.setStorageSync('company_browse_history', filteredHistory)
+      } catch (error) {
+        console.error('记录浏览历史失败:', error)
+      }
+    },
+    
+    // 工具方法
+    validateString(value, defaultValue) {
+      return (typeof value === 'string' && value.trim()) ? value.trim() : defaultValue
+    },
+    
+    async delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    },
+    
+    handleApiError(error) {
+      let message = '加载企业列表失败'
+      
+      if (error.message) {
+        if (error.message.includes('timeout') || error.message.includes('超时')) {
+          message = '网络请求超时，请检查网络连接'
+        } else if (error.message.includes('Network Error') || error.message.includes('网络错误')) {
+          message = '网络连接异常，请检查网络设置'
+        } else if (error.message.includes('404')) {
+          message = '服务暂时不可用'
+        } else if (error.message.includes('500')) {
+          message = '服务器内部错误，请稍后重试'
+        }
+      }
+      
+      uni.showToast({
+        title: message,
+        icon: 'none',
+        duration: 3000
+      })
     }
   }
 }

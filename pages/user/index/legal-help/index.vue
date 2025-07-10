@@ -93,7 +93,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
-import { getHotLawyers } from '@/api/modules/home.js'
+import { getLegalHomeData, getLegalConsultationLawyers, downloadLegalDocument } from '@/api/modules/legal.js'
 
 export default {
   name: 'LegalHelpPage',
@@ -106,31 +106,57 @@ export default {
       // 图片路径
       lawyerIconPath: config.staticBaseUrl + '/icons/lvshi.png',
       backgroundImagePath: config.staticBaseUrl + '/lvshi_bg2.png',
+      
       // 法律文书列表
       documentList: [
-        { name: '劳动合同模版' },
-        { name: '租房合同模版' },
-        { name: '租赁合同模版' },
-        { name: '离婚协议书模版' },
-        { name: '解除协议模版' }
+        { id: 1, name: '劳动合同模板', category: 'labor', downloadUrl: '' },
+        { id: 2, name: '租房合同模板', category: 'rental', downloadUrl: '' },
+        { id: 3, name: '借款协议模板', category: 'loan', downloadUrl: '' },
+        { id: 4, name: '购销合同模板', category: 'purchase', downloadUrl: '' },
+        { id: 5, name: '代理协议模板', category: 'agency', downloadUrl: '' },
+        { id: 6, name: '保密协议模板', category: 'confidentiality', downloadUrl: '' }
       ],
+      
       // 推荐律师列表
       lawyerList: [],
+      
       // 法律知识科普
       knowledgeList: [
         {
-          question: '离职后公司索赔，合法吗？',
-          answer: '公司若因员工离职造成实际经济损失，可依法索赔。但必须提供充分证据，并且金额合理，不能随意扣除工资或押金。遇到争议，可申请劳动仲裁保护自身权益。'
+          question: '劳动合同到期后公司不续签，有补偿吗？',
+          answer: '根据《劳动合同法》规定，劳动合同到期终止的，用人单位应当向劳动者支付经济补偿。'
         },
         {
-          question: '租房押金纠纷怎么解决？',
-          answer: '退租时若房东无合理理由扣押押金，属于违约行为。租客可保留合同、付款凭证等证据，先行协商，协商无果可向居住地法院提起小额诉讼维权。'
+          question: '工伤认定的时效是多长时间？',
+          answer: '职工发生事故伤害或者被诊断、鉴定为职业病，所在单位应当自事故伤害发生之日或者被诊断、鉴定为职业病之日起30日内申请工伤认定。'
         },
         {
-          question: '交通事故私了协议有效吗？',
-          answer: '交通事故双方签订的私了协议，在双方自愿、内容合法的情况下具备法律效力。建议在协议中明确赔偿金额、履行方式及放弃追责等内容，签字确认后保存好原件。'
+          question: '买房定金和订金有什么区别？',
+          answer: '定金具有法律约束力，买方违约定金不退，卖方违约双倍返还；订金不具有担保性质，可以退还。'
         }
-      ]
+      ],
+      
+      // 加载状态
+      loading: {
+        homeData: false,
+        lawyers: false,
+        downloading: false
+      },
+      
+      // 缓存管理
+      cache: {
+        homeData: null,
+        homeDataExpiry: 0,
+        lawyers: null,
+        lawyersExpiry: 0
+      },
+      
+      // 重试配置
+      retryConfig: {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 8000
+      }
     }
   },
   computed: {
@@ -141,55 +167,464 @@ export default {
     }
   },
   onLoad() {
-    // 页面加载时获取热门律师数据
-    this.loadHotLawyers()
+    // 页面加载时获取法律帮助主页数据
+    this.loadPageData()
+  },
+  onPullDownRefresh() {
+    // 下拉刷新时清除缓存
+    this.clearCache()
+    this.loadPageData().finally(() => {
+      uni.stopPullDownRefresh()
+    })
   },
   methods: {
-    // 加载热门律师数据
-    async loadHotLawyers() {
+    /**
+     * 加载页面数据 - 企业级并行加载策略
+     */
+    async loadPageData() {
       try {
-        const response = await getHotLawyers({ limit: 10 })
-        console.log('res',response);
-        if (response ) {
-          // 将API响应数据映射到模板所需的数据结构
-          this.lawyerList = response.map(lawyer => ({
-            name: lawyer.name,
-            specialty: lawyer.specialties ? lawyer.specialties.join('、') : '',
-            price: `¥${lawyer.consultationFee}/次`
-          }))
+        // 显示加载状态
+        this.loading.homeData = true
+        this.loading.lawyers = true
+        
+        // 并行加载主页数据和律师列表，使用智能缓存
+        const [homePageResult, lawyersResult] = await Promise.allSettled([
+          this.loadLegalHelpHomeWithCache(),
+          this.loadLawyerListWithCache()
+        ])
+        
+        // 处理主页数据结果
+        if (homePageResult.status === 'fulfilled') {
+          console.log('✅ 法律帮助主页数据加载成功')
+        } else {
+          console.error('❌ 获取法律帮助主页数据失败：', homePageResult.reason)
+          this.handleApiError('法律帮助主页数据', homePageResult.reason)
+        }
+        
+        // 处理律师列表结果
+        if (lawyersResult.status === 'fulfilled') {
+          console.log('✅ 律师列表数据加载成功')
+        } else {
+          console.error('❌ 获取律师列表失败：', lawyersResult.reason)
+          this.handleApiError('律师列表', lawyersResult.reason)
         }
       } catch (error) {
-        console.error('获取热门律师失败:', error)
+        console.error('❌ 加载页面数据失败：', error)
+        this.handleApiError('页面数据', error)
+      } finally {
+        // 隐藏加载状态
+        this.loading.homeData = false
+        this.loading.lawyers = false
+      }
+    },
+
+    /**
+     * 智能缓存加载法律帮助主页数据
+     */
+    async loadLegalHelpHomeWithCache() {
+      const now = Date.now()
+      const cacheKey = 'homeData'
+      
+      // 检查缓存是否有效（10分钟有效期）
+      if (this.cache[cacheKey] && now < this.cache[`${cacheKey}Expiry`]) {
+        console.log('📦 使用缓存的法律帮助主页数据')
+        this.applyHomeData(this.cache[cacheKey])
+        return this.cache[cacheKey]
+      }
+      
+      try {
+        // 从API获取法律帮助主页数据
+        const response = await this.callApiWithRetry(() => getLegalHomeData())
+        console.log('🌐 从API获取法律帮助主页数据成功')
+        
+        // 处理和应用数据
+        const homeData = this.processHomeData(response)
+        this.applyHomeData(homeData)
+        
+        // 缓存数据（10分钟过期）
+        this.cache[cacheKey] = homeData
+        this.cache[`${cacheKey}Expiry`] = now + 10 * 60 * 1000
+        
+        return homeData
+      } catch (error) {
+        // API失败时尝试使用过期缓存
+        if (this.cache[cacheKey]) {
+          console.log('🔄 API失败，使用过期缓存作为降级方案')
+          this.applyHomeData(this.cache[cacheKey])
+          uni.showToast({
+            title: '数据可能不是最新的',
+            icon: 'none'
+          })
+          return this.cache[cacheKey]
+        }
+        throw error
+      }
+    },
+
+    /**
+     * 智能缓存加载律师列表
+     */
+    async loadLawyerListWithCache() {
+      const now = Date.now()
+      const cacheKey = 'lawyers'
+      
+      // 检查缓存是否有效（15分钟有效期）
+      if (this.cache[cacheKey] && now < this.cache[`${cacheKey}Expiry`]) {
+        console.log('📦 使用缓存的律师列表数据')
+        this.lawyerList = this.cache[cacheKey]
+        return this.cache[cacheKey]
+      }
+      
+      try {
+        // 从API获取律师列表（推荐前5名）
+        const response = await this.callApiWithRetry(() => 
+          getLegalConsultationLawyers({ 
+            page: 1, 
+            pageSize: 5,
+            sortBy: 'rating' // 按评分排序
+          })
+        )
+        console.log('🌐 从API获取律师列表成功')
+        
+        // 处理律师数据
+        const lawyerData = this.processLawyerData(response)
+        this.lawyerList = lawyerData
+        
+        // 缓存数据（15分钟过期）
+        this.cache[cacheKey] = lawyerData
+        this.cache[`${cacheKey}Expiry`] = now + 15 * 60 * 1000
+        
+        return lawyerData
+      } catch (error) {
+        // API失败时尝试使用过期缓存
+        if (this.cache[cacheKey]) {
+          console.log('🔄 API失败，使用过期缓存作为降级方案')
+          this.lawyerList = this.cache[cacheKey]
+          uni.showToast({
+            title: '律师信息可能不是最新的',
+            icon: 'none'
+          })
+          return this.cache[cacheKey]
+        }
+        throw error
+      }
+    },
+
+    /**
+     * 处理法律帮助主页数据
+     */
+    processHomeData(response) {
+      const data = response.data || response
+      return {
+        documents: data.documents || this.documentList,
+        knowledge: data.knowledge || this.knowledgeList,
+        banners: data.banners || [],
+        statistics: data.statistics || {}
+      }
+    },
+
+    /**
+     * 应用法律帮助主页数据
+     */
+    applyHomeData(homeData) {
+      if (homeData.documents && Array.isArray(homeData.documents)) {
+        this.documentList = homeData.documents
+      }
+      if (homeData.knowledge && Array.isArray(homeData.knowledge)) {
+        this.knowledgeList = homeData.knowledge
+      }
+    },
+
+    /**
+     * 处理律师数据
+     */
+    processLawyerData(response) {
+      const data = response.data || response
+      const lawyers = data.list || data.records || data || []
+      
+      return lawyers.map(lawyer => ({
+        id: lawyer.id,
+        name: lawyer.name || lawyer.lawyerName || '律师',
+        avatar: lawyer.avatar || lawyer.headImg || '',
+        specialty: lawyer.specialty || lawyer.specialties || '法律咨询',
+        price: this.formatPrice(lawyer.consultationPrice || lawyer.price || 0),
+        rating: lawyer.rating || lawyer.score || 0,
+        experience: lawyer.experienceYears || lawyer.practiceYears || 0,
+        isOnline: Boolean(lawyer.isOnline || lawyer.onlineStatus)
+      }))
+    },
+
+    /**
+     * 智能重试API调用
+     */
+    async callApiWithRetry(apiCall, maxRetries = 3) {
+      let retryCount = 0
+      while (retryCount < maxRetries) {
+        try {
+          const response = await this.callApiWithTimeout(apiCall)
+          return response
+        } catch (error) {
+          retryCount++
+          if (retryCount >= maxRetries) {
+            throw error
+          }
+          // 指数退避 + 随机抖动
+          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 8000) + Math.random() * 1000
+          await this.delay(delay)
+        }
+      }
+    },
+
+    /**
+     * 带超时的API调用
+     */
+    async callApiWithTimeout(apiCall, timeout = 10000) {
+      return Promise.race([
+        apiCall(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('请求超时')), timeout)
+        )
+      ])
+    },
+
+    /**
+     * 处理文档下载
+     */
+    async handleDocumentDownload() {
+      try {
+        uni.showActionSheet({
+          itemList: this.documentList.map(doc => doc.name),
+          success: async (res) => {
+            const selectedDoc = this.documentList[res.tapIndex]
+            await this.downloadDocument(selectedDoc)
+          }
+        })
+      } catch (error) {
+        console.error('文档下载操作失败:', error)
         uni.showToast({
-          title: '获取律师信息失败',
+          title: '操作失败',
           icon: 'none'
         })
       }
     },
-    handleDocumentDownload() {
-      uni.showToast({
-        title: '文书下载功能开发中',
-        icon: 'none'
+
+    /**
+     * 下载具体文档
+     */
+    async downloadDocument(document) {
+      if (this.loading.downloading) {
+        uni.showToast({
+          title: '正在下载中，请稍候',
+          icon: 'none'
+        })
+        return
+      }
+
+      this.loading.downloading = true
+      
+      try {
+        uni.showLoading({ title: '下载中...' })
+        
+        // 尝试多种下载方案
+        let downloadSuccess = false
+        
+        // 方案1: 通过API下载
+        try {
+          const response = await this.callApiWithRetry(() => downloadLegalDocument(document.id))
+          if (response && response.downloadUrl) {
+            downloadSuccess = await this.downloadFromUrl(response.downloadUrl, document.name)
+          }
+        } catch (apiError) {
+          console.log('API下载失败，尝试备用方案')
+        }
+        
+        // 方案2: 预定义的下载链接
+        if (!downloadSuccess && document.downloadUrl) {
+          downloadSuccess = await this.downloadFromUrl(document.downloadUrl, document.name)
+        }
+        
+        // 方案3: 使用默认文档链接
+        if (!downloadSuccess) {
+          const defaultUrl = `${config.apiBaseUrl}/templates/${document.category}.docx`
+          downloadSuccess = await this.downloadFromUrl(defaultUrl, document.name)
+        }
+        
+        if (downloadSuccess) {
+          uni.showToast({
+            title: '下载成功',
+            icon: 'success'
+          })
+        } else {
+          throw new Error('所有下载方案都失败了')
+        }
+      } catch (error) {
+        console.error('文档下载失败:', error)
+        this.handleDownloadError(error, document)
+      } finally {
+        uni.hideLoading()
+        this.loading.downloading = false
+      }
+    },
+
+    /**
+     * 从URL下载文件
+     */
+    async downloadFromUrl(url, fileName) {
+      return new Promise((resolve, reject) => {
+        const downloadTask = uni.downloadFile({
+          url: url,
+          success: (res) => {
+            if (res.statusCode === 200) {
+              // 保存到本地
+              uni.saveFile({
+                tempFilePath: res.tempFilePath,
+                success: (saveRes) => {
+                  console.log('文件保存成功:', saveRes.savedFilePath)
+                  resolve(true)
+                },
+                fail: (saveError) => {
+                  console.error('文件保存失败:', saveError)
+                  resolve(false)
+                }
+              })
+            } else {
+              resolve(false)
+            }
+          },
+          fail: (error) => {
+            console.error('下载失败:', error)
+            resolve(false)
+          }
+        })
+        
+        // 监听下载进度
+        downloadTask.onProgressUpdate((res) => {
+          console.log('下载进度:', res.progress + '%')
+        })
       })
     },
-    handleLawyerRecommend() {
-      console.log('handleLawyerRecommend');
 
+    /**
+     * 处理文档点击
+     */
+    async handleDocumentClick(document) {
+      uni.showActionSheet({
+        itemList: ['下载文档', '查看详情'],
+        success: async (res) => {
+          if (res.tapIndex === 0) {
+            await this.downloadDocument(document)
+          } else if (res.tapIndex === 1) {
+            // 查看文档详情
+            uni.showModal({
+              title: document.name,
+              content: `文档类型：${document.category}\n适用场景：法律文书模板\n格式：Word文档`,
+              showCancel: false
+            })
+          }
+        }
+      })
+    },
+
+    /**
+     * 处理律师推荐
+     */
+    handleLawyerRecommend() {
+      // 跳转到咨询页面
       uni.navigateTo({
         url: '/pages/user/index/consultation/index'
       })
     },
-    handleDocumentClick(doc) {
-      uni.showToast({
-        title: `下载${doc.name}`,
-        icon: 'none'
+
+    /**
+     * 处理律师咨询
+     */
+    handleConsult(lawyer) {
+      // 跳转到律师详情页面
+      uni.navigateTo({
+        url: `/pages/user/index/lawyer-detail/index?lawyerId=${lawyer.id}`
       })
     },
-    handleConsult(lawyer) {
+
+    /**
+     * 格式化价格
+     */
+    formatPrice(price) {
+      if (!price || price === 0) {
+        return '免费咨询'
+      }
+      return `¥${price}/次`
+    },
+
+    /**
+     * 清除缓存
+     */
+    clearCache() {
+      this.cache = {
+        homeData: null,
+        homeDataExpiry: 0,
+        lawyers: null,
+        lawyersExpiry: 0
+      }
+    },
+
+    /**
+     * 延迟函数
+     */
+    delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    },
+
+    /**
+     * 处理API错误
+     */
+    handleApiError(context, error) {
+      console.error(`${context}失败:`, error)
+      let message = `获取${context}失败`
       
-      uni.showToast({
-        title: `咨询${lawyer.name}`,
-        icon: 'none'
+      if (error.message) {
+        if (error.message.includes('timeout') || error.message.includes('超时')) {
+          message = '网络超时，请检查网络连接'
+        } else if (error.message.includes('Network Error') || error.message.includes('网络错误')) {
+          message = '网络连接失败，请检查网络'
+        } else if (error.code === 401 || error.statusCode === 401) {
+          message = '登录已过期，请重新登录'
+        } else if (error.code === 403 || error.statusCode === 403) {
+          message = '权限不足'
+        } else if (error.code >= 500 || error.statusCode >= 500) {
+          message = '服务器错误，请稍后重试'
+        }
+      }
+      
+      // 不显示错误提示，使用降级方案
+      console.log(`${context}使用降级方案`)
+    },
+
+    /**
+     * 处理下载错误
+     */
+    handleDownloadError(error, document) {
+      let message = '下载失败'
+      
+      if (error.message) {
+        if (error.message.includes('timeout') || error.message.includes('超时')) {
+          message = '下载超时，请重试'
+        } else if (error.message.includes('Network Error') || error.message.includes('网络错误')) {
+          message = '网络连接失败，请检查网络'
+        } else if (error.message.includes('space') || error.message.includes('存储')) {
+          message = '存储空间不足'
+        } else if (error.code === 404 || error.statusCode === 404) {
+          message = '文档不存在'
+        }
+      }
+      
+      uni.showModal({
+        title: '下载失败',
+        content: message + '，是否重试？',
+        success: (res) => {
+          if (res.confirm) {
+            this.downloadDocument(document)
+          }
+        }
       })
     }
   }

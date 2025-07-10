@@ -117,9 +117,8 @@
 </template>
 
 <script>
-	import { post } from '@/utils/request.js'
+	import { register, sendSmsCode, verifySmsCode } from '@/api/modules/auth.js'
 	import { toast } from '@/uni_modules/uv-ui-tools/libs/function/index.js'
-	import { sendSmsCode } from '@/utils/sms.js'
 	
 	export default {
 		data() {
@@ -177,11 +176,31 @@
 			},
 			
 			async getCode() {
-				await sendSmsCode({
-					phone: this.phone,
-					type: 1, // 1-注册
-					codeRef: this.$refs.uCode
-				})
+				if (!this.isPhoneValid) {
+					uni.showToast({
+						title: '请输入正确的手机号码',
+						icon: 'none'
+					})
+					return
+				}
+				
+				try {
+					// 调用发送短信验证码接口
+					await sendSmsCode({
+						phone: this.phone,
+						type: 'register'
+					})
+					
+					// 启动倒计时
+					this.$refs.uCode.start()
+					
+					uni.showToast({
+						title: '验证码已发送',
+						icon: 'success'
+					})
+				} catch (error) {
+					console.error('发送验证码失败：', error)
+				}
 			},
 			// 处理注册
 			async handleRegister() {
@@ -220,20 +239,33 @@
 				try {
 					// 显示加载中
 					uni.showLoading({
+						title: '验证中...'
+					})
+					
+					// 先验证短信验证码
+					await verifySmsCode({
+						phone: this.phone,
+						code: this.verifyCode
+					})
+					
+					// 验证码验证成功后，更新加载提示
+					uni.showLoading({
 						title: '注册中...'
 					})
 					
 					// 调用注册接口
-					const data = await post('/user/register', {
-						phone: this.phone,
-						verifyCode: this.verifyCode,
-						password: this.password,
-						confirmPassword: this.confirmPassword,
-						nickname: this.nickname,
+					const response = await register({
 						realName: this.fullName,
+						nickname: this.nickname,
+						email: this.email,
 						birthDate: this.birthDate,
-						email: this.email
+						phone: this.phone,
+						password: this.password,
+						smsCode: this.verifyCode, // 添加验证码参数
+						userType: 'user' // 默认用户类型
 					})
+					
+					console.log('注册响应：', response)
 					
 					uni.showToast({
 						title: '注册成功',
@@ -247,7 +279,29 @@
 						})
 					}, 1500)
 				} catch (error) {
-					// 错误已经在请求拦截器中处理
+					console.error('注册失败：', error)
+					// 根据错误类型显示不同的提示信息
+					if (error.message && error.message.includes('验证码')) {
+						uni.showToast({
+							title: '验证码错误或已过期',
+							icon: 'none'
+						})
+					} else if (error.message && error.message.includes('手机号')) {
+						uni.showToast({
+							title: '手机号已被注册',
+							icon: 'none'
+						})
+					} else if (error.message && error.message.includes('邮箱')) {
+						uni.showToast({
+							title: '邮箱已被注册',
+							icon: 'none'
+						})
+					} else {
+						uni.showToast({
+							title: error.message || '注册失败，请重试',
+							icon: 'none'
+						})
+					}
 				} finally {
 					uni.hideLoading()
 				}

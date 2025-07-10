@@ -143,6 +143,50 @@ const youthAssistanceApi = {
   getAssistanceApplicationDetail(applicationId) {
     return request.get(`/youth-assistance/applications/${applicationId}`);
   },
+
+  /**
+   * @description 获取心理测试列表
+   * @param {object} params - 查询参数
+   * @param {string} [params.category] - 测试分类
+   * @param {string} [params.difficulty] - 难度级别
+   * @returns {Promise<object>} - 心理测试列表
+   */
+  getPsychologicalTests(params = {}) {
+    return request.get('/youth-assistance/psychological-tests', { params });
+  },
+
+  /**
+   * @description 获取心理测试详情
+   * @param {number|string} testId - 测试ID
+   * @returns {Promise<object>} - 测试详情，包含问题列表
+   */
+  getPsychologicalTestDetail(testId) {
+    return request.get(`/youth-assistance/psychological-tests/${testId}`);
+  },
+
+  /**
+   * @description 提交心理测试结果
+   * @param {object} data - 测试结果数据
+   * @param {number|string} data.testId - 测试ID
+   * @param {array} data.answers - 答案数组
+   * @param {number} data.duration - 测试用时（秒）
+   * @param {object} [data.metadata] - 额外元数据
+   * @returns {Promise<object>} - 测试结果分析
+   */
+  submitPsychologicalTestResult(data) {
+    return request.post('/youth-assistance/psychological-tests/submit', data);
+  },
+
+  /**
+   * @description 获取用户心理测试历史记录
+   * @param {object} params - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.size=10] - 每页大小
+   * @returns {Promise<object>} - 测试历史记录
+   */
+  getPsychologicalTestHistory(params = {}) {
+    return request.get('/youth-assistance/psychological-tests/history', { params });
+  },
 };
 
 export default youthAssistanceApi;

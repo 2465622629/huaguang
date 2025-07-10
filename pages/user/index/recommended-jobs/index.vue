@@ -58,11 +58,11 @@
         <!-- 第二行：地点与学历 -->
          <view class="job-card-info">
            <view class="info-item">
-             <uv-icon :name="`${config.staticBaseUrl}/icons/location.png`" :size="24" color="#888888"></uv-icon>
+             <uv-icon :name="config.staticBaseUrl + '/icons/location.png'" :size="24" color="#888888"></uv-icon>
              <text class="info-text">{{ job.location }}</text>
            </view>
            <view class="info-item">
-             <uv-icon :name="`${config.staticBaseUrl}/icons/graduation.png`" :size="24" color="#888888"></uv-icon>
+             <uv-icon :name="config.staticBaseUrl + '/icons/graduation.png'" :size="24" color="#888888"></uv-icon>
              <text class="info-text">{{ job.education }}</text>
            </view>
          </view>
@@ -130,221 +130,534 @@ export default {
   data() {
     return {
       config,
+      
+      // 企业级数据管理
+      retryCount: 0,
+      maxRetries: 3,
+      cacheKey: 'recommended_jobs_cache',
+      cacheExpiry: 8 * 60 * 1000, // 8分钟缓存
+      lastUpdateTime: 0,
+      
+      // 用户偏好数据
+      userPreferences: {
+        preferredSalaryRange: '',
+        preferredLocation: '',
+        preferredIndustry: '',
+        preferredJobType: '',
+        experienceLevel: ''
+      },
+      
       // 排序相关
       showSort: false,
       currentSort: {
-        label: '默认排序',
-        value: 'default'
+        label: '智能推荐',
+        value: 'recommended'
       },
       sortOptions: [
-        { label: '默认排序', value: 'default' },
+        { label: '智能推荐', value: 'recommended' },
         { label: '最新发布', value: 'newest' },
         { label: '薪资最高', value: 'salary_high' },
-        { label: '规模最大', value: 'scale_large' }
+        { label: '匹配度高', value: 'match_high' },
+        { label: '距离最近', value: 'distance' }
       ],
       
-      // 筛选标签
+      // 智能筛选标签
       filterTags: [
-        { label: '推荐', active: true },
-        { label: '附近', active: false },
-        { label: '无学历限制', active: false },
-        { label: '推荐', active: false },
-        { label: '附近', active: false },
-        { label: '无学历限制', active: false }
+        { label: '为你推荐', active: true, value: 'recommended' },
+        { label: '附近职位', active: false, value: 'nearby' },
+        { label: '无学历限制', active: false, value: 'no_education_limit' },
+        { label: '高薪职位', active: false, value: 'high_salary' },
+        { label: '急招职位', active: false, value: 'urgent' },
+        { label: '大厂职位', active: false, value: 'big_company' }
       ],
       
       // 职位列表数据
-      jobList: [
-        {
-          id: 1,
-          title: '法务专员',
-          salary: '6k-9k',
-          location: '上海市 · 浦东新区',
-          education: '本科'
-        },
-        {
-          id: 2,
-          title: '法务助理',
-          salary: '4k-6k',
-          location: '北京市 · 朝阳区',
-          education: '大专'
-        },
-        {
-          id: 3,
-          title: '法务经理',
-          salary: '10k-15k',
-          location: '深圳市 · 南山区',
-          education: '本科'
-        },
-        {
-          id: 4,
-          title: '合规专员',
-          salary: '7k-10k',
-          location: '广州市 · 天河区',
-          education: '本科'
-        },
-        {
-          id: 5,
-          title: '法务顾问',
-          salary: '8k-12k',
-          location: '杭州市 · 西湖区',
-          education: '硕士'
-        },
-        {
-          id: 6,
-          title: '律师助理',
-          salary: '5k-8k',
-          location: '成都市 · 高新区',
-          education: '本科'
-        }
-      ],
+      jobList: [],
+      hotJobs: [], // 热门职位
+      originalList: [], // 保存原始数据用于本地筛选
       
       // 加载状态
       loading: false,
       noMore: false,
       page: 1,
-      pageSize: 10
+      pageSize: 20,
+      totalCount: 0,
+      
+      // 推荐算法相关
+      recommendationReasons: new Map(), // 推荐理由
+      userBehaviorData: {
+        viewedJobs: new Set(),
+        appliedJobs: new Set(),
+        favoriteJobs: new Set()
+      }
     }
   },
   
-  onLoad() {
-    this.loadJobList()
+  async onLoad() {
+    await this.loadRecommendedJobs()
+  },
+  
+  onPullDownRefresh() {
+    this.onRefresh().finally(() => {
+      uni.stopPullDownRefresh()
+    })
+  },
+  
+  onReachBottom() {
+    this.loadMore()
   },
   
   methods: {
-    // 返回上一页
+    // ==================== 企业级数据加载方法 ====================
+    
+    /**
+     * 智能推荐职位加载 - 企业级实现
+     */
+    async loadRecommendedJobs() {
+      try {
+        this.loading = true
+        this.retryCount = 0
+        
+        // 检查缓存
+        const cachedData = this.getCachedData()
+        if (cachedData && this.isCacheValid()) {
+          console.log('📦 使用缓存数据加载推荐职位')
+          this.processJobData(cachedData)
+          return
+        }
+        
+        // 并行加载数据
+        const [jobsResult, preferencesResult] = await Promise.allSettled([
+          this.fetchRecommendedJobsWithRetry(),
+          this.loadUserPreferences()
+        ])
+        
+        // 处理职位数据
+        if (jobsResult.status === 'fulfilled') {
+          const jobData = jobsResult.value
+          this.processJobData(jobData)
+          this.setCacheData(jobData)
+        } else {
+          throw new Error('获取推荐职位失败')
+        }
+        
+        // 处理用户偏好数据
+        if (preferencesResult.status === 'fulfilled') {
+          this.userPreferences = { ...this.userPreferences, ...preferencesResult.value }
+        }
+        
+      } catch (error) {
+        console.error('❌ 加载推荐职位失败:', error)
+        await this.handleLoadError(error)
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    /**
+     * 带重试机制的职位数据获取
+     */
+    async fetchRecommendedJobsWithRetry() {
+      for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+        try {
+          const params = {
+            page: this.page,
+            pageSize: this.pageSize,
+            sortType: this.currentSort.value,
+            filters: this.getActiveFilters(),
+            userPreferences: this.userPreferences
+          }
+          
+          const response = await enterpriseApi.getRecommendedJobs(params)
+          
+          if (response && response.code === 200) {
+            return response.data
+          } else {
+            throw new Error(response?.message || '获取数据失败')
+          }
+          
+        } catch (error) {
+          console.warn(`⚠️ 第${attempt + 1}次尝试失败:`, error.message)
+          
+          if (attempt === this.maxRetries) {
+            throw error
+          }
+          
+          // 指数退避延迟
+          const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 10000)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    },
+    
+    /**
+     * 加载用户偏好设置
+     */
+    async loadUserPreferences() {
+      try {
+        const response = await enterpriseApi.getUserJobPreferences()
+        if (response && response.code === 200) {
+          return response.data
+        }
+      } catch (error) {
+        console.warn('⚠️ 加载用户偏好失败:', error)
+        return {}
+      }
+    },
+    
+    // ==================== 数据处理方法 ====================
+    
+    /**
+     * 处理职位数据
+     */
+    processJobData(data) {
+      if (!data) return
+      
+      const { list = [], total = 0, hotJobs = [], recommendations = {} } = data
+      
+      // 数据验证和清洗
+      const validJobs = list.filter(job => job && job.id && job.title)
+      
+      if (this.page === 1) {
+        this.jobList = validJobs
+        this.originalList = [...validJobs]
+      } else {
+        this.jobList = [...this.jobList, ...validJobs]
+        this.originalList = [...this.originalList, ...validJobs]
+      }
+      
+      this.hotJobs = hotJobs
+      this.totalCount = total
+      this.noMore = this.jobList.length >= total
+      
+      // 处理推荐理由
+      if (recommendations) {
+        Object.entries(recommendations).forEach(([jobId, reason]) => {
+          this.recommendationReasons.set(parseInt(jobId), reason)
+        })
+      }
+      
+      this.lastUpdateTime = Date.now()
+    },
+    
+    /**
+     * 获取激活的筛选条件
+     */
+    getActiveFilters() {
+      return this.filterTags
+        .filter(tag => tag.active)
+        .map(tag => tag.value)
+    },
+    
+    // ==================== 缓存管理方法 ====================
+    
+    /**
+     * 获取缓存数据
+     */
+    getCachedData() {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        return cached ? JSON.parse(cached) : null
+      } catch (error) {
+        console.warn('⚠️ 读取缓存失败:', error)
+        return null
+      }
+    },
+    
+    /**
+     * 设置缓存数据
+     */
+    setCacheData(data) {
+      try {
+        const cacheData = {
+          data,
+          timestamp: Date.now(),
+          page: this.page,
+          filters: this.getActiveFilters(),
+          sortType: this.currentSort.value
+        }
+        uni.setStorageSync(this.cacheKey, JSON.stringify(cacheData))
+      } catch (error) {
+        console.warn('⚠️ 设置缓存失败:', error)
+      }
+    },
+    
+    /**
+     * 检查缓存是否有效
+     */
+    isCacheValid() {
+      const cached = this.getCachedData()
+      if (!cached) return false
+      
+      const now = Date.now()
+      const isExpired = (now - cached.timestamp) > this.cacheExpiry
+      const isSameFilter = JSON.stringify(cached.filters) === JSON.stringify(this.getActiveFilters())
+      const isSameSort = cached.sortType === this.currentSort.value
+      const isSamePage = cached.page === this.page
+      
+      return !isExpired && isSameFilter && isSameSort && isSamePage
+    },
+    
+    // ==================== 用户交互方法 ====================
+    
+    /**
+     * 返回上一页
+     */
     goBack() {
       uni.navigateBack()
     },
     
-    // 显示排序菜单
+    /**
+     * 显示排序菜单
+     */
     showSortMenu() {
       console.log('点击排序按钮')
       this.showSort = true
       console.log('showSort状态:', this.showSort)
     },
     
-    // 选择排序方式
-    selectSort(option) {
+    /**
+     * 选择排序方式
+     */
+    async selectSort(option) {
       this.currentSort = option
       this.showSort = false
-      this.refreshList()
+      
+      // 重置分页
+      this.page = 1
+      this.noMore = false
+      
+      // 重新加载数据
+      await this.loadRecommendedJobs()
     },
     
-    // 切换筛选标签
-    toggleTag(index) {
+    /**
+     * 智能排序职位列表
+     */
+    sortJobList(sortType) {
+      let sortedList = [...this.originalList]
+      
+      switch(sortType) {
+        case 'recommended':
+          // 按推荐算法排序（已由后端处理）
+          break
+        case 'newest':
+          sortedList.sort((a, b) => new Date(b.publishTime) - new Date(a.publishTime))
+          break
+        case 'salary_high':
+          sortedList.sort((a, b) => this.parseSalary(b.salary) - this.parseSalary(a.salary))
+          break
+        case 'match_high':
+          sortedList.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+          break
+        case 'distance':
+          sortedList.sort((a, b) => (a.distance || 999) - (b.distance || 999))
+          break
+      }
+      
+      this.jobList = sortedList
+    },
+    
+    /**
+     * 解析薪资字符串为数字
+     */
+    parseSalary(salaryStr) {
+      if (!salaryStr) return 0
+      const matches = salaryStr.match(/(\d+)k?-?(\d+)?k?/i)
+      if (matches) {
+        const min = parseInt(matches[1]) * (matches[1].includes('k') ? 1000 : 1)
+        const max = matches[2] ? parseInt(matches[2]) * (matches[2].includes('k') ? 1000 : 1) : min
+        return (min + max) / 2
+      }
+      return 0
+    },
+    
+    /**
+     * 切换筛选标签
+     */
+    async toggleTag(index) {
       this.filterTags[index].active = !this.filterTags[index].active
-      this.refreshList()
+      
+      // 重置分页
+      this.page = 1
+      this.noMore = false
+      
+      // 重新加载数据
+      await this.loadRecommendedJobs()
     },
     
-    // 搜索
+    /**
+     * 搜索
+     */
     handleSearch() {
       uni.navigateTo({
         url: '/pages/user/index/search/index'
       })
     },
     
-    // 跳转到职位详情
+    /**
+     * 记录职位浏览行为
+     */
+    recordJobView(jobId) {
+      this.userBehaviorData.viewedJobs.add(jobId)
+      
+      // 异步上报用户行为
+      this.reportUserBehavior('view', jobId)
+    },
+    
+    /**
+     * 上报用户行为数据
+     */
+    async reportUserBehavior(action, jobId, extra = {}) {
+      try {
+        await enterpriseApi.reportUserBehavior({
+          action,
+          jobId,
+          timestamp: Date.now(),
+          ...extra
+        })
+      } catch (error) {
+        console.warn('⚠️ 上报用户行为失败:', error)
+      }
+    },
+    
+    /**
+     * 跳转到职位详情
+     */
     goToJobDetail(job) {
+      // 记录浏览行为
+      this.recordJobView(job.id)
+      
       console.log('点击职位卡片', job)
       uni.navigateTo({
         url: `/pages/user/index/job-detail/index?id=${job.id}`
       })
     },
     
-    // 加载职位列表
-    async loadJobList() {
-      if (this.loading || this.noMore) return
-      
-      this.loading = true
-      
+    /**
+     * 快速申请职位
+     */
+    async quickApply(job) {
       try {
-        // 调用真实API
-        const params = {
-          page: this.page,
-          size: this.pageSize
-        }
+        const result = await uni.showModal({
+          title: '确认申请',
+          content: `确定要申请「${job.title}」职位吗？`,
+          confirmText: '确认申请',
+          cancelText: '取消'
+        })
         
-        // 添加排序参数
-        if (this.currentSort.value !== 'default') {
-          params.sort = this.currentSort.value
-        }
+        if (!result.confirm) return
         
-        // 添加筛选参数
-        const activeFilters = this.filterTags.filter(tag => tag.active).map(tag => tag.label)
-        if (activeFilters.length > 0) {
-          params.filters = activeFilters.join(',')
-        }
+        uni.showLoading({ title: '申请中...' })
         
-        // 暂时使用模拟数据，后续可替换为真实的职位API
-        // const response = await jobApi.getJobList(params)
-        console.log('职位列表数据加载中...');
+        const response = await enterpriseApi.applyJob({
+          jobId: job.id,
+          companyId: job.companyId
+        })
         
-        // 模拟API延迟
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // 处理API返回数据 - 使用模拟数据
-        let newData = [
-          {
-            id: this.page * 10 + 1,
-            title: '法务专员',
-            salary: '6k-9k',
-            location: '上海市 · 浦东新区',
-            education: '本科'
-          },
-          {
-            id: this.page * 10 + 2,
-            title: '法务助理',
-            salary: '4k-6k',
-            location: '北京市 · 朝阳区',
-            education: '大专'
-          },
-          {
-            id: this.page * 10 + 3,
-            title: '法务经理',
-            salary: '10k-15k',
-            location: '深圳市 · 南山区',
-            education: '本科'
-          }
-        ]
-        
-        if (this.page === 1) {
-          this.jobList = newData
+        if (response && response.code === 200) {
+          this.userBehaviorData.appliedJobs.add(job.id)
+          this.reportUserBehavior('apply', job.id)
+          
+          uni.showToast({
+            title: '申请成功',
+            icon: 'success'
+          })
         } else {
-          this.jobList.push(...newData)
-        }
-        
-        // 检查是否还有更多数据
-        if (newData.length < this.pageSize) {
-          this.noMore = true
-        } else {
-          this.page++
+          throw new Error(response?.message || '申请失败')
         }
         
       } catch (error) {
-        console.error('加载职位列表失败:', error)
+        console.error('❌ 申请职位失败:', error)
         uni.showToast({
-          title: error.message || '加载失败，请稍后重试',
-          icon: 'none',
-          duration: 2000
+          title: error.message || '申请失败',
+          icon: 'none'
         })
       } finally {
-        this.loading = false
+        uni.hideLoading()
       }
     },
     
-    // 刷新列表
-    refreshList() {
+    // ==================== 生命周期方法 ====================
+    
+    /**
+     * 加载更多
+     */
+    async loadMore() {
+      if (this.loading || this.noMore) return
+      
+      this.page++
+      await this.loadRecommendedJobs()
+    },
+    
+    /**
+     * 下拉刷新
+     */
+    async onRefresh() {
       this.page = 1
       this.noMore = false
       this.jobList = []
-      this.loading = false // 重置加载状态
-      this.loadJobList()
+      this.originalList = []
+      
+      // 清除缓存
+      uni.removeStorageSync(this.cacheKey)
+      
+      await this.loadRecommendedJobs()
     },
     
-    // 加载更多
-    loadMore() {
-      this.loadJobList()
+    // ==================== 错误处理方法 ====================
+    
+    /**
+     * 处理加载错误
+     */
+    async handleLoadError(error) {
+      // 尝试使用过期缓存
+      const expiredCache = this.getCachedData()
+      if (expiredCache && expiredCache.data) {
+        console.log('📦 使用过期缓存数据')
+        this.processJobData(expiredCache.data)
+        
+        uni.showToast({
+          title: '数据可能不是最新的',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+      
+      // 显示默认数据
+      this.showDefaultData()
+      
+      uni.showToast({
+        title: '加载失败，请稍后重试',
+        icon: 'none'
+      })
+    },
+    
+    /**
+     * 显示默认数据
+     */
+    showDefaultData() {
+      this.jobList = [
+        {
+          id: 'default_1',
+          title: '法务专员',
+          salary: '6k-9k',
+          location: '上海市 · 浦东新区',
+          education: '本科',
+          companyName: '示例企业',
+          isDefault: true
+        },
+        {
+          id: 'default_2',
+          title: '法务助理',
+          salary: '4k-6k',
+          location: '北京市 · 朝阳区',
+          education: '大专',
+          companyName: '示例企业',
+          isDefault: true
+        }
+      ]
     }
   }
 }

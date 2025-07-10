@@ -6,7 +6,7 @@
     <view class="main-content">
       <!-- Banner区域 -->
       <view class="banner-section">
-        <image class="banner-full-img" :src="`${config.staticBaseUrl}/jobs_banner.png`" mode="aspectFill"></image>
+        <image class="banner-full-img" :src="config.staticBaseUrl + '/jobs_banner.png'" mode="aspectFill"></image>
       </view>
 
       <!-- 推荐企业模块 -->
@@ -16,17 +16,23 @@
           <uv-icon name="arrow-right" size="24" color="#87CEFA"></uv-icon>
         </view>
         <view class="companies-container">
-          <view v-for="(company, index) in companies" :key="company.id" class="company-card"
+          <view v-if="loading.companies" class="loading-placeholder">
+            <text class="loading-text">加载中...</text>
+          </view>
+          <view v-else-if="companies.length === 0" class="empty-placeholder">
+            <text class="empty-text">暂无推荐企业</text>
+          </view>
+          <view v-else v-for="(company, index) in companies" :key="company.id" class="company-card"
             @click="handleCompanyClick(company)">
             <view class="company-header">
               <view class="company-logo">
                 <!-- 圆形企业logo占位符 -->
               </view>
               <view class="company-info">
-                <text class="company-name">{{ company.name }}</text>
+                <text class="company-name">{{ company.companyName }}</text>
               </view>
             </view>
-            <text class="company-jobs">招聘职位 {{ company.jobCount }}</text>
+            <text class="company-jobs">招聘职位 若干</text>
           </view>
         </view>
       </view>
@@ -38,21 +44,27 @@
           <uv-icon name="arrow-right" size="24" color="#87CEFA"></uv-icon>
         </view>
         <view class="jobs-list">
-          <view v-for="(job, index) in jobs" :key="job.id" class="job-item-wrapper">
-            <view class="job-item">
+          <view v-if="loading.jobs" class="loading-placeholder">
+            <text class="loading-text">加载中...</text>
+          </view>
+          <view v-else-if="jobs.length === 0" class="empty-placeholder">
+            <text class="empty-text">暂无推荐职位</text>
+          </view>
+          <view v-else v-for="(job, index) in jobs" :key="job.id" class="job-item-wrapper">
+            <view class="job-item" @click="handleJobClick(job)">
               <view class="job-main">
                 <view class="job-title-row">
-                  <text class="job-title">{{ job.title }}</text>
-                  <text class="job-company">{{ job.company }}</text>
+                  <text class="job-title">{{ job.title || job.jobTitle }}</text>
+                  <text class="job-company">{{ job.enterprise.companyName }}</text>
                 </view>
                 <view class="job-info-row">
-                  <text class="job-info">{{ job.salary }}</text>
-                  <text class="job-info">{{ job.location }}</text>
-                  <text class="job-info">{{ job.education }}</text>
+                  <text class="job-info">{{ job.salary || job.salaryRange }}</text>
+                  <text class="job-info">{{ job.location || job.workLocation }}</text>
+                  <text class="job-info">{{ job.education || job.educationRequirement }}</text>
                 </view>
               </view>
               <view class="job-action">
-                <view class="apply-btn" @click="handleQuickApply(job)">
+                <view class="apply-btn" @click.stop="handleQuickApply(job)">
                   <text class="apply-text">快速投递</text>
                 </view>
               </view>
@@ -72,6 +84,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
+import { getHotJobs, getEnterpriseList, applyJob } from '@/api/modules/enterprise.js'
 
 export default {
   name: 'JobPlatform',
@@ -82,113 +95,87 @@ export default {
     return {
       config,
       // 推荐企业数据
-      companies: [
-        {
-          id: 1,
-          name: 'XX科技',
-          jobCount: 15
-        },
-        {
-          id: 2,
-          name: 'YY集团',
-          jobCount: 8
-        },
-        {
-          id: 3,
-          name: 'ZZ公司',
-          jobCount: 12
-        }
-        
-      ],
+      companies: [],
       // 推荐职业数据
-      jobs: [
-        {
-          id: 1,
-          title: '法务专员',
-          company: 'XX科技',
-          salary: '6k-9k',
-          location: '上海',
-          education: '本科及以上'
-        },
-        {
-          id: 2,
-          title: '前端开发工程师',
-          company: 'YY集团',
-          salary: '8k-15k',
-          location: '北京',
-          education: '本科及以上'
-        },
-        {
-          id: 3,
-          title: '产品经理',
-          company: 'ZZ公司',
-          salary: '12k-20k',
-          location: '深圳',
-          education: '本科及以上'
-        },
-        {
-          id: 4,
-          title: '数据分析师',
-          company: 'AA科技',
-          salary: '10k-18k',
-          location: '广州',
-          education: '本科及以上'
-        },
-        {
-          id: 5,
-          title: 'UI/UX设计师',
-          company: 'BB设计',
-          salary: '9k-16k',
-          location: '杭州',
-          education: '本科及以上'
-        },
-        {
-          id: 6,
-          title: '后端开发工程师',
-          company: 'CC科技',
-          salary: '11k-19k',
-          location: '成都',
-          education: '本科及以上'
-        },
-        {
-          id: 7,
-          title: '测试工程师',
-          company: 'DD科技',
-          salary: '7k-13k',
-          location: '武汉',
-          education: '本科及以上'
-        },
-        {
-          id: 8,
-          title: '运营专员',
-          company: 'EE传媒',
-          salary: '5k-10k',
-          location: '西安',
-          education: '本科及以上'
-        },
-        {
-          id: 9,
-          title: '市场营销',
-          company: 'FF集团',
-          salary: '8k-14k',
-          location: '南京',
-          education: '本科及以上'
-        },
-        {
-          id: 10,
-          title: '人力资源',
-          company: 'GG企业',
-          salary: '6k-12k',
-          location: '苏州',
-          education: '本科及以上'
-        }
-      ]
+      jobs: [],
+      // 加载状态
+      loading: {
+        companies: false,
+        jobs: false
+      }
     }
   },
   onLoad() {
     console.log('招聘主页加载完成')
+    this.loadRecommendedData()
   },
   methods: {
+    // 加载推荐数据
+    async loadRecommendedData() {
+      await Promise.all([
+        this.loadRecommendedCompanies(),
+        this.loadRecommendedJobs()
+      ])
+    },
+
+    // 加载推荐企业
+    async loadRecommendedCompanies() {
+      try {
+        this.loading.companies = true
+        const response = await getEnterpriseList({
+          page: 1,
+          pageSize: 6, // 获取6家推荐企业
+          isRecommended: true
+        })
+        if (response.code === 200 && response.data) {
+          this.companies = response.data.records || []
+        } else {
+          console.error('获取推荐企业失败:', response.message)
+          uni.showToast({
+            title: response.message || '获取推荐企业失败',
+            icon: 'none'
+          })
+        }
+      } catch (error) {
+        console.error('加载推荐企业异常:', error)
+        uni.showToast({
+          title: '网络异常，请稍后重试',
+          icon: 'none'
+        })
+      } finally {
+        this.loading.companies = false
+      }
+    },
+
+    // 加载推荐职位
+    async loadRecommendedJobs() {
+      try {
+        this.loading.jobs = true
+        const response = await getHotJobs({
+          page: 1,
+          pageSize: 10 // 获取10个热门职位
+        })
+        
+        if (response.code === 200 && response.data) {
+          this.jobs = response.data.records || []
+        } else {
+          console.error('获取推荐职位失败:', response.message)
+          uni.showToast({
+            title: response.message || '获取推荐职位失败',
+            icon: 'none'
+          })
+        }
+      } catch (error) {
+        console.error('加载推荐职位异常:', error)
+        uni.showToast({
+          title: '网络异常，请稍后重试',
+          icon: 'none'
+        })
+      } finally {
+        this.loading.jobs = false
+      }
+    },
+
     // 返回上一页
     goBack() {
       uni.navigateBack()
@@ -196,10 +183,9 @@ export default {
 
     // 处理企业卡片点击
     handleCompanyClick(company) {
-      console.log('点击企业：', company.name)
-      uni.showToast({
-        title: '企业详情功能开发中',
-        icon: 'none'
+      console.log('点击企业：', company.name || company.enterpriseName)
+      uni.navigateTo({
+        url: `/pages/user/index/company-detail/index?id=${company.id}`
       })
     },
 
@@ -221,7 +207,7 @@ export default {
     handleMoreJobs() {
       console.log('查看更多职业')
       uni.navigateTo({
-        url: '/pages/user/index/recommended-jobs/index',
+        url: '/pages/user/index/job-search-result/index?keyword=热门职位',
         success: () => {
           console.log('跳转成功');
         },
@@ -232,11 +218,46 @@ export default {
     },
 
     // 处理快速投递
-    handleQuickApply(job) {
-      console.log('快速投递职位：', job.title)
-      uni.showToast({
-        title: '投递功能开发中',
-        icon: 'none'
+    async handleQuickApply(job) {
+      try {
+        console.log('快速投递职位：', job.title || job.jobTitle)
+        
+        uni.showLoading({
+          title: '投递中...'
+        })
+
+        const response = await applyJob({
+          jobId: job.id,
+          resumeId: null // 使用默认简历
+        })
+
+        uni.hideLoading()
+
+        if (response.code === 200) {
+          uni.showToast({
+            title: '投递成功',
+            icon: 'success'
+          })
+        } else {
+          uni.showToast({
+            title: response.message || '投递失败',
+            icon: 'none'
+          })
+        }
+      } catch (error) {
+        uni.hideLoading()
+        console.error('快速投递异常:', error)
+        uni.showToast({
+          title: '投递失败，请稍后重试',
+          icon: 'none'
+        })
+      }
+    },
+
+    // 跳转到职位详情
+    handleJobClick(job) {
+      uni.navigateTo({
+        url: `/pages/user/index/job-detail/index?id=${job.id}`
       })
     }
   }
@@ -338,6 +359,21 @@ export default {
       overflow-y: auto;
       overflow-x: hidden;
     }
+  }
+}
+
+/* 加载和空状态样式 */
+.loading-placeholder,
+.empty-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200rpx;
+  
+  .loading-text,
+  .empty-text {
+    font-size: 28rpx;
+    color: #999999;
   }
 }
 

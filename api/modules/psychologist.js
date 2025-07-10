@@ -126,6 +126,88 @@ export const getUserPsychConsultations = (params) => {
 }
 
 /**
+ * 获取心理师的咨询列表（心理师端）
+ * @param {Object} params 查询参数
+ * @param {number} [params.page] 页码
+ * @param {number} [params.pageSize] 每页数量
+ * @param {string} [params.status] 状态筛选 pending|in_progress|completed
+ * @param {string} [params.sortBy] 排序方式 created_time|updated_time
+ * @param {string} [params.sortOrder] 排序顺序 asc|desc
+ * @returns {Promise} 咨询列表
+ */
+export const getPsychologistConsultations = (params) => {
+  return get('/psychologist/consultations', params)
+}
+
+/**
+ * 获取心理师工作台主页数据
+ * @returns {Promise} 工作台主页数据，包括咨询统计和待处理事项
+ */
+export const getPsychologistWorkspaceHome = () => {
+  return get('/psychologist/workspace/home')
+}
+
+/**
+ * 获取心理师收入统计信息
+ * @param {Object} params 查询参数
+ * @param {string} [params.period] 统计周期 today|week|month|year
+ * @param {string} [params.startDate] 开始日期
+ * @param {string} [params.endDate] 结束日期
+ * @returns {Promise} 收入统计数据
+ */
+export const getPsychologistIncomeStats = (params) => {
+  return get('/psychologist/workspace/income/statistics', params)
+}
+
+/**
+ * 获取心理师咨询管理列表
+ * @param {Object} params 查询参数
+ * @param {string} [params.status] 咨询状态筛选
+ * @param {number} [params.page] 页码
+ * @param {number} [params.size] 每页大小
+ * @returns {Promise} 咨询管理列表
+ */
+export const getPsychologistConsultationManagement = (params) => {
+  return get('/psychologist/workspace/consultations/management', params)
+}
+
+/**
+ * 心理师回复咨询
+ * @param {Object} data 回复数据
+ * @param {string} data.consultationId 咨询ID
+ * @param {string} data.content 回复内容
+ * @param {Array} [data.attachments] 附件列表
+ * @returns {Promise} 回复结果
+ */
+export const replyPsychConsultation = (data) => {
+  return post('/psychologist/consultation-replies', data)
+}
+
+/**
+ * 心理师更新咨询状态
+ * @param {string} consultationId 咨询ID
+ * @param {Object} data 状态数据
+ * @param {string} data.status 新状态 pending|in_progress|completed
+ * @param {string} [data.note] 备注
+ * @returns {Promise} 更新结果
+ */
+export const updateConsultationStatus = (consultationId, data) => {
+  return put(`/psychologist/consultations/${consultationId}/status`, data)
+}
+
+/**
+ * 获取咨询的详细聊天记录
+ * @param {string} consultationId 咨询ID
+ * @param {Object} params 查询参数
+ * @param {number} [params.page] 页码
+ * @param {number} [params.pageSize] 每页数量
+ * @returns {Promise} 聊天记录
+ */
+export const getConsultationMessages = (consultationId, params) => {
+  return get(`/psychologist/consultations/${consultationId}/messages`, params)
+}
+
+/**
  * 评价心理师服务
  * @param {Object} data 评价数据
  * @param {string} data.psychologistId 心理师ID
@@ -305,6 +387,13 @@ export default {
   createPsychConsultation,
   getPsychConsultationDetail,
   getUserPsychConsultations,
+  getPsychologistConsultations,
+  getPsychologistWorkspaceHome,
+  getPsychologistIncomeStats,
+  getPsychologistConsultationManagement,
+  replyPsychConsultation,
+  updateConsultationStatus,
+  getConsultationMessages,
   ratePsychologist,
   getPsychTests,
   getPsychTestDetail,

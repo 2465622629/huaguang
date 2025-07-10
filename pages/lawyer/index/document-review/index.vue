@@ -87,6 +87,7 @@
 
 <script>
 import { staticBaseUrl } from '@/config/index.js'
+import { getDocumentReviewList } from '@/api/modules/lawyer-workspace.js'
 
 export default {
   data() {
@@ -98,6 +99,8 @@ export default {
       hasMore: true,
       page: 1,
       pageSize: 10,
+      retryCount: 0,
+      maxRetries: 3,
       
       // 筛选标签
       filterTabs: [
@@ -108,55 +111,19 @@ export default {
       ],
       
       // 文书列表数据
-      documentList: [
-        {
-          id: 1,
-          title: '民事起诉状',
-          createTime: '2025年5月6日 14:33',
-          status: 'pending'
-        },
-        {
-          id: 2,
-          title: '民事起诉状',
-          createTime: '2025年5月6日 14:33',
-          status: 'approved'
-        },
-        {
-          id: 3,
-          title: '民事起诉状',
-          createTime: '2025年5月6日 14:33',
-          status: 'rejected'
-        },
-        {
-          id: 4,
-          title: '劳动合同纠纷起诉状',
-          createTime: '2025年5月5日 16:20',
-          status: 'pending'
-        },
-        {
-          id: 5,
-          title: '房屋买卖合同纠纷起诉状',
-          createTime: '2025年5月5日 10:15',
-          status: 'approved'
-        },
-        {
-          id: 6,
-          title: '交通事故赔偿起诉状',
-          createTime: '2025年5月4日 09:30',
-          status: 'rejected'
-        }
-      ]
+      documentList: [],
+      
+      // 缓存相关
+      cacheKey: 'document_review_list_cache',
+      cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
+      lastCacheTime: 0
     }
   },
   
   computed: {
-    // 根据当前选中的标签过滤文书列表
+    // 显示的文书列表（API已处理筛选，直接返回）
     filteredDocuments() {
-      const currentFilter = this.filterTabs[this.currentTab].value
-      if (currentFilter === 'all') {
-        return this.documentList
-      }
-      return this.documentList.filter(doc => doc.status === currentFilter)
+      return this.documentList
     },
     backgroundStyle() {
       return {
@@ -167,6 +134,7 @@ export default {
   
   mounted() {
     this.calculateScrollViewHeight()
+    this.loadDocumentList()
   },
   
   methods: {
@@ -181,14 +149,264 @@ export default {
       this.scrollViewHeight = systemInfo.windowHeight - statusBarHeight - navbarHeight - filterTabsHeight - tabBarHeight
     },
     
+    // 加载文档审核列表
+    async loadDocumentList(isRefresh = false, isLoadMore = false) {
+      // 防止重复请求
+      if (this.loading && !isRefresh) return
+      
+      try {
+        // 设置加载状态
+        if (isRefresh) {
+          this.refreshing = true
+          this.page = 1
+          this.hasMore = true
+        } else if (isLoadMore) {
+          if (!this.hasMore) return
+          this.loading = true
+          this.page++
+        } else {
+          this.loading = true
+        }
+        
+        // 检查缓存（仅首次加载且非刷新时）
+        if (!isRefresh && !isLoadMore && this.page === 1) {
+          const cachedData = this.getCachedData()
+          if (cachedData) {
+            this.documentList = cachedData
+            this.loading = false
+            console.log('使用缓存数据加载文档列表')
+            return
+          }
+        }
+        
+        // 准备API参数
+        const currentFilter = this.filterTabs[this.currentTab].value
+        const params = {
+          page: this.page,
+          size: this.pageSize,
+          status: currentFilter === 'all' ? undefined : currentFilter
+        }
+        
+        // 调用API获取数据
+        const response = await this.callApiWithRetry(() => getDocumentReviewList(params))
+        
+        // 处理API响应
+        if (response && response.code === 200) {
+          const newDocuments = this.formatDocumentList(response.data?.list || [])
+          
+          if (isRefresh || (!isLoadMore && this.page === 1)) {
+            this.documentList = newDocuments
+          } else {
+            this.documentList = [...this.documentList, ...newDocuments]
+          }
+          
+          // 更新分页状态
+          const total = response.data?.total || 0
+          const currentTotal = this.documentList.length
+          this.hasMore = currentTotal < total
+          
+          // 缓存数据（仅首页数据）
+          if (this.page === 1) {
+            this.setCachedData(this.documentList)
+          }
+          
+          console.log(`文档列表加载成功，当前页：${this.page}，总数：${currentTotal}/${total}`)
+        } else {
+          throw new Error(response?.message || '获取文档列表失败')
+        }
+        
+        // 重置重试计数
+        this.retryCount = 0
+        
+      } catch (error) {
+        console.error('加载文档列表失败:', error)
+        await this.handleLoadError(error, isRefresh, isLoadMore)
+      } finally {
+        // 重置加载状态
+        this.loading = false
+        this.refreshing = false
+      }
+    },
+    
+    // 企业级API调用重试机制
+    async callApiWithRetry(apiCall, maxRetries = this.maxRetries) {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await apiCall()
+          return result
+        } catch (error) {
+          console.warn(`API调用失败，尝试 ${attempt + 1}/${maxRetries + 1}:`, error.message)
+          
+          if (attempt === maxRetries) {
+            throw error
+          }
+          
+          // 指数退避重试，添加随机抖动避免雷群效应
+          const baseDelay = 1000 * Math.pow(2, attempt)
+          const jitter = Math.random() * 1000
+          const delay = Math.min(baseDelay + jitter, 8000)
+          
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    },
+    
+    // 格式化文档列表数据
+    formatDocumentList(documents) {
+      return documents.map(doc => ({
+        id: doc.id || doc.documentId,
+        title: doc.title || doc.documentTitle || '未知文书',
+        createTime: this.formatDateTime(doc.createTime || doc.createdAt),
+        status: this.mapApiStatus(doc.status || doc.reviewStatus),
+        originalData: doc // 保存原始数据以备后用
+      }))
+    },
+    
+    // API状态映射到前端状态
+    mapApiStatus(apiStatus) {
+      const statusMap = {
+        'PENDING': 'pending',
+        'APPROVED': 'approved',
+        'REJECTED': 'rejected',
+        'pending': 'pending',
+        'approved': 'approved',
+        'rejected': 'rejected',
+        '0': 'pending',
+        '1': 'approved',
+        '2': 'rejected'
+      }
+      return statusMap[apiStatus] || 'pending'
+    },
+    
+    // 格式化日期时间
+    formatDateTime(dateTime) {
+      if (!dateTime) return '未知时间'
+      
+      try {
+        const date = new Date(dateTime)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        
+        return `${year}年${month}月${day}日 ${hours}:${minutes}`
+      } catch (error) {
+        console.warn('日期格式化失败:', error)
+        return String(dateTime)
+      }
+    },
+    
+    // 处理加载错误
+    async handleLoadError(error, isRefresh, isLoadMore) {
+      const errorMessage = this.getErrorMessage(error)
+      
+      // 尝试使用缓存数据
+      if (!isRefresh && !isLoadMore && this.documentList.length === 0) {
+        const cachedData = this.getCachedData(true) // 允许过期缓存
+        if (cachedData && cachedData.length > 0) {
+          this.documentList = cachedData
+          uni.showToast({
+            title: '网络异常，显示缓存数据',
+            icon: 'none',
+            duration: 2000
+          })
+          return
+        }
+      }
+      
+      // 显示错误提示
+      uni.showToast({
+        title: errorMessage,
+        icon: 'none',
+        duration: 3000
+      })
+      
+      // 如果是加载更多失败，回退页码
+      if (isLoadMore) {
+        this.page = Math.max(1, this.page - 1)
+      }
+    },
+    
+    // 获取错误信息
+    getErrorMessage(error) {
+      if (!error) return '未知错误'
+      
+      // 网络错误
+      if (error.message?.includes('Network') || error.message?.includes('timeout')) {
+        return '网络连接异常，请检查网络设置'
+      }
+      
+      // HTTP状态码错误
+      if (error.statusCode) {
+        const statusMessages = {
+          400: '请求参数错误',
+          401: '登录已过期，请重新登录',
+          403: '没有访问权限',
+          404: '接口不存在',
+          500: '服务器内部错误',
+          502: '服务器网关错误',
+          503: '服务暂时不可用'
+        }
+        return statusMessages[error.statusCode] || `服务器错误 (${error.statusCode})`
+      }
+      
+      // 业务逻辑错误
+      if (error.message) {
+        return error.message
+      }
+      
+      return '加载失败，请稍后重试'
+    },
+    
+    // 缓存管理
+    getCachedData(allowExpired = false) {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        if (!cached) return null
+        
+        const { data, timestamp } = JSON.parse(cached)
+        const now = Date.now()
+        
+        if (!allowExpired && (now - timestamp > this.cacheExpiry)) {
+          uni.removeStorageSync(this.cacheKey)
+          return null
+        }
+        
+        return data
+      } catch (error) {
+        console.warn('读取缓存失败:', error)
+        return null
+      }
+    },
+    
+    setCachedData(data) {
+      try {
+        const cacheData = {
+          data,
+          timestamp: Date.now()
+        }
+        uni.setStorageSync(this.cacheKey, JSON.stringify(cacheData))
+      } catch (error) {
+        console.warn('设置缓存失败:', error)
+      }
+    },
+    
     // 返回上一页
     goBack() {
       uni.navigateBack()
     },
     
     // 切换筛选标签
-    handleTabChange(index) {
+    async handleTabChange(index) {
+      if (this.currentTab === index) return
+      
       this.currentTab = index
+      this.page = 1
+      this.hasMore = true
+      
+      // 重新加载数据
+      await this.loadDocumentList()
     },
     
     // 获取状态样式类
@@ -214,41 +432,34 @@ export default {
     // 跳转到文书详情页
     goToDocumentDetail(document) {
       console.log('查看文书详情:', document)
-      // 跳转到仲裁审核页面
+      
+      if (!document || !document.id) {
+        uni.showToast({
+          title: '文档信息异常',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+      
+      // 跳转到仲裁审核页面，传递文档ID
       uni.navigateTo({
-        url: '/pages/lawyer/index/arbitration-review/index'
+        url: `/pages/lawyer/index/arbitration-review/index?documentId=${document.id}`
       })
     },
     
     // 下拉刷新
-    onRefresh() {
-      this.refreshing = true
-      this.page = 1
-      this.hasMore = true
-      
-      // 模拟刷新数据
-      setTimeout(() => {
-        this.refreshing = false
-        console.log('刷新完成')
-      }, 1000)
+    async onRefresh() {
+      console.log('开始下拉刷新')
+      await this.loadDocumentList(true)
     },
     
     // 加载更多
-    loadMore() {
+    async loadMore() {
       if (this.loading || !this.hasMore) return
       
-      this.loading = true
-      this.page++
-      
-      // 模拟加载更多数据
-      setTimeout(() => {
-        this.loading = false
-        // 模拟没有更多数据
-        if (this.page > 3) {
-          this.hasMore = false
-        }
-        console.log('加载更多完成')
-      }, 1000)
+      console.log('开始加载更多数据')
+      await this.loadDocumentList(false, true)
     }
   }
 }

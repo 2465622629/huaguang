@@ -1,5 +1,5 @@
 <template>
-  <view class="apply-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <view class="apply-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
     <!-- 状态栏（iOS风格） -->
     <view class="status-bar"></view>
     
@@ -397,22 +397,34 @@ export default {
       }
 
       try {
-        const res = await request({
-          url: '/api/fund/apply',
-          method: 'POST',
-          data: {
+        // 使用青年帮扶基金API提交申请
+        const submitData = {
+          applicationType: 'general', // 通用帮扶申请
+          basicInfo: {
             applicantName: this.formData.applicantName,
             birthDate: this.formData.birthDate,
-            gender: this.formData.gender === '男' ? 1 : 2,
+            gender: this.formData.gender === '男' ? 'male' : 'female',
             education: this.formData.education,
             address: this.formData.address,
             property: this.formData.property || '',
-            parentContact: this.formData.parentContact,
-            debts: debts
-          }
-        })
+            parentContact: this.formData.parentContact
+          },
+          financialInfo: {
+            debts: debts.map(debt => ({
+              bankPlatform: debt.platformName,
+              loanAmount: debt.debtAmount,
+              proofDocuments: [debt.debtImageFileId]
+            }))
+          },
+          supportingDocuments: debts.map(debt => debt.debtImageFileId)
+        }
+
+        // 导入青年帮扶基金API
+        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
         
-        if (res.code === 0) {
+        const res = await youthAssistanceApi.submitAssistanceApplication(submitData)
+        
+        if (res && res.success !== false) {
           uni.showToast({
             title: '申请提交成功',
             icon: 'success'
@@ -428,6 +440,7 @@ export default {
           })
         }
       } catch (error) {
+        console.error('提交申请失败:', error)
         uni.showToast({
           title: '提交失败，请稍后重试',
           icon: 'none'

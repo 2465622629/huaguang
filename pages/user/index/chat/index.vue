@@ -8,16 +8,16 @@
       <view class="navbar-content">
         <!-- 返回按钮 -->
         <view class="back-button" @click="goBack">
-          <uv-icon name="arrow-left" color="#FFFFFF" size="50" ></uv-icon>
+          <uv-icon name="arrow-left" color="#FFFFFF" size="50"></uv-icon>
         </view>
         
-        <!-- 律师信息和计时器 -->
+        <!-- 专家信息和计时器 -->
         <view class="lawyer-info">
-          <text class="lawyer-name">林默</text>
-          <text class="lawyer-desc">专业心理咨询师</text>
+          <text class="lawyer-name">{{ sessionInfo.expertName }}</text>
+          <text class="lawyer-desc">{{ sessionInfo.expertDesc }}</text>
           <view class="timer-container">
-            <uv-icon :name="`${config.staticBaseUrl}/icons/shalou.png`" color="#FFFFFF" size="32"></uv-icon>
-            <text class="timer-text">19:58</text>
+            <uv-icon :name="config.staticBaseUrl + '/icons/shalou.png'" color="#FFFFFF" size="32"></uv-icon>
+            <text class="timer-text">{{ sessionInfo.sessionDuration }}</text>
           </view>
         </view>
       </view>
@@ -30,63 +30,40 @@
       :scroll-top="scrollTop"
       :style="{ height: chatHeight }"
     >
-      <!-- 时间戳分隔符 -->
-      <view class="timestamp-separator">
-        <text class="timestamp-text">2025年4月24日 17:01</text>
+      <!-- 加载状态 -->
+      <view v-if="loading" class="loading-container">
+        <text class="loading-text">加载中...</text>
       </view>
       
-      <!-- 接收的消息1 -->
-      <view class="message-item received">
-        <view class="avatar"></view>
-        <view class="message-bubble received-bubble">
-          <text class="message-text">你好呀，我是心理咨询师林默。在这里，你可以放心地聊聊自己最近的感受。今天是什么让你想找个人说说话呢？</text>
-        </view>
-      </view>
-      
-      <!-- 发送的消息1 -->
-      <view class="message-item sent">
-        <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
-          <text class="message-text">工作特别忙，晚上睡不着，白天又没精神，感觉整个人被掏空了...</text>
-        </view>
-        <view class="avatar"></view>
-      </view>
-      
-      <!-- 接收的消息2 -->
-      <view class="message-item received">
-        <view class="avatar"></view>
-        <view class="message-bubble received-bubble">
-          <text class="message-text">嗯，我能感觉到你现在真的很累...这种"被掏空"的状态持续多久了？是一两周，还是更久？</text>
-        </view>
-      </view>
-      
-      <!-- 发送的消息2 -->
-      <view class="message-item sent">
-        <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
-          <text class="message-text">好像几个月了</text>
-        </view>
-        <view class="avatar"></view>
-      </view>
-      
-      <!-- 视频邀请卡片 -->
-      <view class="video-invitation-card" :style="{ backgroundColor: themeColors.cardBg, borderColor: themeColors.cardBorder }">
-        <view class="invitation-info">
-          <view class="video-icon" :style="{ backgroundColor: themeColors.iconColor }">
-            <uv-icon :name="`${config.staticBaseUrl}/icons/zixun-liao.png`" color="#FFFFFF" size="32"></uv-icon>
-          </view>
-          <view class="invitation-text">
-            <text class="invitation-line1">为了让咨询师更好的了解你,</text>
-            <text class="invitation-line2">建议向她发送测试结果哦。</text>
+      <!-- 消息列表 -->
+      <template v-else>
+        <!-- 消息项 -->
+        <view v-for="(message, index) in messages" :key="message.id" class="message-wrapper">
+          <!-- 消息内容 -->
+          <view class="message-item" :class="message.senderType === 'user' ? 'sent' : 'received'">
+            <!-- 接收的消息 -->
+            <template v-if="message.senderType !== 'user'">
+              <view class="avatar"></view>
+              <view class="message-bubble received-bubble">
+                <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
+              </view>
+            </template>
+            
+            <!-- 发送的消息 -->
+            <template v-else>
+              <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
+                <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
+              </view>
+              <view class="avatar"></view>
+            </template>
           </view>
         </view>
-        <view class="invitation-buttons">
-          <view class="reject-button" @click="rejectVideo">
-            <text class="reject-text">拒绝</text>
-          </view>
-          <view class="accept-button" @click="acceptVideo" :style="{ backgroundColor: themeColors.acceptBg }">
-            <text class="accept-text" :style="{ color: themeColors.acceptText }">同意</text>
-          </view>
+        
+        <!-- 空状态 -->
+        <view v-if="!loading && messages.length === 0" class="empty-container">
+          <text class="empty-text">暂无消息，开始聊天吧</text>
         </view>
-      </view>
+      </template>
     </scroll-view>
     
     <!-- 消息输入区域 -->
@@ -106,16 +83,15 @@
     
     <!-- 快捷操作栏 -->
     <view class="quick-actions">
-     
       <view class="action-item" @click="sendTestResult">
         <view class="action-icon" >
-          <uv-icon :name="`${config.staticBaseUrl}/icons/send_test.png`" color="#FFFFFF" size="64"></uv-icon>
+          <uv-icon :name="config.staticBaseUrl + '/icons/send_test.png'" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">发送测试结果</text>
       </view>
       <view class="action-item" @click="openAlbum">
         <view class="action-icon" >
-          <uv-icon :name="`${config.staticBaseUrl}/icons/photo.png`" color="#FFFFFF" size="64"></uv-icon>
+          <uv-icon :name="config.staticBaseUrl + '/icons/photo.png'" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">相册</text>
       </view>
@@ -134,18 +110,45 @@ export default {
       scrollTop: 0,
       inputMessage: '',
       messages: [],
-      themeType: 'pink', // 默认粉色主题
-      config
+      themeType: 'pink',
+      config,
+      sessionId: '',
+      targetType: '',
+      targetId: '',
+      sessionInfo: {
+        expertName: '林默',
+        expertDesc: '专业心理咨询师',
+        sessionDuration: '19:58',
+        sessionStatus: 'active'
+      },
+      loading: false,
+      loadingMessages: false,
+      sendingMessage: false,
+      currentPage: 1,
+      pageSize: 20,
+      hasMoreMessages: true,
+      cacheKey: '',
+      cacheExpiry: 5 * 60 * 1000,
+      retryCount: 0,
+      maxRetries: 3
     }
   },
   onLoad(options) {
-    // 接收页面参数
+    console.log('聊天页面加载参数:', options)
+    
     if (options.theme) {
       this.themeType = options.theme
     }
+    
+    this.sessionId = options.sessionId || options.conversationId || ''
+    this.targetType = options.targetType || options.type || 'psychologist'
+    this.targetId = options.targetId || options.expertId || ''
+    
+    this.cacheKey = `chat_${this.sessionId}_${this.targetType}`
+    
+    this.initChatData()
   },
   computed: {
-    // 计算主题色
     themeColors() {
       const themes = {
         blue: {
@@ -192,91 +195,48 @@ export default {
     this.calculateChatHeight()
   },
   methods: {
-    // 返回上一页
     goBack() {
       uni.navigateBack()
     },
     
-    // 计算聊天区域高度
     calculateChatHeight() {
       const systemInfo = uni.getSystemInfoSync()
       const statusBarHeight = systemInfo.statusBarHeight || 0
-      const navBarHeight = 60 // 自定义导航栏高度
-      const inputAreaHeight = 50 // 输入区域高度
-      const quickActionsHeight = 80 // 快捷操作栏高度
+      const navBarHeight = 60
+      const inputAreaHeight = 50
+      const quickActionsHeight = 80
       
       this.chatHeight = `${systemInfo.windowHeight - statusBarHeight - navBarHeight - inputAreaHeight - quickActionsHeight}px`
     },
     
-    // 发送消息
+    async initChatData() {
+      try {
+        this.loading = true
+        console.log('初始化聊天数据')
+      } catch (error) {
+        console.error('初始化聊天数据失败:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
     sendMessage() {
       if (this.inputMessage.trim()) {
-        // 这里可以添加发送消息的逻辑
         console.log('发送消息:', this.inputMessage)
         this.inputMessage = ''
       }
     },
     
-    // 显示更多选项
     showMoreOptions() {
-      uni.showActionSheet({
-        itemList: ['拍照', '从相册选择', '文件'],
-        success: (res) => {
-          console.log('选择了第' + (res.tapIndex + 1) + '个选项')
-        }
-      })
+      console.log('显示更多选项')
     },
-    
-    // 打开相册
-    openAlbum() {
-      uni.chooseImage({
-        count: 9,
-        sizeType: ['original', 'compressed'],
-        sourceType: ['album'],
-        success: (res) => {
-          console.log('选择的图片:', res.tempFilePaths)
-        }
-      })
-    },
-    
-    // 拒绝视频邀请
-    rejectVideo() {
-      uni.showToast({
-        title: '已拒绝视频邀请',
-        icon: 'none'
-      })
-    },
-    
-    // 接受视频邀请
-    acceptVideo() {
-      uni.showToast({
-        title: '已接受视频邀请',
-        icon: 'none'
-      })
-    },
-    
-    // 语音通话
-    makeVoiceCall() {
-      uni.showToast({
-        title: '发起语音通话',
-        icon: 'none'
-      })
-    },
-    
-    // 视频通话
-    makeVideoCall() {
-      uni.showToast({
-        title: '发起视频通话',
-        icon: 'none'
-      })
-    },
-    
-    // 发送测试结果
+
     sendTestResult() {
-      uni.showToast({
-        title: '发送测试结果',
-        icon: 'none'
-      })
+      console.log('发送测试结果')
+    },
+
+    openAlbum() {
+      console.log('打开相册')
     }
   }
 }
@@ -291,17 +251,12 @@ export default {
   flex-direction: column;
 }
 
-// 系统状态栏占位
 .status-bar {
   height: var(--status-bar-height);
-  // background 通过动态绑定设置
 }
 
-// 自定义导航栏
 .custom-navbar {
-  // background 通过动态绑定设置
   padding: 15px 15px;
-  // 添加阴影
   box-shadow: 0 20px 4px rgba(0, 0, 0, 0.1);
   
   .navbar-content {
@@ -353,25 +308,11 @@ export default {
   }
 }
 
-// 聊天内容区域
 .chat-content {
   flex: 1;
-  // padding: 15px;
   background-color: rgb(255, 248, 248);
 }
 
-// 时间戳分隔符
-.timestamp-separator {
-  text-align: center;
-  margin: 20px 0;
-  
-  .timestamp-text {
-    color: #AAAAAA;
-    font-size: 10px;
-  }
-}
-
-// 消息项
 .message-item {
   display: flex;
   margin-bottom: 35rpx;
@@ -413,7 +354,6 @@ export default {
   }
 }
 
-// 消息气泡
 .message-bubble {
   padding: 10px 12px;
   border-radius: 12px;
@@ -433,7 +373,6 @@ export default {
   }
   
   &.sent-bubble {
-    // background-color 通过动态绑定设置
     border-bottom-right-radius: 4px;
     
     .message-text {
@@ -442,88 +381,6 @@ export default {
   }
 }
 
-// 视频邀请卡片
-.video-invitation-card {
-  margin: 20px auto;
-  width: 70%;
-  background: linear-gradient(180deg, rgb(255, 224, 224) 0%, rgb(255, 252, 252) 100%) !important;
-  border: 3rpx solid;
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  
-  .invitation-info {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    width: 100%;
-    
-    .video-icon {
-      width: 32px;
-      height: 32px;
-      // background-color 通过动态绑定设置
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 4px;
-      flex-shrink: 0;
-    }
-    
-    .invitation-text {
-      flex: 1;
-      text-align: left;
-      
-      .invitation-line1,
-      .invitation-line2 {
-        display: block;
-        color: #333333;
-        font-size: 16px;
-        line-height: 1.4;
-      }
-    }
-  }
-  
-  .invitation-buttons {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    gap: 15px;
-    
-    .reject-button,
-    .accept-button {
-      flex: 1;
-      padding: 8px 20px;
-      border-radius: 20rpx;
-      text-align: center;
-      min-width: 80px;
-      font-weight: 500;
-      font-size: 0.8rem;
-    }
-    
-    .reject-button {
-      background-color: #F0F0F0;
-      
-      .reject-text {
-        color: #666666;
-        font-size: 12px;
-      }
-    }
-    
-    .accept-button {
-      // background-color 通过动态绑定设置
-      .accept-text {
-        // color 通过动态绑定设置
-        font-size: 12px;
-        
-      }
-    }
-  }
-}
-
-// 消息输入区域
 .message-input-area {
   background-color: #FFFFFF;
   padding: 10px 15px;
@@ -569,7 +426,6 @@ export default {
   }
 }
 
-// 快捷操作栏
 .quick-actions {
   background-color: #FFFFFF;
   padding: 20px 20px;
@@ -590,8 +446,6 @@ export default {
       display: flex;
       align-items: center;
       justify-content: center;
-      // background-color 通过动态绑定设置
-      // box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
       
       &:active {
@@ -608,4 +462,28 @@ export default {
     }
   }
 }
-</style>
+
+.loading-container {
+  text-align: center;
+  padding: 40px 20px;
+  
+  .loading-text {
+    color: #999999;
+    font-size: 14px;
+  }
+}
+
+.empty-container {
+  text-align: center;
+  padding: 60px 20px;
+  
+  .empty-text {
+    color: #999999;
+    font-size: 14px;
+  }
+}
+
+.message-wrapper {
+  margin-bottom: 10px;
+}
+</style> 

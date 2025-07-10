@@ -24,15 +24,15 @@
                 <view class="info-list">
                     <view class="info-row">
                         <text class="info-label">姓名</text>
-                        <text class="info-content">李律师</text>
+                        <text class="info-content">{{ psychologistInfo.realName || '心理师' }}</text>
                     </view>
                     <view class="info-row">
-                        <text class="info-label">标签</text>
-                        <text class="info-content">劳动法专长</text>
+                        <text class="info-label">专业领域</text>
+                        <text class="info-content">{{ formatSpecialties(psychologistInfo.specialties) }}</text>
                     </view>
                     <view class="info-row">
                         <text class="info-label">执业经验</text>
-                        <text class="info-content">8年</text>
+                        <text class="info-content">{{ psychologistInfo.experienceYears || 0 }}年</text>
                     </view>
                 </view>
             </view>
@@ -42,15 +42,14 @@
                 <view class="detail-row">
                     <text class="detail-label">宣传语句</text>
                     <view class="detail-content">
-                        <text class="detail-text">在你疲惫无助的时候，我会陪你一起走过这段低谷。</text>
+                        <text class="detail-text">{{ psychologistInfo.slogan || '在你疲惫无助的时候，我会陪你一起走过这段低谷。' }}</text>
                     </view>
                 </view>
 
                 <view class="detail-row">
                     <text class="detail-label">服务优势</text>
                     <view class="detail-content">
-                        <text
-                            class="detail-text">擅长情绪调节、焦虑缓解与亲密关系修复，始终坚持倾听、共情与专业并重，致力于用温和而坚定的方式陪伴来访者走出困境。无论是生活压力、职场困扰，还是长期的情绪压抑，师都能通过系统的方法与细致引导，帮助你找回内在的平衡与力量。</text>
+                        <text class="detail-text">{{ psychologistInfo.serviceAdvantages || '擅长情绪调节、焦虑缓解与亲密关系修复，始终坚持倾听、共情与专业并重，致力于用温和而坚定的方式陪伴来访者走出困境。' }}</text>
                     </view>
                 </view>
 
@@ -65,8 +64,8 @@
             </view>
 
             <!-- 操作按钮 -->
-            <view class="action-button" @click="handleSave">
-                <text class="button-text">点击保存</text>
+            <view class="action-button" @click="handleSave" :class="{ disabled: loading }">
+                <text class="button-text">{{ loading ? '保存中...' : '点击保存' }}</text>
             </view>
 
             <!-- 底部安全区域 -->
@@ -81,6 +80,7 @@
 <script>
 import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
 import config from '@/config/index.js'
+import { getPsychologistProfile, updatePsychologistProfile } from '@/api/modules/psychologist.js'
 
 export default {
     name: 'PsychologistProfile',
@@ -91,11 +91,21 @@ export default {
         return {
             config,
             statusBarHeight: 0,
-            scrollHeight: 0
+            scrollHeight: 0,
+            loading: false,
+            psychologistInfo: {
+                realName: '',
+                specialties: [],
+                experienceYears: 0,
+                slogan: '',
+                serviceAdvantages: '',
+                certificates: []
+            }
         }
     },
     onLoad() {
         this.initPage()
+        this.loadPsychologistInfo()
     },
     methods: {
         // 初始化页面
@@ -118,12 +128,61 @@ export default {
             })
         },
 
+        // 加载心理师信息
+        async loadPsychologistInfo() {
+            this.loading = true
+            try {
+                const response = await getPsychologistProfile()
+                this.psychologistInfo = response.data || {}
+                console.log('心理师信息加载成功:', this.psychologistInfo)
+            } catch (error) {
+                console.error('心理师信息加载失败:', error)
+                uni.showToast({
+                    title: '数据加载失败',
+                    icon: 'none'
+                })
+            } finally {
+                this.loading = false
+            }
+        },
+
         // 处理保存操作
-        handleSave() {
-            uni.showToast({
-                title: '保存成功',
-                icon: 'success'
-            })
+        async handleSave() {
+            if (this.loading) return
+            
+            this.loading = true
+            try {
+                const updateData = {
+                    slogan: this.psychologistInfo.slogan || '在你疲惫无助的时候，我会陪你一起走过这段低谷。',
+                    serviceAdvantages: this.psychologistInfo.serviceAdvantages || '擅长情绪调节、焦虑缓解与亲密关系修复...',
+                    certificates: this.psychologistInfo.certificates || []
+                }
+                
+                await updatePsychologistProfile(updateData)
+                
+                uni.showToast({
+                    title: '保存成功',
+                    icon: 'success'
+                })
+                
+                console.log('心理师信息保存成功')
+            } catch (error) {
+                console.error('保存失败:', error)
+                uni.showToast({
+                    title: '保存失败，请重试',
+                    icon: 'none'
+                })
+            } finally {
+                this.loading = false
+            }
+        },
+
+        // 格式化专业领域
+        formatSpecialties(specialties) {
+            if (!specialties || !Array.isArray(specialties)) {
+                return '心理咨询'
+            }
+            return specialties.join('、') || '心理咨询'
         },
 
         // 处理文件上传

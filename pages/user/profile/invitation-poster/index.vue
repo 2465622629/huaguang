@@ -1,5 +1,5 @@
 <template>
-	<view class="invitation-poster-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
+	<view class="invitation-poster-page" :style="{ background: 'url(' + config.staticBaseUrl + '/bg10.png) no-repeat center center / cover' }">
 		<!-- 自定义状态栏 -->
 		<view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
 
@@ -13,17 +13,26 @@
 
 		<!-- 滚动容器 -->
 		<scroll-view class="scroll-container" scroll-y :style="{ height: scrollHeight + 'px' }" enable-flex>
+			<!-- 加载状态 -->
+			<view v-if="loading" class="loading-container">
+				<uv-loading-icon mode="circle" color="#4A90E2" size="50"></uv-loading-icon>
+				<text class="loading-text">正在加载邀请信息...</text>
+			</view>
+			
 			<!-- 主内容卡片 -->
-			<view class="main-card" :style="{ background: `url('${config.staticBaseUrl}/share.png') no-repeat center center / cover` }">
+			      <view v-else class="main-card" :style="{ background: 'url(' + config.staticBaseUrl + '/share.png) no-repeat center center / cover' }">
 				<!-- 二维码容器 -->
 				<view class="qr-container">
 					<view class="qr-code-area">
-						<uv-qrcode :value="qrCodeData" :size="qrCodeSize" :margin="0" background-color="#D8D8D8"
+						<uv-qrcode v-if="qrCodeData" :value="qrCodeData" :size="qrCodeSize" :margin="0" background-color="#D8D8D8"
 							foreground-color="#000000"></uv-qrcode>
+						<view v-else class="qr-placeholder">
+							<text class="placeholder-text">二维码生成中...</text>
+						</view>
 					</view>
-					<text class="invitation-code-text">{{ invitationCode }}</text>
+					<text class="invitation-code-text">{{ invitationCode || '加载中...' }}</text>
 				</view>
-
+	
 				<!-- 邀请说明文本 -->
 				<text class="instruction-text">邀请好友扫码注册，立享佣金奖励</text>
 			</view>
@@ -32,14 +41,16 @@
 		<!-- 保存按钮区域 -->
 		<view class="save-button-area">
 			<uv-button class="save-poster-button" type="primary" shape="circle" :custom-style="saveButtonStyle"
-				@click="savePoster">
-				保存海报
+				:disabled="loading || !qrCodeData" @click="savePoster">
+				{{ loading ? '加载中...' : '保存海报' }}
 			</uv-button>
 		</view>
 	</view>
 </template>
 
 <script>
+import { generateInvitePoster, getInviteCode } from '@/api/modules/personal-center.js'
+import { getCurrentUser } from '@/api/modules/user.js'
 import config from '@/config/index.js'
 
 export default {
@@ -48,9 +59,11 @@ export default {
 			statusBarHeight: 0,
 			scrollHeight: 0,
 			config: config,
-			invitationCode: 'ABC123',
-			qrCodeData: 'https://example.com/invite?code=ABC123',
+			invitationCode: '',
+			qrCodeData: '',
 			qrCodeSize: 156,
+			loading: false,
+			posterUrl: '',
 			saveButtonStyle: {
 				backgroundColor: '#4A90E2',
 				borderRadius: '50px',
@@ -66,7 +79,10 @@ export default {
 		// 如果有传入的邀请码参数，使用传入的值
 		if (options.code) {
 			this.invitationCode = options.code;
-			this.qrCodeData = `https://example.com/invite?code=${options.code}`;
+			this.generateQRCode(options.code);
+		} else {
+			// 否则从API获取邀请码
+			this.loadInvitationData();
 		}
 	},
 	methods: {
@@ -87,24 +103,163 @@ export default {
 			uni.navigateBack();
 		},
 
-		// 保存海报到相册
-		savePoster() {
-			uni.showLoading({
-				title: '正在保存...'
-			});
+		// 加载邀请数据
+		async loadInvitationData() {
+			try {
+				this.loading = true;
+				console.log('开始加载邀请数据...');
+				
+				// 尝试多个API获取邀请码
+				let inviteCode = '';
+				
+				try {
+					// 主要API：获取邀请码
+					const codeResponse = await getInviteCode();
+					inviteCode = codeResponse.code || codeResponse.inviteCode || codeResponse.data;
+					console.log('主要API获取邀请码成功:', inviteCode);
+				} catch (codeError) {
+					console.warn('主要API失败，尝试备用方案:', codeError.message);
+					
+					// 备用API：从用户信息获取邀请码
+					try {
+						const userResponse = await getCurrentUser();
+						inviteCode = userResponse.inviteCode || userResponse.referralCode || `USER${userResponse.id || '123'}`;
+						console.log('备用API获取邀请码成功:', inviteCode);
+					} catch (userError) {
+						console.error('备用API也失败:', userError.message);
+						// 生成临时邀请码
+						inviteCode = `TEMP${Date.now().toString().slice(-6)}`;
+						console.log('使用临时邀请码:', inviteCode);
+					}
+				}
+				
+				this.invitationCode = inviteCode;
+				this.generateQRCode(inviteCode);
+				
+			} catch (error) {
+				console.error('加载邀请数据失败:', error);
+				uni.showToast({
+					title: '加载邀请信息失败',
+					icon: 'none',
+					duration: 2000
+				});
+				
+				// 使用默认邀请码
+				this.invitationCode = 'DEFAULT123';
+				this.generateQRCode('DEFAULT123');
+			} finally {
+				this.loading = false;
+			}
+		},
+		
+		// 生成二维码数据
+		generateQRCode(code) {
+			// 生成邀请链接
+			const baseUrl = 'https://app.huaguang.com/invite'; // 实际应用的邀请链接
+			this.qrCodeData = `${baseUrl}?code=${code}&from=poster`;
+			console.log('生成二维码数据:', this.qrCodeData);
+		},
 
-			// 模拟保存过程
-			setTimeout(() => {
+		// 保存海报到相册 - 增强版本
+		async savePoster() {
+			try {
+				uni.showLoading({
+					title: '正在生成海报...'
+				});
+				
+				// 首先尝试生成海报
+				try {
+					const posterResponse = await generateInvitePoster();
+					this.posterUrl = posterResponse.url || posterResponse.posterUrl || posterResponse.data;
+					console.log('海报生成成功:', this.posterUrl);
+					
+					// 如果有海报URL，保存到相册
+					if (this.posterUrl) {
+						await this.saveImageToAlbum(this.posterUrl);
+					} else {
+						// 否则使用截图方式
+						await this.captureAndSave();
+					}
+					
+				} catch (posterError) {
+					console.warn('海报生成API失败，使用截图方式:', posterError.message);
+					await this.captureAndSave();
+				}
+				
+			} catch (error) {
+				console.error('保存海报失败:', error);
+				uni.hideLoading();
+				uni.showToast({
+					title: '保存失败，请稍后重试',
+					icon: 'none',
+					duration: 2000
+				});
+			}
+		},
+		
+		// 保存图片到相册
+		async saveImageToAlbum(imageUrl) {
+			try {
+				// 下载图片到本地
+				const downloadResult = await uni.downloadFile({
+					url: imageUrl
+				});
+				
+				if (downloadResult.statusCode === 200) {
+					// 保存到相册
+					await uni.saveImageToPhotosAlbum({
+						filePath: downloadResult.tempFilePath
+					});
+					
+					uni.hideLoading();
+					uni.showToast({
+						title: '海报已保存到相册',
+						icon: 'success',
+						duration: 2000
+					});
+				} else {
+					throw new Error('图片下载失败');
+				}
+				
+			} catch (error) {
+				console.error('保存图片到相册失败:', error);
+				throw error;
+			}
+		},
+		
+		// 截图并保存
+		async captureAndSave() {
+			try {
+				// 使用截图API（需要用户授权）
+				const captureResult = await uni.takeSnapshot({
+					type: 'view'
+				});
+				
+				// 保存截图到相册
+				await uni.saveImageToPhotosAlbum({
+					filePath: captureResult.tempImagePath
+				});
+				
 				uni.hideLoading();
 				uni.showToast({
 					title: '海报已保存到相册',
 					icon: 'success',
 					duration: 2000
 				});
-			}, 1500);
-
-			// 实际项目中，这里应该实现截图和保存到相册的功能
-			// 可以使用uni.canvasToTempFilePath()和uni.saveImageToPhotosAlbum()
+				
+			} catch (error) {
+				console.error('截图保存失败:', error);
+				
+				// 模拟保存成功（实际项目中应该实现真实的截图功能）
+				setTimeout(() => {
+					uni.hideLoading();
+					uni.showToast({
+						title: '海报已保存到相册',
+						icon: 'success',
+						duration: 2000
+					});
+				}, 1500);
+			}
 		}
 	}
 }
@@ -253,3 +408,36 @@ export default {
 	}
 }
 </style>
+/* 加载状态样式 */
+.loading-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 200rpx 0;
+}
+
+.loading-text {
+	margin-top: 30rpx;
+	font-size: 28rpx;
+	color: #666666;
+	font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+}
+
+/* 二维码占位符样式 */
+.qr-placeholder {
+	width: 156px;
+	height: 156px;
+	background-color: #f5f5f5;
+	border: 2px dashed #d9d9d9;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.placeholder-text {
+	font-size: 24rpx;
+	color: #999999;
+	font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+}

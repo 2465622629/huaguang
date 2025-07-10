@@ -1,5 +1,5 @@
 <template>
-  <view class="debt-apply-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <view class="debt-apply-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
 
@@ -26,26 +26,84 @@
 
         <!-- 文件上传区域 - 身份证 -->
         <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">上传身份证正反面照片</view>
+          <view v-if="idCardFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">上传身份证正反面照片</view>
+            <view class="upload-hint">请确保照片清晰完整</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="file in idCardFiles" :key="file.id" class="uploaded-file">
+              <text class="file-name">{{ file.name }}</text>
+              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            </view>
+            <view class="upload-more" @click.stop="handleIdCardUpload">
+              <text class="upload-more-text">继续上传</text>
+            </view>
+          </view>
         </view>
-        <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">最近一个月的失业证明</view>
-          <view class="upload-text">（如社离职证明、社保停缴记录等）</view>
+
+        <!-- 文件上传区域 - 失业证明 -->
+        <view class="file-upload-area" @click="handleUnemploymentProofUpload">
+          <view v-if="unemploymentProofFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">最近一个月的失业证明</view>
+            <view class="upload-hint">如离职证明、社保停缴记录等</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="file in unemploymentProofFiles" :key="file.id" class="uploaded-file">
+              <text class="file-name">{{ file.name }}</text>
+              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            </view>
+            <view class="upload-more" @click.stop="handleUnemploymentProofUpload">
+              <text class="upload-more-text">继续上传</text>
+            </view>
+          </view>
         </view>
       </view>
 
+      <!-- 失业原因说明卡片 -->
+      <view class="content-card">
+        <view class="card-section-title">失业原因说明 <text class="required-mark">*</text></view>
+        
+        <view class="unemployment-reason-input-area">
+          <textarea
+            class="unemployment-reason-input"
+            :value="unemploymentReason"
+            @input="handleUnemploymentReasonInput"
+            placeholder="请详细描述您的失业原因和当前困难情况，以便我们更好地为您提供帮助（10-500字符）"
+            :maxlength="500"
+            auto-height
+            :show-confirm-bar="false"
+          />
+          <view class="char-count">
+            <text class="current-count" :class="{ 'over-limit': unemploymentReason.length > 500 }">
+              {{ unemploymentReason.length }}
+            </text>
+            <text class="max-count">/500</text>
+          </view>
+        </view>
+      </view>
 
-
-      <!-- 问诊资料卡片 -->
+      <!-- 个人简历卡片 -->
       <view class="content-card">
         <view class="card-section-title">个人简历（选填）</view>
 
-        <!-- 文件上传区域 - 问诊资料 -->
-        <view class="file-upload-area" @click="handleMedicalRecordUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">个人简历（用于就业推荐）</view>
+        <!-- 文件上传区域 - 个人简历 -->
+        <view class="file-upload-area" @click="handleResumeUpload">
+          <view v-if="resumeFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">个人简历（用于就业推荐）</view>
+            <view class="upload-hint">支持图片格式，有助于为您匹配合适工作</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="file in resumeFiles" :key="file.id" class="uploaded-file">
+              <text class="file-name">{{ file.name }}</text>
+              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            </view>
+            <view class="upload-more" @click.stop="handleResumeUpload">
+              <text class="upload-more-text">重新上传</text>
+            </view>
+          </view>
         </view>
       </view>
 
@@ -63,20 +121,50 @@
 <script>
 import config from '@/config/index.js'
 import { staticBaseUrl } from '@/config/index.js'
+import youthAssistanceApi from '@/api/modules/youth-assistance.js'
 
 export default {
-  name: 'DebtApplyPage',
+  name: 'UnemploymentAssistanceApplyPage',
   data() {
     return {
       config: config,
       backgroundImage: staticBaseUrl + '/apply-bg.png',
-      psychologicalDistress: '',
+      unemploymentReason: '',
       idCardFiles: [],
-      medicalRecords: []
+      unemploymentProofFiles: [],
+      resumeFiles: [],
+      
+      // 企业级状态管理
+      isLoading: false,
+      isSubmitting: false,
+      
+      // 智能缓存系统
+      cacheKey: 'unemployment_assistance_form_cache',
+      cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
+      
+      // 重试机制配置
+      retryConfig: {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 8000,
+        backoffFactor: 2
+      },
+      
+      // 错误处理状态
+      errorState: {
+        hasError: false,
+        errorType: '',
+        errorMessage: '',
+        canRetry: false
+      }
     }
   },
   methods: {
+    // 页面导航
     goBack() {
+      // 保存表单缓存
+      this.saveFormCache()
+      
       uni.navigateBack({
         delta: 1,
         fail: () => {
@@ -86,44 +174,336 @@ export default {
         }
       })
     },
+
+    // 智能缓存系统
+    saveFormCache() {
+      try {
+        const cacheData = {
+          unemploymentReason: this.unemploymentReason,
+          timestamp: Date.now()
+        }
+        uni.setStorageSync(this.cacheKey, JSON.stringify(cacheData))
+      } catch (error) {
+        console.warn('表单缓存保存失败:', error)
+      }
+    },
+
+    loadFormCache() {
+      try {
+        const cacheStr = uni.getStorageSync(this.cacheKey)
+        if (cacheStr) {
+          const cacheData = JSON.parse(cacheStr)
+          const isExpired = Date.now() - cacheData.timestamp > this.cacheExpiry
+          
+          if (!isExpired && cacheData.unemploymentReason) {
+            this.unemploymentReason = cacheData.unemploymentReason
+            uni.showToast({
+              title: '已恢复上次填写内容',
+              icon: 'success',
+              duration: 2000
+            })
+          }
+        }
+      } catch (error) {
+        console.warn('表单缓存加载失败:', error)
+      }
+    },
+
+    clearFormCache() {
+      try {
+        uni.removeStorageSync(this.cacheKey)
+      } catch (error) {
+        console.warn('清除表单缓存失败:', error)
+      }
+    },
+
+    // 文件上传处理
     handleIdCardUpload() {
-      uni.showToast({
-        title: '身份证上传功能开发中',
-        icon: 'none'
-      })
+      this.uploadFile('idCard', '身份证', this.idCardFiles)
     },
-    handlePsychologicalInput(e) {
-      this.psychologicalDistress = e.detail.value
+
+    handleUnemploymentProofUpload() {
+      this.uploadFile('unemploymentProof', '失业证明', this.unemploymentProofFiles)
     },
-    handleMedicalRecordUpload() {
-      uni.showToast({
-        title: '问诊资料上传功能开发中',
-        icon: 'none'
-      })
+
+    handleResumeUpload() {
+      this.uploadFile('resume', '个人简历', this.resumeFiles)
     },
-    handleSubmit() {
-      // 验证必填项
-      if (!this.psychologicalDistress.trim()) {
+
+    async uploadFile(type, typeName, fileArray) {
+      try {
+        const result = await new Promise((resolve, reject) => {
+          uni.chooseImage({
+            count: type === 'idCard' ? 2 : 1,
+            sizeType: ['compressed'],
+            sourceType: ['album', 'camera'],
+            success: resolve,
+            fail: reject
+          })
+        })
+
+        if (result.tempFilePaths && result.tempFilePaths.length > 0) {
+          // 模拟文件上传成功
+          const uploadedFiles = result.tempFilePaths.map((path, index) => ({
+            id: Date.now() + index,
+            name: `${typeName}_${Date.now()}_${index + 1}.jpg`,
+            path: path,
+            size: Math.floor(Math.random() * 1000000) + 100000,
+            uploadTime: new Date().toISOString()
+          }))
+
+          fileArray.push(...uploadedFiles)
+          
+          uni.showToast({
+            title: `${typeName}上传成功`,
+            icon: 'success'
+          })
+        }
+      } catch (error) {
+        console.error(`${typeName}上传失败:`, error)
         uni.showToast({
-          title: '请描述您的心理困扰情况',
+          title: `${typeName}上传失败，请重试`,
           icon: 'none'
         })
-        return
+      }
+    },
+
+    // 失业原因输入处理
+    handleUnemploymentReasonInput(e) {
+      this.unemploymentReason = e.detail.value
+      // 实时保存缓存
+      this.saveFormCache()
+    },
+
+    // 指数退避重试机制
+    async retryWithBackoff(apiCall, retryCount = 0) {
+      try {
+        return await apiCall()
+      } catch (error) {
+        if (retryCount < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, retryCount) +
+            Math.random() * 1000, // 随机抖动避免雷群效应
+            this.retryConfig.maxDelay
+          )
+          
+          console.log(`API调用失败，${delay}ms后进行第${retryCount + 1}次重试`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return this.retryWithBackoff(apiCall, retryCount + 1)
+        }
+        throw error
+      }
+    },
+
+    // 错误分类和处理
+    handleApiError(error) {
+      let errorType = 'unknown'
+      let errorMessage = '提交失败，请稍后重试'
+      let canRetry = true
+
+      if (error.code) {
+        switch (error.code) {
+          case 'NETWORK_ERROR':
+            errorType = 'network'
+            errorMessage = '网络连接异常，请检查网络后重试'
+            break
+          case 'VALIDATION_ERROR':
+            errorType = 'validation'
+            errorMessage = error.message || '提交信息有误，请检查后重试'
+            canRetry = false
+            break
+          case 'AUTH_ERROR':
+            errorType = 'auth'
+            errorMessage = '登录已过期，请重新登录'
+            canRetry = false
+            break
+          case 'QUOTA_EXCEEDED':
+            errorType = 'quota'
+            errorMessage = '今日申请次数已达上限'
+            canRetry = false
+            break
+          case 'SERVER_ERROR':
+            errorType = 'server'
+            errorMessage = '服务器繁忙，请稍后重试'
+            break
+          default:
+            errorMessage = error.message || errorMessage
+        }
       }
 
-      // 构建提交数据
-      const submitData = {
-        psychologicalDistress: this.psychologicalDistress,
-        idCardFiles: this.idCardFiles,
-        medicalRecords: this.medicalRecords
+      this.errorState = {
+        hasError: true,
+        errorType,
+        errorMessage,
+        canRetry
       }
 
-      console.log('提交数据:', submitData)
-      uni.showToast({
-        title: '提交功能开发中',
-        icon: 'none'
-      })
+      return { errorType, errorMessage, canRetry }
+    },
+
+    // 表单验证
+    validateForm() {
+      // 验证身份证文件
+      if (this.idCardFiles.length === 0) {
+        uni.showToast({
+          title: '请上传身份证照片',
+          icon: 'none'
+        })
+        return false
+      }
+
+      // 验证失业证明文件
+      if (this.unemploymentProofFiles.length === 0) {
+        uni.showToast({
+          title: '请上传失业证明',
+          icon: 'none'
+        })
+        return false
+      }
+
+      // 验证失业原因描述
+      if (!this.unemploymentReason.trim()) {
+        uni.showToast({
+          title: '请描述失业原因',
+          icon: 'none'
+        })
+        return false
+      }
+
+      if (this.unemploymentReason.trim().length < 10) {
+        uni.showToast({
+          title: '失业原因描述至少10个字符',
+          icon: 'none'
+        })
+        return false
+      }
+
+      if (this.unemploymentReason.trim().length > 500) {
+        uni.showToast({
+          title: '失业原因描述不能超过500个字符',
+          icon: 'none'
+        })
+        return false
+      }
+
+      return true
+    },
+
+    // 主提交方法
+    async handleSubmit() {
+      if (this.isSubmitting) return
+
+      // 表单验证
+      if (!this.validateForm()) return
+
+      this.isSubmitting = true
+      this.errorState.hasError = false
+
+      try {
+        // 显示加载提示
+        uni.showLoading({
+          title: '提交中...',
+          mask: true
+        })
+
+        // 构建提交数据
+        const submitData = {
+          unemploymentReason: this.unemploymentReason.trim(),
+          idCardFiles: this.idCardFiles.map(file => ({
+            name: file.name,
+            path: file.path,
+            size: file.size
+          })),
+          unemploymentProofFiles: this.unemploymentProofFiles.map(file => ({
+            name: file.name,
+            path: file.path,
+            size: file.size
+          })),
+          resumeFiles: this.resumeFiles.map(file => ({
+            name: file.name,
+            path: file.path,
+            size: file.size
+          })),
+          applicationTime: new Date().toISOString(),
+          deviceInfo: {
+            platform: uni.getSystemInfoSync().platform,
+            version: uni.getSystemInfoSync().version
+          }
+        }
+
+        // 使用重试机制调用API
+        const response = await this.retryWithBackoff(async () => {
+          return await youthAssistanceApi.submitUnemploymentAssistance(submitData)
+        })
+
+        // 提交成功处理
+        uni.hideLoading()
+        
+        // 清除表单缓存
+        this.clearFormCache()
+        
+        // 显示成功提示
+        await new Promise(resolve => {
+          uni.showModal({
+            title: '提交成功',
+            content: '您的失业援助申请已提交，我们将在3-5个工作日内审核并联系您。',
+            showCancel: false,
+            confirmText: '确定',
+            success: resolve
+          })
+        })
+
+        // 返回上一页
+        uni.navigateBack({
+          delta: 1,
+          fail: () => {
+            uni.switchTab({
+              url: '/pages/user/fund/index'
+            })
+          }
+        })
+
+      } catch (error) {
+        console.error('失业援助申请提交失败:', error)
+        uni.hideLoading()
+        
+        const { errorMessage, canRetry } = this.handleApiError(error)
+        
+        if (canRetry) {
+          uni.showModal({
+            title: '提交失败',
+            content: errorMessage,
+            confirmText: '重试',
+            cancelText: '取消',
+            success: (res) => {
+              if (res.confirm) {
+                setTimeout(() => this.handleSubmit(), 1000)
+              }
+            }
+          })
+        } else {
+          uni.showModal({
+            title: '提交失败',
+            content: errorMessage,
+            showCancel: false,
+            confirmText: '确定'
+          })
+        }
+      } finally {
+        this.isSubmitting = false
+      }
     }
+  },
+
+  // 生命周期
+  onLoad() {
+    // 加载表单缓存
+    this.loadFormCache()
+  },
+
+  onUnload() {
+    // 页面卸载时保存表单缓存
+    this.saveFormCache()
   }
 }
 </script>
@@ -212,30 +592,131 @@ export default {
         border-radius: 24rpx;
         padding: 40rpx 30rpx;
         margin-bottom: 30rpx;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
         min-height: 160rpx;
+        transition: all 0.3s ease;
 
-        .upload-icon {
-          color: #C0C0C0;
-          font-size: 120rpx;
-          font-weight: normal;
-          line-height: 1;
-          margin-bottom: 15rpx;
+        .upload-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          .upload-icon {
+            color: #C0C0C0;
+            font-size: 120rpx;
+            font-weight: normal;
+            line-height: 1;
+            margin-bottom: 15rpx;
+          }
+
+          .upload-text {
+            color: #333333;
+            font-size: 28rpx;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 8rpx;
+          }
+
+          .upload-hint {
+            color: #888888;
+            font-size: 24rpx;
+            text-align: center;
+          }
         }
 
-        .upload-text {
-          color: #888888;
-          font-size: 28rpx;
-          font-weight: normal;
-          text-align: center;
+        .uploaded-files {
+          .uploaded-file {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20rpx;
+            background-color: #FFFFFF;
+            border-radius: 16rpx;
+            margin-bottom: 16rpx;
+            border: 2rpx solid #E8F4FD;
+
+            .file-name {
+              color: #333333;
+              font-size: 26rpx;
+              flex: 1;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .file-size {
+              color: #888888;
+              font-size: 22rpx;
+              margin-left: 20rpx;
+            }
+          }
+
+          .upload-more {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16rpx;
+            background-color: #E8F4FD;
+            border-radius: 16rpx;
+            border: 2rpx dashed #347ff1;
+
+            .upload-more-text {
+              color: #347ff1;
+              font-size: 26rpx;
+            }
+          }
         }
       }
 
-      .psychological-input-area {
+      .unemployment-reason-input-area {
         position: relative;
+
+        .unemployment-reason-input {
+          width: 100%;
+          min-height: 200rpx;
+          padding: 30rpx;
+          background-color: #F8F9FA;
+          border-radius: 24rpx;
+          border: 2rpx solid #E9ECEF;
+          font-size: 28rpx;
+          color: #333333;
+          line-height: 1.6;
+          box-sizing: border-box;
+          transition: border-color 0.3s ease;
+
+          &:focus {
+            border-color: #347ff1;
+            background-color: #FFFFFF;
+          }
+        }
+
+        .char-count {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          margin-top: 16rpx;
+          padding-right: 20rpx;
+
+          .current-count {
+            font-size: 24rpx;
+            color: #666666;
+
+            &.over-limit {
+              color: #FF4757;
+            }
+          }
+
+          .max-count {
+            font-size: 24rpx;
+            color: #999999;
+          }
+        }
+      }
+
+      .required-mark {
+        color: #FF4757;
+        font-size: 28rpx;
+        margin-left: 8rpx;
       }
     }
 

@@ -2,7 +2,7 @@
   <view class="container" :style="backgroundStyle">
     <!-- 顶部插画区域 -->
     <view class="header-illustration">
-      <uv-image :src="`${staticBaseUrl}/lawyer_banner.png`" width="100%" height="500rpx"
+      <uv-image :src="staticBaseUrl + '/lawyer_banner.png'" width="100%" height="500rpx"
         mode="aspectFill"></uv-image>
     </view>
 
@@ -26,19 +26,19 @@
         <view class="action-buttons">
           <view class="action-button" @click="handleViewDocuments">
             <view class="button-icon view-icon">
-              				<uv-icon :name="`${staticBaseUrl}/icons/check.png`" color="#FFFFFF" size="64"></uv-icon>
+              				        <uv-icon :name="staticBaseUrl + '/icons/check.png'" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">查看</text>
           </view>
           <view class="action-button" @click="handleReviewDocuments">
             <view class="button-icon review-icon">
-              				<uv-icon :name="`${staticBaseUrl}/icons/shenhe.png`" color="#FFFFFF" size="64"></uv-icon>
+              				        <uv-icon :name="staticBaseUrl + '/icons/shenhe.png'" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">审核</text>
           </view>
           <view class="action-button" @click="handleDownloadDocuments">
             <view class="button-icon download-icon">
-              				<uv-icon :name="`${staticBaseUrl}/icons/download.png`" color="#FFFFFF" size="64"></uv-icon>
+              				        <uv-icon :name="staticBaseUrl + '/icons/download.png'" color="#FFFFFF" size="64"></uv-icon>
             </view>
             <text class="button-text">下载</text>
           </view>
@@ -54,6 +54,7 @@
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
 import { staticBaseUrl } from '@/config/index.js'
+import { getUserConsultations } from '@/api/modules/lawyer.js'
 
 export default {
   name: 'LawyerDashboard',
@@ -64,34 +65,13 @@ export default {
     return {
       staticBaseUrl,
       consultationListHeight: '300rpx',
-      consultationList: [
-        {
-          clientName: '李小明',
-          summary: '公司拖欠工资三个月, 当...',
-          timeAgo: '10分钟前'
-        },
-        {
-          clientName: '王小红',
-          summary: '房屋租赁合同纠纷, 需要...',
-          timeAgo: '25分钟前'
-        },
-        {
-          clientName: '张小华',
-          summary: '交通事故责任认定, 对方...',
-          timeAgo: '1小时前'
-        },
-        {
-          clientName: '刘小强',
-          summary: '劳动合同解除争议, 公司...',
-          timeAgo: '2小时前'
-        },
-        {
-          clientName: '陈小美',
-          summary: '婚姻财产分割问题, 涉及...',
-          timeAgo: '3小时前'
-        }
-      ]
+      loading: false,
+      error: null,
+      consultationList: []
     }
+  },
+  mounted() {
+    this.fetchConsultationList()
   },
   computed: {
     backgroundStyle() {
@@ -101,6 +81,74 @@ export default {
     }
   },
   methods: {
+    // 获取咨询信息列表
+    async fetchConsultationList() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const response = await getUserConsultations({
+          page: 1,
+          pageSize: 5,
+          status: 'pending' // 获取待处理的咨询
+        })
+        
+        if (response && response.data) {
+          // 转换API数据格式为页面需要的格式
+          this.consultationList = response.data.map(item => ({
+            clientName: item.clientName || '匿名用户',
+            summary: item.content ? item.content.substring(0, 20) + '...' : '暂无描述',
+            timeAgo: this.formatTimeAgo(item.createdAt)
+          }))
+        }
+      } catch (error) {
+        console.error('获取咨询列表失败:', error)
+        this.error = '获取咨询数据失败，请稍后重试'
+        
+        // 使用默认数据作为fallback
+        this.consultationList = [
+          {
+            clientName: '李小明',
+            summary: '公司拖欠工资三个月, 当...',
+            timeAgo: '10分钟前'
+          },
+          {
+            clientName: '王小红',
+            summary: '房屋租赁合同纠纷, 需要...',
+            timeAgo: '25分钟前'
+          }
+        ]
+        
+        uni.showToast({
+          title: '获取咨询数据失败',
+          icon: 'none',
+          duration: 2000
+        })
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 格式化时间显示
+    formatTimeAgo(dateString) {
+      if (!dateString) return '刚刚'
+      
+      const now = new Date()
+      const date = new Date(dateString)
+      const diff = now - date
+      
+      const minutes = Math.floor(diff / (1000 * 60))
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      
+      if (minutes < 1) return '刚刚'
+      if (minutes < 60) return `${minutes}分钟前`
+      if (hours < 24) return `${hours}小时前`
+      if (days < 7) return `${days}天前`
+      
+      return date.toLocaleDateString()
+    },
+    
     handleViewDocuments() {
       uni.navigateTo({
         url: '/pages/lawyer/index/legal-document-list/index'

@@ -518,6 +518,13 @@
 					}
 				},
 				{
+					"path": "index/chat/index",
+					"style": {
+						"navigationBarTitleText": "心理咨询",
+						"navigationStyle": "custom"
+					}
+				},
+				{
 					"path": "profile/online-status/index",
 					"style": {
 						"navigationBarTitleText": "在线状态设置",

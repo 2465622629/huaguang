@@ -1,5 +1,5 @@
 <template>
-  <view class="credit-recovery-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <view class="credit-recovery-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -282,7 +282,7 @@ export default {
       }
     },
     
-    handleSubmit() {
+    async handleSubmit() {
       // 表单验证
       const { loanInfo, repaymentInfo } = this.formData
       
@@ -310,19 +310,53 @@ export default {
         return
       }
       
-      // 显示提交成功提示
-      uni.showToast({
-        title: '提交成功',
-        icon: 'success',
-        duration: 1500
-      })
-      
-      // 延时跳转到信用评分页面
-      setTimeout(() => {
-        uni.navigateTo({
-          url: '/pages/user/fund/credit-score/index'
+      try {
+        // 导入青年帮扶API模块
+        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
+        
+        // 准备提交数据
+        const submitData = {
+          applicationType: 'CREDIT_REPAIR',
+          loanInfo: {
+            bankOrPlatform: loanInfo.bank,
+            loanTime: loanInfo.loanTime,
+            amount: parseFloat(loanInfo.amount),
+            overdueTime: loanInfo.overdueTime
+          },
+          repaymentInfo: {
+            remainingAmount: parseFloat(repaymentInfo.remainingAmount),
+            repaymentAmount: parseFloat(repaymentInfo.repaymentAmount),
+            screenshotUrl: repaymentInfo.screenshot.url,
+            screenshotFileId: repaymentInfo.screenshot.fileId
+          }
+        }
+        
+        // 调用信用修复申请接口
+        const res = await youthAssistanceApi.submitCreditRepairApplication(submitData)
+        
+        if (res && res.success) {
+          uni.showToast({
+            title: '信用修复申请提交成功',
+            icon: 'success',
+            duration: 1500
+          })
+          
+          // 延时跳转到信用评分页面
+          setTimeout(() => {
+            uni.navigateTo({
+              url: '/pages/user/fund/credit-score/index'
+            })
+          }, 1500)
+        } else {
+          throw new Error(res.message || '提交失败')
+        }
+      } catch (error) {
+        console.error('信用修复申请提交失败：', error)
+        uni.showToast({
+          title: error.message || '提交失败，请重试',
+          icon: 'none'
         })
-      }, 1500)
+      }
     }
   }
 }

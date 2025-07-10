@@ -43,36 +43,40 @@
       <!-- 可滚动的律师列表区域 -->
       <view class="scrollable-list-area">
         <scroll-view class="list-scroll" scroll-y="true" style="height: 100%;">
-          <!-- 律师卡片列表 -->
+          <!-- 专家卡片列表 -->
           <view class="lawyer-list">
-            <view 
-              v-for="(lawyer, index) in lawyerList" 
-              :key="lawyer.id"
+            <view
+              v-for="(expert, index) in expertList"
+              :key="expert.id"
               class="lawyer-card"
             >
               <view class="card-content">
-                <!-- 律师基本信息区域 -->
+                <!-- 专家基本信息区域 -->
                 <view class="lawyer-basic-info">
-                  <!-- 律师头像 -->
-                  <view class="lawyer-avatar"></view>
+                  <!-- 专家头像 -->
+                  <view class="lawyer-avatar">
+                    <view class="expert-type-badge" :class="expert.type">
+                      {{ expert.type === 'lawyer' ? '律' : '心' }}
+                    </view>
+                  </view>
                   
-                  <!-- 律师文本信息 -->
+                  <!-- 专家文本信息 -->
                   <view class="lawyer-text-info">
-                    <text class="lawyer-name">{{ lawyer.name }}</text>
-                    <text class="lawyer-tags">{{ lawyer.specialty }} | {{ lawyer.experience }} | {{ lawyer.successRate }}</text>
-                    <text class="consult-count">{{ lawyer.consultCount }}</text>
+                    <text class="lawyer-name">{{ expert.name }}</text>
+                    <text class="lawyer-tags">{{ expert.specialty }} | {{ expert.experience }} | {{ expert.successRate }}</text>
+                    <text class="consult-count">{{ expert.consultCount }}</text>
                   </view>
                 </view>
                 
                 <!-- 服务项目区域 -->
                 <view class="services-section">
                   <view class="services">
-                    <view 
-                      v-for="(service, sIndex) in lawyer.services" 
+                    <view
+                      v-for="(service, sIndex) in expert.services"
                       :key="sIndex"
                       class="service-item"
                     >
-                      <image :src="`${config.staticBaseUrl}/icons/${service.icon}.png`" style="width: 12px; height: 12px;" mode="aspectFit"></image>
+                      <image :src="config.staticBaseUrl + '/icons/' + service.icon + '.png'" style="width: 12px; height: 12px;" mode="aspectFit"></image>
                       <text class="service-name">{{ service.type }}</text>
                       <view class="service-price-container">
                         <text class="service-price">¥{{ service.price }}</text>
@@ -82,17 +86,17 @@
                   </view>
                   
                   <!-- 立即咨询按钮 -->
-                  <view class="consult-button" @click="consultLawyer(lawyer)">
+                  <view class="consult-button" @click="consultLawyer(expert)">
                     <text class="consult-text">立即咨询</text>
                   </view>
                 </view>
                 
-                <!-- 成功案例 -->
-                <text class="achievement">{{ lawyer.achievement }}</text>
+                <!-- 成功案例/专业介绍 -->
+                <text class="achievement">{{ expert.achievement }}</text>
               </view>
               
               <!-- 分割线 -->
-              <view v-if="index < lawyerList.length - 1" class="divider"></view>
+              <view v-if="index < expertList.length - 1" class="divider"></view>
             </view>
           </view>
           
@@ -109,6 +113,8 @@
 
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
+import { getLegalConsultationLawyers } from '@/api/modules/legal.js'
+import { getPsychologists } from '@/api/modules/psychologist.js'
 import { getHotLawyers } from '@/api/modules/home.js'
 import config from '@/config/index.js'
 
@@ -122,21 +128,31 @@ export default {
       config,
       scrollHeight: '100vh',
       loading: false,
+      retryCount: 0,
+      maxRetries: 3,
+      cacheExpiry: 10 * 60 * 1000, // 10分钟缓存
+      lastCacheTime: null,
+      cachedData: null,
       // 筛选标签数据
       filterTabs: [
-        { name: '劳动纠纷', active: true },
-        { name: '合同纠纷', active: false },
-        { name: '婚姻家庭', active: false },
-        { name: '消费维权', active: false },
-        { name: '知识产权', active: false },
+        { name: '法律咨询', active: true, type: 'legal' },
+        { name: '心理咨询', active: false, type: 'psychology' },
+        { name: '劳动纠纷', active: false, type: 'legal', specialty: 'labor' },
+        { name: '合同纠纷', active: false, type: 'legal', specialty: 'contract' },
+        { name: '婚姻家庭', active: false, type: 'legal', specialty: 'family' },
+        { name: '心理健康', active: false, type: 'psychology', specialty: 'mental' },
+        { name: '情感咨询', active: false, type: 'psychology', specialty: 'emotion' },
       ],
-      // 律师信息数据
-      lawyerList: []
+      // 专家信息数据（律师+心理师）
+      expertList: [],
+      allLawyers: [],
+      allPsychologists: [],
+      currentType: 'legal' // 当前显示类型：legal 或 psychology
     }
   },
   mounted() {
     this.calculateScrollHeight()
-    this.loadHotLawyers()
+    this.loadExpertData()
   },
   methods: {
     // 返回上一页
@@ -148,64 +164,241 @@ export default {
       this.filterTabs.forEach((tab, i) => {
         tab.active = i === index
       })
-    },
-    // 咨询律师
-    consultLawyer(lawyer) {
-      console.log('咨询律师:', lawyer)
       
-      uni.navigateTo({
-        url: `/pages/user/index/lawyer-detail/index?lawyerId=${lawyer.id}`
-      })
+      const selectedTab = this.filterTabs[index]
+      this.currentType = selectedTab.type
+      
+      // 根据选择的标签筛选和显示对应的专家
+      this.filterExpertsByTab(selectedTab)
     },
-    // 加载热门律师数据
-    async loadHotLawyers() {
-      try {
-        this.loading = true
-        console.log('开始加载热门律师数据...')
-        const response = await getHotLawyers({ limit: 10 })
-        console.log('API响应数据:', response)
-        
-        // 处理API响应数据，适配页面显示格式
-        if (response && Array.isArray(response)) {
-          console.log('处理API数据，律师数量:', response.length)
-          this.lawyerList = response.map(lawyer => ({
-            id: lawyer.id,
-            name: lawyer.name || '未知律师',
-            specialty: lawyer.specialties ? lawyer.specialties.join('、') : '专业领域',
-            experience: lawyer.experienceYears ? `${lawyer.experienceYears}年经验` : '经验年限',
-            successRate: lawyer.successRate ? `胜诉率${lawyer.successRate}%` : '胜诉率',
-            consultCount: lawyer.consultationCount ? `${lawyer.consultationCount}+人已咨询` : '咨询次数',
-            services: [
-              { type: '图文咨询', price: Math.floor(lawyer.consultationFee * 0.6) || 60, unit: '次', icon: 'img' },
-              { type: '语音咨询', price: lawyer.consultationFee || 120, unit: '30分钟', icon: 'call' }
-            ],
-            achievement: `专业${lawyer.specialties ? lawyer.specialties[0] : '法律'}服务，成功率${lawyer.successRate || 95}%`
-          }))
-          console.log('处理后的律师列表:', this.lawyerList)
+    
+    // 根据标签筛选专家
+    filterExpertsByTab(selectedTab) {
+      console.log('筛选专家，选择的标签:', selectedTab)
+      
+      if (selectedTab.type === 'legal') {
+        // 显示律师数据
+        if (selectedTab.specialty) {
+          // 按专业领域筛选律师
+          this.expertList = this.allLawyers.filter(lawyer =>
+            lawyer.specialties && lawyer.specialties.includes(selectedTab.specialty)
+          )
         } else {
-          console.log('API响应数据格式不正确，使用默认数据')
-          this.setDefaultLawyerData()
+          // 显示所有律师
+          this.expertList = [...this.allLawyers]
         }
-      } catch (error) {
-        console.error('获取热门律师数据失败:', error)
-        uni.showToast({
-          title: '获取律师数据失败，显示默认数据',
-          icon: 'none'
+      } else if (selectedTab.type === 'psychology') {
+        // 显示心理师数据
+        if (selectedTab.specialty) {
+          // 按专业领域筛选心理师
+          this.expertList = this.allPsychologists.filter(psychologist =>
+            psychologist.specialties && psychologist.specialties.includes(selectedTab.specialty)
+          )
+        } else {
+          // 显示所有心理师
+          this.expertList = [...this.allPsychologists]
+        }
+      }
+      
+      console.log('筛选后的专家列表:', this.expertList)
+    },
+    // 咨询专家（律师或心理师）
+    consultLawyer(expert) {
+      console.log('咨询专家:', expert)
+      
+      if (expert.type === 'lawyer') {
+        uni.navigateTo({
+          url: `/pages/user/index/lawyer-detail/index?lawyerId=${expert.id}`
         })
-        // 使用默认数据作为备选
-        this.setDefaultLawyerData()
-      } finally {
-        this.loading = false
-        console.log('最终律师列表长度:', this.lawyerList.length)
+      } else if (expert.type === 'psychologist') {
+        uni.navigateTo({
+          url: `/pages/psychologist/consultation/consultation?psychologistId=${expert.id}`
+        })
       }
     },
-    // 设置默认律师数据
-    setDefaultLawyerData() {
-      this.lawyerList = [
+    // 加载专家数据（律师+心理师）
+    async loadExpertData() {
+      // 检查缓存
+      if (this.isCacheValid()) {
+        console.log('使用缓存数据')
+        this.restoreFromCache()
+        return
+      }
+      
+      try {
+        this.loading = true
+        this.retryCount = 0
+        console.log('开始加载专家数据...')
+        
+        await this.loadDataWithRetry()
+        
+        // 缓存数据
+        this.cacheData()
+        
+        // 初始显示法律咨询专家
+        this.filterExpertsByTab(this.filterTabs[0])
+        
+      } catch (error) {
+        console.error('加载专家数据最终失败:', error)
+        this.handleLoadError(error)
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 带重试机制的数据加载
+    async loadDataWithRetry() {
+      for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+        try {
+          console.log(`数据加载尝试 ${attempt + 1}/${this.maxRetries + 1}`)
+          
+          // 并行加载律师和心理师数据
+          const [lawyersResult, psychologistsResult] = await Promise.allSettled([
+            this.loadLawyersData(),
+            this.loadPsychologistsData()
+          ])
+          
+          // 处理律师数据
+          if (lawyersResult.status === 'fulfilled') {
+            this.allLawyers = lawyersResult.value
+            console.log('律师数据加载成功，数量:', this.allLawyers.length)
+          } else {
+            console.warn('律师数据加载失败:', lawyersResult.reason)
+            this.allLawyers = this.getDefaultLawyerData()
+          }
+          
+          // 处理心理师数据
+          if (psychologistsResult.status === 'fulfilled') {
+            this.allPsychologists = psychologistsResult.value
+            console.log('心理师数据加载成功，数量:', this.allPsychologists.length)
+          } else {
+            console.warn('心理师数据加载失败:', psychologistsResult.reason)
+            this.allPsychologists = this.getDefaultPsychologistData()
+          }
+          
+          // 如果至少有一个数据源成功，就认为加载成功
+          if (lawyersResult.status === 'fulfilled' || psychologistsResult.status === 'fulfilled') {
+            console.log('专家数据加载完成')
+            return
+          }
+          
+          throw new Error('所有数据源都加载失败')
+          
+        } catch (error) {
+          console.error(`第 ${attempt + 1} 次尝试失败:`, error)
+          
+          if (attempt === this.maxRetries) {
+            throw error
+          }
+          
+          // 指数退避重试，添加随机抖动
+          const delay = Math.min(1000 * Math.pow(2, attempt), 8000) + Math.random() * 1000
+          console.log(`等待 ${delay.toFixed(0)}ms 后重试...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    },
+    
+    // 加载律师数据
+    async loadLawyersData() {
+      try {
+        // 优先使用法律咨询专用API
+        const response = await getLegalConsultationLawyers({
+          page: 1,
+          pageSize: 20,
+          sortBy: 'rating'
+        })
+        
+        if (response && Array.isArray(response)) {
+          return this.formatLawyerData(response)
+        }
+        
+        throw new Error('法律咨询API响应格式不正确')
+        
+      } catch (error) {
+        console.warn('法律咨询API失败，尝试备用API:', error)
+        
+        // 备用方案：使用热门律师API
+        try {
+          const backupResponse = await getHotLawyers({ limit: 15 })
+          if (backupResponse && Array.isArray(backupResponse)) {
+            return this.formatLawyerData(backupResponse)
+          }
+        } catch (backupError) {
+          console.error('备用律师API也失败:', backupError)
+        }
+        
+        throw error
+      }
+    },
+    
+    // 加载心理师数据
+    async loadPsychologistsData() {
+      try {
+        const response = await getPsychologists({
+          page: 1,
+          pageSize: 20,
+          sortBy: 'rating'
+        })
+        
+        if (response && Array.isArray(response)) {
+          return this.formatPsychologistData(response)
+        }
+        
+        throw new Error('心理师API响应格式不正确')
+        
+      } catch (error) {
+        console.error('心理师数据加载失败:', error)
+        throw error
+      }
+    },
+    
+    // 格式化律师数据
+    formatLawyerData(lawyers) {
+      return lawyers.map(lawyer => ({
+        id: lawyer.id,
+        type: 'lawyer',
+        name: lawyer.name || '未知律师',
+        specialty: lawyer.specialties ? lawyer.specialties.join('、') : '专业领域',
+        specialties: lawyer.specialties || [],
+        experience: lawyer.experienceYears ? `${lawyer.experienceYears}年经验` : '经验年限',
+        successRate: lawyer.successRate ? `胜诉率${lawyer.successRate}%` : '胜诉率',
+        consultCount: lawyer.consultationCount ? `${lawyer.consultationCount}+人已咨询` : '咨询次数',
+        services: [
+          { type: '图文咨询', price: Math.floor(lawyer.consultationFee * 0.6) || 60, unit: '次', icon: 'img' },
+          { type: '语音咨询', price: lawyer.consultationFee || 120, unit: '30分钟', icon: 'call' }
+        ],
+        achievement: `专业${lawyer.specialties ? lawyer.specialties[0] : '法律'}服务，成功率${lawyer.successRate || 95}%`
+      }))
+    },
+    
+    // 格式化心理师数据
+    formatPsychologistData(psychologists) {
+      return psychologists.map(psychologist => ({
+        id: psychologist.id,
+        type: 'psychologist',
+        name: psychologist.name || '未知心理师',
+        specialty: psychologist.specialties ? psychologist.specialties.join('、') : '心理咨询',
+        specialties: psychologist.specialties || [],
+        experience: psychologist.experienceYears ? `${psychologist.experienceYears}年经验` : '经验年限',
+        successRate: psychologist.rating ? `评分${psychologist.rating}分` : '专业评分',
+        consultCount: psychologist.consultationCount ? `${psychologist.consultationCount}+人已咨询` : '咨询次数',
+        services: [
+          { type: '文字咨询', price: psychologist.textFee || 80, unit: '次', icon: 'img' },
+          { type: '语音咨询', price: psychologist.voiceFee || 150, unit: '30分钟', icon: 'call' }
+        ],
+        achievement: `专业心理咨询服务，${psychologist.specialties ? psychologist.specialties[0] : '心理健康'}专家`
+      }))
+    },
+    // 获取默认律师数据
+    getDefaultLawyerData() {
+      return [
         {
-          id: 1,
+          id: 'default_lawyer_1',
+          type: 'lawyer',
           name: '李晓明',
           specialty: '劳动法专长',
+          specialties: ['labor'],
           experience: '8年经验',
           successRate: '胜诉率91%',
           consultCount: '400+人已咨询',
@@ -216,9 +409,11 @@ export default {
           achievement: '成功帮助某员工追回工资5万元'
         },
         {
-          id: 2,
+          id: 'default_lawyer_2',
+          type: 'lawyer',
           name: '王律师',
           specialty: '合同纠纷、债务纠纷',
+          specialties: ['contract'],
           experience: '12年经验',
           successRate: '胜诉率95%',
           consultCount: '300+人已咨询',
@@ -229,7 +424,93 @@ export default {
           achievement: '专业合同服务，成功率95%'
         }
       ]
-      console.log('设置默认律师数据完成:', this.lawyerList)
+    },
+    
+    // 获取默认心理师数据
+    getDefaultPsychologistData() {
+      return [
+        {
+          id: 'default_psychologist_1',
+          type: 'psychologist',
+          name: '张心理师',
+          specialty: '情感咨询、心理健康',
+          specialties: ['emotion', 'mental'],
+          experience: '6年经验',
+          successRate: '评分4.8分',
+          consultCount: '200+人已咨询',
+          services: [
+            { type: '文字咨询', price: 80, unit: '次', icon: 'img' },
+            { type: '语音咨询', price: 150, unit: '30分钟', icon: 'call' }
+          ],
+          achievement: '专业心理咨询服务，情感专家'
+        },
+        {
+          id: 'default_psychologist_2',
+          type: 'psychologist',
+          name: '刘心理师',
+          specialty: '心理健康、职场压力',
+          specialties: ['mental'],
+          experience: '10年经验',
+          successRate: '评分4.9分',
+          consultCount: '350+人已咨询',
+          services: [
+            { type: '文字咨询', price: 100, unit: '次', icon: 'img' },
+            { type: '语音咨询', price: 180, unit: '30分钟', icon: 'call' }
+          ],
+          achievement: '专业心理咨询服务，心理健康专家'
+        }
+      ]
+    },
+    
+    // 缓存相关方法
+    isCacheValid() {
+      if (!this.cachedData || !this.lastCacheTime) {
+        return false
+      }
+      return (Date.now() - this.lastCacheTime) < this.cacheExpiry
+    },
+    
+    cacheData() {
+      this.cachedData = {
+        allLawyers: [...this.allLawyers],
+        allPsychologists: [...this.allPsychologists]
+      }
+      this.lastCacheTime = Date.now()
+      console.log('数据已缓存')
+    },
+    
+    restoreFromCache() {
+      if (this.cachedData) {
+        this.allLawyers = [...this.cachedData.allLawyers]
+        this.allPsychologists = [...this.cachedData.allPsychologists]
+        this.filterExpertsByTab(this.filterTabs[0])
+        console.log('从缓存恢复数据')
+      }
+    },
+    
+    // 错误处理
+    handleLoadError(error) {
+      console.error('专家数据加载失败:', error)
+      
+      // 使用默认数据
+      this.allLawyers = this.getDefaultLawyerData()
+      this.allPsychologists = this.getDefaultPsychologistData()
+      this.filterExpertsByTab(this.filterTabs[0])
+      
+      // 显示用户友好的错误提示
+      let errorMessage = '网络连接异常，显示默认数据'
+      
+      if (error.message && error.message.includes('timeout')) {
+        errorMessage = '网络超时，请检查网络连接'
+      } else if (error.message && error.message.includes('404')) {
+        errorMessage = '服务暂时不可用，显示默认数据'
+      }
+      
+      uni.showToast({
+        title: errorMessage,
+        icon: 'none',
+        duration: 3000
+      })
     },
     calculateScrollHeight() {
       // 获取系统信息
@@ -413,6 +694,34 @@ export default {
           background-color: #D8D8D8;
           border-radius: 50%;
           margin-right: 15px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          
+          .expert-type-badge {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #FFFFFF;
+            border: 2px solid #FFFFFF;
+            
+            &.lawyer {
+              background-color: #4A7DFF;
+            }
+            
+            &.psychologist {
+              background-color: #FF6B9D;
+            }
+          }
         }
         
         .lawyer-text-info {

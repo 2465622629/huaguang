@@ -1,5 +1,5 @@
 <template>
-  <view class="enterprise-page" :style="{ backgroundImage: `url(${backgroundImageUrl})` }">
+  <view class="enterprise-page" :style="{ backgroundImage: 'url(' + backgroundImageUrl + ')' }">
     <!-- iOS 状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -14,13 +14,13 @@
         <view class="logo-placeholder"></view>
       </view>
       <view class="company-details">
-        <text class="company-name">XX科技有限公司</text>
+        <text class="company-name">{{ enterpriseInfo.name }}</text>
         <view class="company-tags">
           <view class="tag">
-            <text class="tag-text">互联网 · 软件开发</text>
+            <text class="tag-text">{{ enterpriseInfo.industry }}</text>
           </view>
           <view class="tag">
-            <text class="tag-text">500-999人</text>
+            <text class="tag-text">{{ enterpriseInfo.scale }}</text>
           </view>
         </view>
       </view>
@@ -45,8 +45,8 @@
         ></uv-button>
       </view>
       <view class="section-content">
-        <text class="content-subtitle">关于XX科技</text>
-        <text class="content-text">XX科技成立于2012年，是一家专注于人工智能、大数据分析与云计算服务的高新技术企业。我们致力于用科技赋能产业，推动数字化转型，服务全球客户。</text>
+        <text class="content-subtitle">关于{{ enterpriseInfo.name.replace('有限公司', '').replace('科技', '') }}</text>
+        <text class="content-text">{{ enterpriseInfo.description }}</text>
         <view class="content-list">
           <text class="list-item">· 核心业务：智慧零售、智慧物流、AI算法平台开发</text>
           <text class="list-item">· 服务客户：已覆盖全球30多个国家，超过500家企业</text>
@@ -110,6 +110,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import { staticBaseUrl } from '@/config/index.js'
+import { enterpriseApi } from '@/api/index.js'
 
 export default {
   name: 'EnterpriseJobHunting',
@@ -119,7 +120,290 @@ export default {
   data() {
     return {
       statusBarHeight: 0,
-      jobList: [
+      loading: false,
+      loadingJobs: false,
+      // 企业级缓存管理
+      cacheData: null,
+      cacheTimestamp: 0,
+      cacheExpiration: 10 * 60 * 1000, // 10分钟缓存
+      // 重试机制配置
+      maxRetries: 3,
+      retryDelays: [1000, 2000, 4000], // 指数退避延迟
+      // 错误状态管理
+      enterpriseLoadError: null,
+      jobsLoadError: null,
+      enterpriseInfo: {
+        name: 'XX科技有限公司',
+        industry: '互联网 · 软件开发',
+        scale: '500-999人',
+        logo: '',
+        description: 'XX科技成立于2012年，是一家专注于人工智能、大数据分析与云计算服务的高新技术企业。我们致力于用科技赋能产业，推动数字化转型，服务全球客户。'
+      },
+      jobList: []
+    }
+  },
+  computed: {
+    // 动态生成背景图片URL
+    backgroundImageUrl() {
+      return `${staticBaseUrl}/bg3.png`
+    }
+  },
+  onLoad() {
+    // 获取系统状态栏高度
+    const systemInfo = uni.getSystemInfoSync()
+    this.statusBarHeight = systemInfo.statusBarHeight || 0
+    
+    // 加载企业数据
+    this.loadEnterpriseData()
+    
+    // 加载职位列表
+    this.loadJobList()
+  },
+  methods: {
+    /**
+     * 企业级API调用重试机制
+     * @param {Function} apiCall - API调用函数
+     * @param {Array} params - API参数
+     * @param {number} retryCount - 当前重试次数
+     */
+    async callApiWithRetry(apiCall, params = [], retryCount = 0) {
+      try {
+        return await apiCall(...params)
+      } catch (error) {
+        console.error(`API调用失败 (尝试 ${retryCount + 1}/${this.maxRetries + 1}):`, error)
+        
+        if (retryCount < this.maxRetries) {
+          // 添加随机抖动避免雷群效应
+          const baseDelay = this.retryDelays[retryCount] || 4000
+          const jitter = Math.random() * 1000
+          const delay = baseDelay + jitter
+          
+          console.log(`${delay}ms后进行第${retryCount + 1}次重试...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          
+          return this.callApiWithRetry(apiCall, params, retryCount + 1)
+        }
+        
+        throw error
+      }
+    },
+
+    /**
+     * 智能缓存数据获取
+     * @param {string} key - 缓存键
+     */
+    getCachedData(key) {
+      const now = Date.now()
+      if (this.cacheData && this.cacheData[key] &&
+          (now - this.cacheTimestamp) < this.cacheExpiration) {
+        console.log(`使用缓存数据: ${key}`)
+        return this.cacheData[key]
+      }
+      return null
+    },
+
+    /**
+     * 设置缓存数据
+     * @param {string} key - 缓存键
+     * @param {any} data - 缓存数据
+     */
+    setCachedData(key, data) {
+      if (!this.cacheData) {
+        this.cacheData = {}
+      }
+      this.cacheData[key] = data
+      this.cacheTimestamp = Date.now()
+      console.log(`缓存数据已更新: ${key}`)
+    },
+
+    /**
+     * 企业级企业信息加载 - 多层数据保护
+     */
+    async loadEnterpriseData() {
+      this.loading = true
+      this.enterpriseLoadError = null
+      
+      try {
+        // 第一层：尝试从缓存获取数据
+        const cacheKey = 'enterprise_info'
+        const cachedData = this.getCachedData(cacheKey)
+        
+        if (cachedData) {
+          this.updateEnterpriseInfo(cachedData)
+          this.loading = false
+          // 后台静默更新数据
+          this.silentUpdateEnterpriseInfo()
+          return
+        }
+        
+        // 第二层：API调用获取数据
+        const response = await this.callApiWithRetry(
+          enterpriseApi.getCurrentEnterpriseInfo.bind(enterpriseApi)
+        )
+        
+        if (response && response.data) {
+          const enterpriseData = response.data
+          this.updateEnterpriseInfo(enterpriseData)
+          this.setCachedData(cacheKey, enterpriseData)
+          
+          console.log('企业信息加载成功')
+        } else {
+          throw new Error('企业信息数据格式异常')
+        }
+      } catch (error) {
+        console.error('加载企业信息失败:', error)
+        this.handleEnterpriseLoadError(error)
+        
+        // 第三层：使用默认数据作为降级方案
+        this.useDefaultEnterpriseData()
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 静默更新企业信息
+     */
+    async silentUpdateEnterpriseInfo() {
+      try {
+        const response = await enterpriseApi.getCurrentEnterpriseInfo()
+        if (response && response.data) {
+          const cacheKey = 'enterprise_info'
+          this.setCachedData(cacheKey, response.data)
+          console.log('企业信息已静默更新')
+        }
+      } catch (error) {
+        console.warn('企业信息静默更新失败:', error)
+      }
+    },
+
+    /**
+     * 更新企业信息
+     * @param {Object} enterpriseData - 企业数据
+     */
+    updateEnterpriseInfo(enterpriseData) {
+      this.enterpriseInfo = {
+        name: enterpriseData.companyName || enterpriseData.name || this.enterpriseInfo.name,
+        industry: enterpriseData.industry || this.enterpriseInfo.industry,
+        scale: enterpriseData.scale || this.enterpriseInfo.scale,
+        logo: enterpriseData.logo || this.enterpriseInfo.logo,
+        description: enterpriseData.description || this.enterpriseInfo.description
+      }
+    },
+
+    /**
+     * 使用默认企业数据
+     */
+    useDefaultEnterpriseData() {
+      console.log('使用默认企业数据作为降级方案')
+      // 当前已有默认数据，无需额外处理
+    },
+
+    /**
+     * 处理企业信息加载错误
+     * @param {Error|string} error - 错误信息
+     */
+    handleEnterpriseLoadError(error) {
+      this.enterpriseLoadError = error
+      const errorMessage = this.getErrorMessage(error)
+      
+      uni.showToast({
+        title: `企业信息加载失败: ${errorMessage}`,
+        icon: 'none',
+        duration: 3000
+      })
+    },
+    
+    /**
+     * 企业级职位列表加载 - 多层数据保护
+     */
+    async loadJobList() {
+      this.loadingJobs = true
+      this.jobsLoadError = null
+      
+      try {
+        // 第一层：尝试从缓存获取数据
+        const cacheKey = 'enterprise_jobs'
+        const cachedData = this.getCachedData(cacheKey)
+        
+        if (cachedData) {
+          this.updateJobList(cachedData)
+          this.loadingJobs = false
+          // 后台静默更新数据
+          this.silentUpdateJobList()
+          return
+        }
+        
+        // 第二层：API调用获取数据
+        const response = await this.callApiWithRetry(
+          enterpriseApi.getEnterpriseJobs.bind(enterpriseApi),
+          [{
+            page: 1,
+            size: 20
+          }]
+        )
+        
+        if (response && response.data && response.data.list) {
+          const jobsData = response.data.list
+          this.updateJobList(jobsData)
+          this.setCachedData(cacheKey, jobsData)
+          
+          console.log('职位列表加载成功')
+        } else {
+          throw new Error('职位列表数据格式异常')
+        }
+      } catch (error) {
+        console.error('加载职位列表失败:', error)
+        this.handleJobsLoadError(error)
+        
+        // 第三层：使用默认数据作为降级方案
+        this.useDefaultJobsData()
+      } finally {
+        this.loadingJobs = false
+      }
+    },
+
+    /**
+     * 静默更新职位列表
+     */
+    async silentUpdateJobList() {
+      try {
+        const response = await enterpriseApi.getEnterpriseJobs({
+          page: 1,
+          size: 20
+        })
+        if (response && response.data && response.data.list) {
+          const cacheKey = 'enterprise_jobs'
+          this.setCachedData(cacheKey, response.data.list)
+          console.log('职位列表已静默更新')
+        }
+      } catch (error) {
+        console.warn('职位列表静默更新失败:', error)
+      }
+    },
+
+    /**
+     * 更新职位列表
+     * @param {Array} jobsData - 职位数据数组
+     */
+    updateJobList(jobsData) {
+      this.jobList = jobsData.map(job => ({
+        id: job.id,
+        title: job.title,
+        salary: job.salaryMin && job.salaryMax ?
+          `${job.salaryMin}k-${job.salaryMax}k` :
+          job.salary || '面议',
+        location: job.location || '待定',
+        education: job.educationRequirement || job.education || '本科'
+      }))
+    },
+
+    /**
+     * 使用默认职位数据
+     */
+    useDefaultJobsData() {
+      console.log('使用默认职位数据作为降级方案')
+      this.jobList = [
         {
           id: 1,
           title: '法务专员',
@@ -142,37 +426,96 @@ export default {
           education: '本科'
         }
       ]
-    }
-  },
-  computed: {
-    // 动态生成背景图片URL
-    backgroundImageUrl() {
-      return `${staticBaseUrl}/bg3.png`
-    }
-  },
-  onLoad() {
-    // 获取系统状态栏高度
-    const systemInfo = uni.getSystemInfoSync()
-    this.statusBarHeight = systemInfo.statusBarHeight || 0
-  },
-  methods: {
+    },
+
+    /**
+     * 处理职位列表加载错误
+     * @param {Error|string} error - 错误信息
+     */
+    handleJobsLoadError(error) {
+      this.jobsLoadError = error
+      const errorMessage = this.getErrorMessage(error)
+      
+      uni.showToast({
+        title: `职位列表加载失败: ${errorMessage}`,
+        icon: 'none',
+        duration: 3000
+      })
+    },
+
+    /**
+     * 编辑公司信息
+     */
     editCompanyInfo() {
       console.log('编辑公司详情')
       uni.navigateTo({
         url: '/pages/enterprise/companydetails/index'
       })
     },
+
+    /**
+     * 编辑职位信息
+     */
     editJobs() {
       console.log('立即编辑职位')
       uni.navigateTo({
         url: '/pages/enterprise/jobdetails/index'
       })
     },
+
+    /**
+     * 跳转到职位详情
+     * @param {Object} job - 职位信息
+     */
     goToJobDetail(job) {
       console.log('查看职位详情', job)
+      if (!job.id) {
+        uni.showToast({
+          title: '职位信息异常',
+          icon: 'none'
+        })
+        return
+      }
+      
       uni.navigateTo({
         url: `/pages/enterprise/jobdetails/index?jobId=${job.id}&title=${encodeURIComponent(job.title)}`
       })
+    },
+
+    /**
+     * 统一错误消息处理
+     * @param {Error|string} error - 错误对象或字符串
+     */
+    getErrorMessage(error) {
+      if (typeof error === 'string') {
+        return error
+      }
+      
+      if (error && error.message) {
+        // 网络错误
+        if (error.message.includes('Network Error') || error.message.includes('timeout')) {
+          return '网络连接异常，请检查网络后重试'
+        }
+        
+        // 权限错误
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          return '登录已过期，请重新登录'
+        }
+        
+        // 服务器错误
+        if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+          return '服务器繁忙，请稍后重试'
+        }
+        
+        // 数据验证错误
+        if (error.message.includes('400') || error.message.includes('Bad Request')) {
+          return '请求参数异常，请重试'
+        }
+        
+        return error.message
+      }
+      
+      return '操作失败，请重试'
     }
   }
 }

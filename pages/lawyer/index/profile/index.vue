@@ -53,7 +53,7 @@
 						hover-class="setting-item-hover"
 					>
 						<view class="item-left">
-							<uv-icon :name="`${staticBaseUrl}/icons/${item.icon}.png`" size="40" color="#888888"></uv-icon>
+							        <uv-icon :name="staticBaseUrl + '/icons/' + item.icon + '.png'" size="40" color="#888888"></uv-icon>
 							<text class="item-text">{{ item.text }}</text>
 						</view>
 						<text class="arrow-icon">></text>
@@ -157,7 +157,7 @@ export default {
 	computed: {
 		backgroundStyle() {
 			return {
-				backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+				        backgroundImage: 'url(' + staticBaseUrl + '/bg10.png)'
 			}
 		}
 	}

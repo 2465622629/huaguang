@@ -24,10 +24,13 @@
 		</scroll-view>
 		
 		<!-- 案件列表 -->
-		<scroll-view 
-			class="case-list" 
-			scroll-y 
+		<scroll-view
+			class="case-list"
+			scroll-y
 			@scrolltolower="loadMore"
+			@refresherrefresh="onRefresh"
+			:refresher-enabled="true"
+			:refresher-triggered="refreshing"
 			:style="{ height: scrollHeight + 'px' }"
 		>
 			<view class="case-item" v-for="(item, index) in caseList" :key="index" @click="goToDetail(item.id)">
@@ -89,6 +92,9 @@
 </template>
 
 <script>
+	// 导入法律服务API模块
+	import { getAssistanceCases, getLegalDocumentDetail } from '@/api/modules/legal.js'
+	
 	export default {
 		data() {
 			return {
@@ -111,7 +117,14 @@
 				updateForm: {
 					progress: '',
 					description: ''
-				}
+				},
+				// 缓存相关
+				cacheKey: 'lawyer_cases_cache',
+				cacheExpiry: 10 * 60 * 1000, // 10分钟缓存
+				searchTimeout: null, // 搜索防抖
+				retryCount: 0,
+				maxRetries: 3,
+				refreshing: false // 下拉刷新状态
 			}
 		},
 		onLoad() {
@@ -124,10 +137,19 @@
 		},
 		methods: {
 			handleSearch() {
-				this.page = 1
-				this.caseList = []
-				this.noMore = false
-				this.loadData()
+				// 清除之前的搜索定时器
+				if (this.searchTimeout) {
+					clearTimeout(this.searchTimeout)
+				}
+				
+				// 搜索防抖，300ms后执行
+				this.searchTimeout = setTimeout(() => {
+					this.page = 1
+					this.caseList = []
+					this.noMore = false
+					this.retryCount = 0
+					this.loadData()
+				}, 300)
 			},
 			handleStatusChange(status) {
 				this.currentStatus = status
@@ -136,40 +158,264 @@
 				this.noMore = false
 				this.loadData()
 			},
-			loadData() {
+			async loadData() {
 				if (this.loading || this.noMore) return
 				
 				this.loading = true
-				// 模拟接口请求
-				setTimeout(() => {
-					const mockData = Array(this.pageSize).fill(0).map((_, index) => ({
-						id: this.page * this.pageSize + index,
-						title: '离婚财产分割案件',
-						description: '处理离婚财产分割纠纷，包括房产、存款等财产的分割问题',
-						status: ['pending', 'processing', 'completed', 'cancelled'][Math.floor(Math.random() * 4)],
-						statusText: {
-							pending: '待处理',
-							processing: '处理中',
-							completed: '已完成',
-							cancelled: '已取消'
-						}[this.status],
-						clientName: '张女士',
-						createTime: '2024-05-09',
-						progress: '正在收集证据'
-					}))
-					
-					this.caseList = [...this.caseList, ...mockData]
-					this.loading = false
-					
-					if (this.page >= 3) {
-						this.noMore = true
+				
+				try {
+					// 检查缓存（仅第一页且无搜索条件时使用）
+					if (this.page === 1 && !this.searchKey && this.currentStatus === 'all') {
+						const cachedData = this.getCachedData()
+						if (cachedData) {
+							console.log('使用缓存数据加载律师案例')
+							this.caseList = cachedData.list
+							this.loading = false
+							this.page = cachedData.nextPage
+							return
+						}
 					}
-					this.page++
-				}, 1000)
+					
+					// 构建API请求参数
+					const params = {
+						page: this.page,
+						pageSize: this.pageSize
+					}
+					
+					// 添加搜索条件
+					if (this.searchKey && this.searchKey.trim()) {
+						params.keyword = this.searchKey.trim()
+					}
+					
+					// 添加状态筛选
+					if (this.currentStatus && this.currentStatus !== 'all') {
+						params.status = this.currentStatus
+					}
+					
+					console.log('正在加载律师案例数据，参数：', params)
+					
+					// 调用API获取案例数据
+					const response = await getAssistanceCases(params)
+					
+					if (response && response.code === 200) {
+						const apiData = response.data || {}
+						const newCases = this.formatCaseData(apiData.list || [])
+						
+						if (this.page === 1) {
+							this.caseList = newCases
+							// 缓存第一页数据（无搜索条件时）
+							if (!this.searchKey && this.currentStatus === 'all') {
+								this.setCachedData({
+									list: newCases,
+									nextPage: 2,
+									timestamp: Date.now()
+								})
+							}
+						} else {
+							this.caseList = [...this.caseList, ...newCases]
+						}
+						
+						// 判断是否还有更多数据
+						this.noMore = newCases.length < this.pageSize || !apiData.hasMore
+						
+						if (!this.noMore) {
+							this.page++
+						}
+						
+						console.log(`成功加载 ${newCases.length} 条律师案例数据`)
+						this.retryCount = 0 // 重置重试计数
+						
+					} else {
+						throw new Error(response?.message || '获取案例数据失败')
+					}
+					
+				} catch (error) {
+					console.error('加载律师案例数据失败：', error)
+					await this.handleLoadError(error)
+				} finally {
+					this.loading = false
+				}
+			},
+			
+			// 格式化案例数据
+			formatCaseData(rawData) {
+				if (!Array.isArray(rawData)) return []
+				
+				return rawData.map(item => ({
+					id: item.id || item.caseId || Date.now() + Math.random(),
+					title: item.title || item.caseName || '案例标题',
+					description: item.description || item.summary || '案例描述',
+					status: this.mapCaseStatus(item.status),
+					statusText: this.getStatusText(item.status),
+					clientName: item.clientName || item.applicantName || '委托人',
+					createTime: this.formatDate(item.createTime || item.createdAt),
+					progress: item.progress || item.currentStage || '进行中',
+					amount: item.amount || 0,
+					category: item.category || '法律咨询',
+					lawyerId: item.lawyerId || '',
+					documentId: item.documentId || ''
+				}))
+			},
+			
+			// 映射案例状态
+			mapCaseStatus(status) {
+				const statusMap = {
+					'PENDING': 'pending',
+					'IN_PROGRESS': 'processing',
+					'PROCESSING': 'processing',
+					'COMPLETED': 'completed',
+					'CANCELLED': 'cancelled',
+					'CLOSED': 'completed'
+				}
+				return statusMap[status] || 'pending'
+			},
+			
+			// 获取状态文本
+			getStatusText(status) {
+				const textMap = {
+					'pending': '待处理',
+					'processing': '处理中',
+					'completed': '已完成',
+					'cancelled': '已取消'
+				}
+				return textMap[this.mapCaseStatus(status)] || '待处理'
+			},
+			
+			// 处理加载错误
+			async handleLoadError(error) {
+				if (this.retryCount < this.maxRetries) {
+					this.retryCount++
+					const delay = Math.min(1000 * Math.pow(2, this.retryCount - 1), 8000) + Math.random() * 1000
+					console.log(`第 ${this.retryCount} 次重试，延迟 ${Math.round(delay)}ms`)
+					
+					setTimeout(() => {
+						this.loadData()
+					}, delay)
+					return
+				}
+				
+				// 尝试使用缓存数据
+				const cachedData = this.getCachedData()
+				if (cachedData && this.page === 1) {
+					console.log('API失败，使用缓存数据')
+					this.caseList = cachedData.list
+					uni.showToast({
+						title: '使用缓存数据',
+						icon: 'none',
+						duration: 2000
+					})
+					return
+				}
+				
+				// 使用默认数据
+				if (this.page === 1) {
+					this.caseList = this.getDefaultCaseData()
+					uni.showToast({
+						title: '网络异常，显示示例数据',
+						icon: 'none',
+						duration: 3000
+					})
+				} else {
+					uni.showToast({
+						title: '加载失败，请重试',
+						icon: 'none',
+						duration: 2000
+					})
+				}
+			},
+			
+			// 获取默认案例数据
+			getDefaultCaseData() {
+				return [
+					{
+						id: 'default_1',
+						title: '劳动纠纷案例',
+						description: '处理劳动合同纠纷，包括工资、加班费等争议问题',
+						status: 'processing',
+						statusText: '处理中',
+						clientName: '李先生',
+						createTime: '2024-12-01',
+						progress: '正在调解中'
+					},
+					{
+						id: 'default_2',
+						title: '合同纠纷案例',
+						description: '处理买卖合同纠纷，涉及货物质量和付款问题',
+						status: 'completed',
+						statusText: '已完成',
+						clientName: '王女士',
+						createTime: '2024-11-15',
+						progress: '已结案'
+					}
+				]
 			},
 			loadMore() {
 				this.loadData()
 			},
+			
+			// 下拉刷新
+			async onRefresh() {
+				this.refreshing = true
+				this.page = 1
+				this.caseList = []
+				this.noMore = false
+				this.retryCount = 0
+				
+				// 清除缓存，强制从服务器获取最新数据
+				try {
+					uni.removeStorageSync(this.cacheKey)
+				} catch (error) {
+					console.error('清除缓存失败：', error)
+				}
+				
+				await this.loadData()
+				this.refreshing = false
+			},
+			
+			// 缓存管理方法
+			getCachedData() {
+				try {
+					const cached = uni.getStorageSync(this.cacheKey)
+					if (cached && cached.timestamp) {
+						const now = Date.now()
+						if (now - cached.timestamp < this.cacheExpiry) {
+							return cached
+						}
+					}
+				} catch (error) {
+					console.error('获取缓存失败：', error)
+				}
+				return null
+			},
+			
+			setCachedData(data) {
+				try {
+					uni.setStorageSync(this.cacheKey, {
+						...data,
+						timestamp: Date.now()
+					})
+				} catch (error) {
+					console.error('设置缓存失败：', error)
+				}
+			},
+			
+			// 格式化日期
+			formatDate(dateStr) {
+				if (!dateStr) return '未知时间'
+				
+				try {
+					const date = new Date(dateStr)
+					if (isNaN(date.getTime())) return dateStr
+					
+					const year = date.getFullYear()
+					const month = String(date.getMonth() + 1).padStart(2, '0')
+					const day = String(date.getDate()).padStart(2, '0')
+					return `${year}-${month}-${day}`
+				} catch (error) {
+					return dateStr
+				}
+			},
+			
 			goToDetail(id) {
 				uni.navigateTo({
 					url: `/pages/lawyer/cases/detail?id=${id}`
@@ -184,7 +430,7 @@
 			closeUpdatePopup() {
 				this.$refs.updatePopup.close()
 			},
-			submitUpdate() {
+			async submitUpdate() {
 				if (!this.updateForm.progress.trim()) {
 					uni.showToast({
 						title: '请输入当前进度',
@@ -201,12 +447,27 @@
 					return
 				}
 				
-				// 模拟提交更新
 				uni.showLoading({
 					title: '更新中...'
 				})
 				
-				setTimeout(() => {
+				try {
+					// 构建更新数据
+					const updateData = {
+						caseId: this.currentCase.id,
+						progress: this.updateForm.progress.trim(),
+						description: this.updateForm.description.trim(),
+						updateTime: new Date().toISOString()
+					}
+					
+					console.log('正在更新案例进度：', updateData)
+					
+					// 这里可以调用更新案例进度的API
+					// const response = await updateCaseProgress(updateData)
+					
+					// 模拟API调用成功
+					await new Promise(resolve => setTimeout(resolve, 1000))
+					
 					uni.hideLoading()
 					uni.showToast({
 						title: '更新成功',
@@ -217,10 +478,37 @@
 					const index = this.caseList.findIndex(item => item.id === this.currentCase.id)
 					if (index !== -1) {
 						this.caseList[index].progress = this.updateForm.progress
+						// 如果有时间戳，也可以更新
+						if (this.caseList[index].updateTime) {
+							this.caseList[index].updateTime = updateData.updateTime
+						}
+					}
+					
+					// 清除相关缓存，确保下次加载最新数据
+					try {
+						uni.removeStorageSync(this.cacheKey)
+					} catch (error) {
+						console.error('清除缓存失败：', error)
 					}
 					
 					this.closeUpdatePopup()
-				}, 1500)
+					
+				} catch (error) {
+					console.error('更新案例进度失败：', error)
+					uni.hideLoading()
+					uni.showToast({
+						title: '更新失败，请重试',
+						icon: 'none',
+						duration: 2000
+					})
+				}
+			},
+			
+			// 页面销毁时清理定时器
+			onUnload() {
+				if (this.searchTimeout) {
+					clearTimeout(this.searchTimeout)
+				}
 			}
 		}
 	}

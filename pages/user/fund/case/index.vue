@@ -1,5 +1,5 @@
 <template>
-  <view class="case-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <view class="case-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
     <!-- iOS 状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -142,21 +142,32 @@ export default {
       this.loading = true
       
       try {
-        // 尝试从API获取数据
-        const res = await request({
-          url: '/api/help-cases',
-          method: 'GET',
-          data: {
-            page: this.page,
-            pageSize: this.pageSize
-          }
+        // 导入统计API模块
+        const statisticsApi = (await import('@/api/modules/statistics.js')).default
+        
+        // 使用帮扶案例统计接口
+        const res = await statisticsApi.getAssistanceCases({
+          page: this.page,
+          size: this.pageSize,
+          serviceType: this.currentFilter === 'all' ? undefined : this.currentFilter
         })
         
-        if (res && res.length > 0) {
-          this.caseList = [...this.caseList, ...res]
+        if (res && res.data && res.data.length > 0) {
+          // 转换API数据格式为页面需要的格式
+          const formattedData = res.data.map(item => ({
+            id: item.id,
+            name: item.applicantName || item.userName || '匿名用户',
+            location: item.location || item.city || '未知地区',
+            helpType: item.serviceType || item.assistanceType || '帮扶服务',
+            description: item.description || item.summary || '帮助脱贫',
+            dateRange: `${item.startDate || item.createdAt} - ${item.endDate || item.updatedAt}`,
+            type: this.mapServiceTypeToFilter(item.serviceType)
+          }))
+          
+          this.caseList = [...this.caseList, ...formattedData]
           this.page++
           
-          if (res.length < this.pageSize) {
+          if (res.data.length < this.pageSize) {
             this.noMore = true
           }
         } else {
@@ -164,7 +175,7 @@ export default {
         }
       } catch (error) {
         console.error('获取案例数据失败：', error)
-        // 使用模拟数据
+        // API调用失败时使用模拟数据
         this.loadMockData()
       }
       

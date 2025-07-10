@@ -35,7 +35,7 @@
             </view>
             <view class="text-content">
               <text class="main-text">按时完成信用卡还款</text>
-              <text class="sub-text">{{ isReminderSet ? `下次还款日期${paymentDayText}号` : '点击设置提醒' }}</text>
+              <text class="sub-text">{{ isReminderSet ? '下次还款日期' + paymentDayText + '号' : '点击设置提醒' }}</text>
             </view>
           </view>
           <view class="card-right">
@@ -134,9 +134,10 @@ export default {
   },
   data() {
     return {
-      remainingDebt: 85166,
+      remainingDebt: 0,
       selectedDate: null,
       isReminderSet: false,
+      loading: true,
       creditKnowledge: {
         question1: {
           question: "什么是信用?",
@@ -179,7 +180,41 @@ export default {
       return date.getDate()
     }
   },
+  async onLoad() {
+    await this.loadCreditData()
+  },
   methods: {
+    // 加载信用数据
+    async loadCreditData() {
+      try {
+        // 导入青年帮扶API模块
+        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
+        
+        // 获取用户信用评分和债务信息
+        const creditRes = await youthAssistanceApi.getUserCreditScore()
+        
+        if (creditRes && creditRes.success) {
+          this.remainingDebt = creditRes.data.remainingDebt || 0
+          
+          // 如果有还款提醒设置，加载提醒信息
+          if (creditRes.data.paymentReminder) {
+            this.selectedDate = creditRes.data.paymentReminder.date
+            this.isReminderSet = true
+          }
+        } else {
+          // API调用失败时使用默认值
+          console.warn('获取信用数据失败，使用默认值')
+          this.remainingDebt = 85166
+        }
+      } catch (error) {
+        console.error('加载信用数据失败：', error)
+        // 使用默认值
+        this.remainingDebt = 85166
+      } finally {
+        this.loading = false
+      }
+    },
+    
     goBack() {
       uni.navigateBack()
     },

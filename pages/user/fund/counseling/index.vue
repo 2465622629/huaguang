@@ -9,7 +9,7 @@
     </view>
     
     <!-- Banner区域 -->
-    <view class="banner" :style="{ backgroundImage: `url(${backgroundImage})` }">
+          <view class="banner" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
       <view class="banner-content">
         <view class="banner-title">Hi, 这是你的专属导师</view>
         <view class="banner-subtitle">无需预约，专属你的心理倾听老师</view>

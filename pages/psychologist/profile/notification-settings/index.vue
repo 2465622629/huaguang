@@ -59,12 +59,14 @@
 
 <script>
 import config from '@/config/index.js'
+import { getPsychologistProfile } from '@/api/modules/psychologist.js'
 
 export default {
   name: 'NotificationSettings',
   data() {
     return {
       config,
+      loading: false,
       // 通知设置状态
       notificationSettings: {
         consultation: true,    // 咨询通知
@@ -86,26 +88,62 @@ export default {
     },
     
     // 开关状态变更处理
-    onSwitchChange(type, value) {
+    async onSwitchChange(type, value) {
       console.log(`${type} 通知设置变更为: ${value}`)
-      // 这里可以添加保存设置到本地存储或服务器的逻辑
-      this.saveNotificationSettings()
+      // 实时保存设置到本地存储和服务器
+      await this.saveNotificationSettings()
+    },
+
+    // 加载服务器通知设置
+    async loadServerNotificationSettings() {
+      try {
+        const response = await getPsychologistProfile()
+        const psychologistInfo = response.data || {}
+        
+        // 从服务器数据同步通知设置
+        if (psychologistInfo.notificationSettings) {
+          this.notificationSettings = {
+            ...this.notificationSettings,
+            ...psychologistInfo.notificationSettings
+          }
+        }
+        
+        console.log('服务器通知设置加载成功:', this.notificationSettings)
+      } catch (error) {
+        console.error('服务器通知设置加载失败:', error)
+        // 如果服务器加载失败，使用本地存储的设置
+      }
     },
     
     // 保存通知设置
-    saveNotificationSettings() {
+    async saveNotificationSettings() {
+      if (this.loading) return
+      
+      this.loading = true
       try {
-        uni.setStorageSync('lawyer_notification_settings', this.notificationSettings)
-        console.log('通知设置已保存')
+        // 保存到本地存储
+        uni.setStorageSync('psychologist_notification_settings', this.notificationSettings)
+        
+        // TODO: 这里可以调用服务器API保存通知设置
+        // 由于当前API模块中没有专门的通知设置接口，暂时只保存到本地
+        // 可以考虑扩展 updatePsychologistProfile API 来包含通知设置
+        
+        console.log('通知设置已保存:', this.notificationSettings)
       } catch (error) {
         console.error('保存通知设置失败:', error)
+        uni.showToast({
+          title: '保存失败',
+          icon: 'none'
+        })
+      } finally {
+        this.loading = false
       }
     },
     
     // 加载通知设置
     loadNotificationSettings() {
       try {
-        const savedSettings = uni.getStorageSync('lawyer_notification_settings')
+        const savedSettings = uni.getStorageSync('psychologist_notification_settings')
         if (savedSettings) {
           this.notificationSettings = { ...this.notificationSettings, ...savedSettings }
         }
@@ -118,6 +156,8 @@ export default {
   onLoad() {
     // 页面加载时读取保存的设置
     this.loadNotificationSettings()
+    // 加载服务器设置
+    this.loadServerNotificationSettings()
   }
 }
 </script>

@@ -88,12 +88,14 @@
 			<!-- 操作按钮 -->
 			<view class="action-button">
 				<uv-button
-					text="点击修改"
+					:text="isLoading ? '修改中...' : '点击修改'"
 					type="primary"
 					shape="circle"
 					size="large"
+					:disabled="isLoading"
+					:loading="isLoading"
 					:customStyle="{
-						backgroundColor: '#007AFF',
+						backgroundColor: isLoading ? '#CCCCCC' : '#007AFF',
 						borderRadius: '25px',
 						height: '50px',
 						width: '280px'
@@ -107,6 +109,7 @@
 
 <script>
 import { staticBaseUrl } from '@/config/index.js'
+import { changePassword } from '@/api/modules/user.js'
 
 export default {
 	data() {
@@ -121,7 +124,9 @@ export default {
 			// 密码显示状态
 			showCurrentPassword: false,
 			showNewPassword: false,
-			showConfirmPassword: false
+			showConfirmPassword: false,
+			// 加载状态
+			isLoading: false
 		}
 	},
 	onLoad() {
@@ -151,14 +156,54 @@ export default {
 		},
 		
 		// 处理修改密码
-		handleChangePassword() {
+		async handleChangePassword() {
+			// 防止重复提交
+			if (this.isLoading) {
+				return
+			}
+			
 			// 表单验证
+			if (!this.validateForm()) {
+				return
+			}
+			
+			this.isLoading = true
+			
+			try {
+				// 调用API修改密码
+				await this.callApiWithRetry()
+				
+				// 修改成功
+				uni.showToast({
+					title: '密码修改成功',
+					icon: 'success',
+					duration: 2000
+				})
+				
+				// 清除表单数据
+				this.clearForm()
+				
+				// 延迟返回上一页
+				setTimeout(() => {
+					uni.navigateBack()
+				}, 2000)
+				
+			} catch (error) {
+				console.error('修改密码失败：', error)
+				this.handleChangeError(error)
+			} finally {
+				this.isLoading = false
+			}
+		},
+		
+		// 表单验证
+		validateForm() {
 			if (!this.formData.currentPassword) {
 				uni.showToast({
 					title: '请输入当前密码',
 					icon: 'none'
 				})
-				return
+				return false
 			}
 			
 			if (!this.formData.newPassword) {
@@ -166,7 +211,7 @@ export default {
 					title: '请输入新密码',
 					icon: 'none'
 				})
-				return
+				return false
 			}
 			
 			if (!this.formData.confirmPassword) {
@@ -174,7 +219,7 @@ export default {
 					title: '请确认新密码',
 					icon: 'none'
 				})
-				return
+				return false
 			}
 			
 			if (this.formData.newPassword !== this.formData.confirmPassword) {
@@ -182,21 +227,99 @@ export default {
 					title: '两次密码输入不一致',
 					icon: 'none'
 				})
-				return
+				return false
 			}
 			
-			// 这里可以调用API进行密码修改
-			console.log('修改密码数据：', this.formData)
+			// 密码强度验证
+			if (this.formData.newPassword.length < 6) {
+				uni.showToast({
+					title: '新密码长度不能少于6位',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			if (this.formData.currentPassword === this.formData.newPassword) {
+				uni.showToast({
+					title: '新密码不能与当前密码相同',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			return true
+		},
+		
+		// 智能API调用重试机制
+		async callApiWithRetry(maxRetries = 3) {
+			let lastError = null
+			
+			for (let attempt = 1; attempt <= maxRetries; attempt++) {
+				try {
+					console.log(`修改密码API调用 - 第${attempt}次尝试`)
+					
+					const response = await changePassword({
+						oldPassword: this.formData.currentPassword,
+						newPassword: this.formData.newPassword
+					})
+					
+					console.log('密码修改成功：', response)
+					return response
+					
+				} catch (error) {
+					console.error(`第${attempt}次API调用失败：`, error)
+					lastError = error
+					
+					// 如果不是最后一次尝试，等待后重试
+					if (attempt < maxRetries) {
+						const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000) + Math.random() * 1000
+						console.log(`等待${Math.round(delay)}ms后重试...`)
+						await new Promise(resolve => setTimeout(resolve, delay))
+					}
+				}
+			}
+			
+			throw lastError
+		},
+		
+		// 错误处理
+		handleChangeError(error) {
+			let errorMessage = '密码修改失败，请稍后重试'
+			
+			if (error && error.message) {
+				// 根据错误类型提供具体提示
+				if (error.message.includes('当前密码错误') || error.message.includes('password incorrect')) {
+					errorMessage = '当前密码输入错误，请重新输入'
+				} else if (error.message.includes('密码格式') || error.message.includes('password format')) {
+					errorMessage = '新密码格式不符合要求'
+				} else if (error.message.includes('网络') || error.message.includes('network')) {
+					errorMessage = '网络连接异常，请检查网络后重试'
+				} else if (error.message.includes('权限') || error.message.includes('permission')) {
+					errorMessage = '权限不足，请重新登录后重试'
+				} else if (error.message.includes('频繁') || error.message.includes('frequent')) {
+					errorMessage = '操作过于频繁，请稍后再试'
+				} else if (error.message.includes('服务器') || error.message.includes('server')) {
+					errorMessage = '服务器繁忙，请稍后重试'
+				}
+			}
 			
 			uni.showToast({
-				title: '密码修改成功',
-				icon: 'success'
+				title: errorMessage,
+				icon: 'none',
+				duration: 3000
 			})
-			
-			// 延迟返回上一页
-			setTimeout(() => {
-				uni.navigateBack()
-			}, 1500)
+		},
+		
+		// 清除表单数据
+		clearForm() {
+			this.formData = {
+				currentPassword: '',
+				newPassword: '',
+				confirmPassword: ''
+			}
+			this.showCurrentPassword = false
+			this.showNewPassword = false
+			this.showConfirmPassword = false
 		}
 	},
 	computed: {

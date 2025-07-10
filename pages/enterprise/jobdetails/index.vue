@@ -1,5 +1,5 @@
 <template>
-  <view class="job-detail-container" :style="{ backgroundImage: `url(${backgroundImageUrl})` }">
+  <view class="job-detail-container" :style="{ backgroundImage: 'url(' + backgroundImageUrl + ')' }">
     <!-- iOS状态栏占位 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -114,6 +114,19 @@ export default {
       statusBarHeight: 0,
       jobId: '',
       loading: false,
+      saving: false,
+      applying: false,
+      // 企业级缓存管理
+      cacheData: null,
+      cacheTimestamp: 0,
+      cacheExpiration: 10 * 60 * 1000, // 10分钟缓存
+      // 重试机制配置
+      maxRetries: 3,
+      retryDelays: [1000, 2000, 4000], // 指数退避延迟
+      // 错误状态管理
+      loadError: null,
+      saveError: null,
+      applyError: null,
       jobInfo: {
         title: '法务专员',
         location: '',
@@ -208,6 +221,62 @@ export default {
   
   methods: {
     /**
+     * 企业级API调用重试机制
+     * @param {Function} apiCall - API调用函数
+     * @param {Array} params - API参数
+     * @param {number} retryCount - 当前重试次数
+     */
+    async callApiWithRetry(apiCall, params = [], retryCount = 0) {
+      try {
+        return await apiCall(...params)
+      } catch (error) {
+        console.error(`API调用失败 (尝试 ${retryCount + 1}/${this.maxRetries + 1}):`, error)
+        
+        if (retryCount < this.maxRetries) {
+          // 添加随机抖动避免雷群效应
+          const baseDelay = this.retryDelays[retryCount] || 4000
+          const jitter = Math.random() * 1000
+          const delay = baseDelay + jitter
+          
+          console.log(`${delay}ms后进行第${retryCount + 1}次重试...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          
+          return this.callApiWithRetry(apiCall, params, retryCount + 1)
+        }
+        
+        throw error
+      }
+    },
+
+    /**
+     * 智能缓存数据获取
+     * @param {string} key - 缓存键
+     */
+    getCachedData(key) {
+      const now = Date.now()
+      if (this.cacheData && this.cacheData[key] &&
+          (now - this.cacheTimestamp) < this.cacheExpiration) {
+        console.log(`使用缓存数据: ${key}`)
+        return this.cacheData[key]
+      }
+      return null
+    },
+
+    /**
+     * 设置缓存数据
+     * @param {string} key - 缓存键
+     * @param {any} data - 缓存数据
+     */
+    setCachedData(key, data) {
+      if (!this.cacheData) {
+        this.cacheData = {}
+      }
+      this.cacheData[key] = data
+      this.cacheTimestamp = Date.now()
+      console.log(`缓存数据已更新: ${key}`)
+    },
+
+    /**
      * 获取系统状态栏高度
      */
     getStatusBarHeight() {
@@ -225,43 +294,315 @@ export default {
     },
     
     /**
-     * 加载职位详情数据
+     * 企业级职位详情加载 - 多层数据保护
      */
     async loadJobDetail() {
       if (!this.jobId) {
         console.log('未提供职位ID，使用默认数据')
+        this.handleLoadError('缺少职位ID参数')
         return
       }
       
+      this.loading = true
+      this.loadError = null
+      
       try {
-        this.loading = true
-        const response = await enterpriseApi.getJobDetail(this.jobId)
+        // 第一层：尝试从缓存获取数据
+        const cacheKey = `job_detail_${this.jobId}`
+        const cachedData = this.getCachedData(cacheKey)
+        
+        if (cachedData) {
+          this.updateJobInfo(cachedData)
+          this.loading = false
+          // 后台静默更新数据
+          this.silentUpdateJobDetail()
+          return
+        }
+        
+        // 第二层：API调用获取数据
+        const response = await this.callApiWithRetry(
+          enterpriseApi.getJobDetail.bind(enterpriseApi),
+          [this.jobId]
+        )
         
         if (response && response.data) {
-          this.jobInfo = {
-            ...this.jobInfo,
-            ...response.data
-          }
+          const jobData = response.data
+          this.updateJobInfo(jobData)
+          this.setCachedData(cacheKey, jobData)
+          
+          // 记录职位浏览量（异步，不影响主流程）
+          this.incrementViewCount().catch(error => {
+            console.warn('浏览量记录失败:', error)
+          })
+          
+          uni.showToast({
+            title: '职位详情加载成功',
+            icon: 'success',
+            duration: 1500
+          })
+        } else {
+          throw new Error('职位数据格式异常')
         }
       } catch (error) {
         console.error('加载职位详情失败:', error)
-        uni.showToast({
-          title: '加载失败，请重试',
-          icon: 'none'
-        })
+        this.handleLoadError(error)
+        
+        // 第三层：使用默认数据作为降级方案
+        this.useDefaultJobData()
       } finally {
         this.loading = false
       }
     },
+
+    /**
+     * 静默更新职位详情数据
+     */
+    async silentUpdateJobDetail() {
+      try {
+        const response = await enterpriseApi.getJobDetail(this.jobId)
+        if (response && response.data) {
+          const cacheKey = `job_detail_${this.jobId}`
+          this.setCachedData(cacheKey, response.data)
+          console.log('职位详情数据已静默更新')
+        }
+      } catch (error) {
+        console.warn('静默更新失败:', error)
+      }
+    },
+
+    /**
+     * 更新职位信息
+     * @param {Object} jobData - 职位数据
+     */
+    updateJobInfo(jobData) {
+      this.jobInfo = {
+        title: jobData.title || this.jobInfo.title,
+        location: jobData.location || this.jobInfo.location,
+        experience: jobData.workExperience || jobData.experience || this.jobInfo.experience,
+        education: jobData.educationRequirement || jobData.education || this.jobInfo.education,
+        description: jobData.description || this.jobInfo.description,
+        educationRequirement: jobData.requirements || jobData.educationRequirement || this.jobInfo.educationRequirement,
+        experienceRequirement: jobData.workExperience || jobData.experienceRequirement || this.jobInfo.experienceRequirement
+      }
+    },
+
+    /**
+     * 使用默认职位数据
+     */
+    useDefaultJobData() {
+      console.log('使用默认职位数据作为降级方案')
+      // 当前已有默认数据，无需额外处理
+      uni.showToast({
+        title: '已加载默认职位信息',
+        icon: 'none',
+        duration: 2000
+      })
+    },
+
+    /**
+     * 处理加载错误
+     * @param {Error|string} error - 错误信息
+     */
+    handleLoadError(error) {
+      this.loadError = error
+      const errorMessage = this.getErrorMessage(error)
+      
+      uni.showToast({
+        title: errorMessage,
+        icon: 'none',
+        duration: 3000
+      })
+    },
     
     /**
-     * 处理保存按钮点击
+     * 企业级浏览量记录 - 带重试机制
      */
-    handleSave() {
+    async incrementViewCount() {
+      try {
+        await this.callApiWithRetry(
+          enterpriseApi.incrementJobViewCount.bind(enterpriseApi),
+          [this.jobId]
+        )
+        console.log('职位浏览量记录成功')
+      } catch (error) {
+        console.error('记录浏览量失败:', error)
+        // 浏览量记录失败不影响主要功能，只记录日志
+      }
+    },
+    
+    /**
+     * 企业级简历投递 - 完整验证和错误处理
+     */
+    async handleSave() {
+      // 基础验证
+      if (!this.jobId) {
+        this.handleApplyError('职位信息异常，无法投递简历')
+        return
+      }
+      
+      if (this.applying) {
+        uni.showToast({
+          title: '正在投递中，请稍候...',
+          icon: 'none'
+        })
+        return
+      }
+      
+      // 确认投递
+      const confirmed = await this.showConfirmDialog(
+        '确认投递',
+        `确定要投递简历到"${this.jobInfo.title}"职位吗？`
+      )
+      
+      if (!confirmed) {
+        return
+      }
+      
+      this.applying = true
+      this.applyError = null
+      
+      try {
+        uni.showLoading({
+          title: '投递中...',
+          mask: true
+        })
+        
+        // 构建投递数据
+        const applicationData = {
+          jobId: this.jobId,
+          coverLetter: `我对${this.jobInfo.title}职位非常感兴趣，希望能够加入贵公司。我具备相关工作经验和专业技能，期待能有机会为贵公司贡献力量。`,
+          applyTime: new Date().toISOString()
+        }
+        
+        // 企业级API调用
+        const response = await this.callApiWithRetry(
+          enterpriseApi.applyJob.bind(enterpriseApi),
+          [applicationData]
+        )
+        
+        if (response && (response.success || response.code === 200)) {
+          uni.showToast({
+            title: '简历投递成功！',
+            icon: 'success',
+            duration: 2000
+          })
+          
+          // 记录投递成功状态
+          this.recordApplicationSuccess()
+          
+          // 延迟返回上一页
+          setTimeout(() => {
+            uni.navigateBack({
+              delta: 1
+            })
+          }, 2000)
+        } else {
+          throw new Error(response?.message || response?.msg || '投递失败，请重试')
+        }
+      } catch (error) {
+        console.error('投递简历失败:', error)
+        this.handleApplyError(error)
+      } finally {
+        this.applying = false
+        uni.hideLoading()
+      }
+    },
+
+    /**
+     * 记录投递成功状态
+     */
+    recordApplicationSuccess() {
+      try {
+        // 可以在这里添加本地存储记录
+        const applicationRecord = {
+          jobId: this.jobId,
+          jobTitle: this.jobInfo.title,
+          applyTime: new Date().toISOString(),
+          status: 'applied'
+        }
+        
+        // 存储到本地缓存
+        const existingRecords = uni.getStorageSync('job_applications') || []
+        existingRecords.push(applicationRecord)
+        uni.setStorageSync('job_applications', existingRecords)
+        
+        console.log('投递记录已保存到本地')
+      } catch (error) {
+        console.warn('保存投递记录失败:', error)
+      }
+    },
+
+    /**
+     * 处理投递错误
+     * @param {Error|string} error - 错误信息
+     */
+    handleApplyError(error) {
+      this.applyError = error
+      const errorMessage = this.getErrorMessage(error)
+      
       uni.showToast({
-        title: '保存成功',
-        icon: 'success'
+        title: errorMessage,
+        icon: 'none',
+        duration: 3000
       })
+    },
+
+    /**
+     * 显示确认对话框
+     * @param {string} title - 标题
+     * @param {string} content - 内容
+     */
+    showConfirmDialog(title, content) {
+      return new Promise((resolve) => {
+        uni.showModal({
+          title,
+          content,
+          confirmText: '确定',
+          cancelText: '取消',
+          success: (res) => {
+            resolve(res.confirm)
+          },
+          fail: () => {
+            resolve(false)
+          }
+        })
+      })
+    },
+
+    /**
+     * 统一错误消息处理
+     * @param {Error|string} error - 错误对象或字符串
+     */
+    getErrorMessage(error) {
+      if (typeof error === 'string') {
+        return error
+      }
+      
+      if (error && error.message) {
+        // 网络错误
+        if (error.message.includes('Network Error') || error.message.includes('timeout')) {
+          return '网络连接异常，请检查网络后重试'
+        }
+        
+        // 权限错误
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          return '登录已过期，请重新登录'
+        }
+        
+        // 服务器错误
+        if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+          return '服务器繁忙，请稍后重试'
+        }
+        
+        // 数据验证错误
+        if (error.message.includes('400') || error.message.includes('Bad Request')) {
+          return '请求参数异常，请重试'
+        }
+        
+        return error.message
+      }
+      
+      return '操作失败，请重试'
     }
   }
 }

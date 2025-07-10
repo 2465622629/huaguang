@@ -8,7 +8,8 @@ export const API_CONFIG = {
 }
 
 //静态图标地址baseurl
-export const staticBaseUrl = 'http://localhost:3000/static'
+export const staticBaseUrl = 'https://huaguang-admin.djjp.cn/static'
+
 
 // 导出所有配置
 export default {

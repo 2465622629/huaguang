@@ -514,6 +514,51 @@ export const getEnterpriseApplications = (params) => {
 }
 
 // 导出所有企业相关API
+/**
+ * 获取个性化推荐职位
+ * @param {Object} params 推荐参数
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.pageSize=20] 每页大小
+ * @param {string} [params.sortType='recommended'] 排序类型
+ * @param {Array} [params.filters=[]] 筛选条件
+ * @param {Object} [params.userPreferences={}] 用户偏好
+ * @returns {Promise} 推荐职位列表
+ */
+export const getRecommendedJobs = (params) => {
+  return get('/enterprise/jobs/recommended', params)
+}
+
+/**
+ * 获取用户求职偏好设置
+ * @returns {Promise} 用户偏好数据
+ */
+export const getUserJobPreferences = () => {
+  return get('/user/preferences')
+}
+
+/**
+ * 上报用户行为数据
+ * @param {Object} data 行为数据
+ * @param {string} data.action 行为类型（view/apply/favorite/share）
+ * @param {string|number} data.jobId 职位ID
+ * @param {number} data.timestamp 时间戳
+ * @param {Object} [data.extra] 额外数据
+ * @returns {Promise} 上报结果
+ */
+export const reportUserBehavior = (data) => {
+  return post('/user/behavior/report', data)
+}
+
+/**
+ * 获取热门搜索关键词
+ * @param {Object} params 查询参数
+ * @param {number} [params.limit=10] 返回数量限制
+ * @returns {Promise} 热门关键词列表
+ */
+export const getHotSearchKeywords = (params) => {
+  return get('/enterprise/search/hot-keywords', params)
+}
+
 export default {
   getEnterpriseInfo,
   updateEnterpriseInfo,
@@ -557,6 +602,10 @@ export default {
   getJobDetail,
   searchJobs,
   getHotJobs,
+  getRecommendedJobs,
+  getUserJobPreferences,
+  reportUserBehavior,
+  getHotSearchKeywords,
   // 申请记录管理接口
   getApplicationDetail,
   getUserApplications,

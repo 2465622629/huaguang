@@ -39,7 +39,7 @@
       <view class="feature-item" style="background-color: #A8C8FF;" @click="handleResumeClick">
         <view class="feature-header">
           <text class="feature-title">投递简历</text>
-          <uv-image class="feature-icon" :src="`${config.staticBaseUrl}/icons/resume.png`" width="120rpx"
+                      <uv-image class="feature-icon" :src="config.staticBaseUrl + '/icons/resume.png'" width="120rpx"
             height="120rpx" mode="aspectFit"></uv-image>
         </view>
         <view class="feature-desc">
@@ -50,7 +50,7 @@
       <view class="feature-item" style="background-color: #A8E3FF;" @click="handleSkillTrainingClick">
         <view class="feature-header">
           <text class="feature-title">技能网课</text>
-          <uv-image class="feature-icon" :src="`${config.staticBaseUrl}/icons/course.png`" width="120rpx"
+                      <uv-image class="feature-icon" :src="config.staticBaseUrl + '/icons/course.png'" width="120rpx"
             height="120rpx" mode="aspectFit"></uv-image>
         </view>
         <view class="feature-desc">
@@ -62,7 +62,7 @@
 
     <!-- Banner图 -->
     <view class="banner-section">
-      <uv-image :src="`${config.staticBaseUrl}/banner/bottom-banner.png`" width="100%" height="200rpx" mode="aspectFill"
+              <uv-image :src="config.staticBaseUrl + '/banner/bottom-banner.png'" width="100%" height="200rpx" mode="aspectFill"
         radius="16rpx"></uv-image>
     </view>
 
@@ -70,7 +70,7 @@
     <view class="lawyer-section">
       <view class="section-header">
         <view class="header-left">
-          <uv-image :src="`${config.staticBaseUrl}/icons/lawyer.png`" width="40rpx" height="40rpx"
+          <uv-image :src="config.staticBaseUrl + '/icons/lawyer.png'" width="40rpx" height="40rpx"
             mode="aspectFit"></uv-image>
           <text class="header-title">热门律师推荐</text>
         </view>
@@ -93,12 +93,12 @@
     <view class="job-section">
       <view class="section-header">
         <view class="header-left">
-          <uv-image :src="`${config.staticBaseUrl}/icons/career.png`" width="40rpx" height="40rpx"
+          <uv-image :src="config.staticBaseUrl + '/icons/career.png'" width="40rpx" height="40rpx"
             mode="aspectFit"></uv-image>
           <text class="header-title">热门职业推荐</text>
         </view>
         <view class="header-right">
-          <view class="more-btn" @click="handleLawyerMoreClick">
+          <view class="more-btn" @click="handleJobMoreClick">
             <text class="more-text">了解更多</text>
             <view class="triangle"></view>
           </view>
@@ -106,8 +106,12 @@
       </view>
 
       <uv-scroll-list :indicator="false" indicatorColor="#fff0f0" indicatorActiveColor="#f56c6c">
-        <view v-for="(item, index) in jobList" :key="index" class="job-item">
+        <view v-for="(item, index) in jobList" :key="index" class="job-item" @click="handleJobItemClick(item)">
           <uv-image :src="item.image" mode="aspectFill" width="200rpx" height="200rpx" radius="16rpx"></uv-image>
+          <view class="job-info-overlay">
+            <text class="job-title">{{ item.title || '热门职位' }}</text>
+            <text class="job-company">{{ item.company || '知名企业' }}</text>
+          </view>
         </view>
       </uv-scroll-list>
     </view>
@@ -120,6 +124,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
+import { getHomePageData, getHotLawyers, getHotJobs, getBanners } from '@/api/modules/home.js'
 
 export default {
   components: {
@@ -186,25 +191,128 @@ export default {
     }
   },
   onLoad() {
-    this.getRandomImages()
+    this.loadHomeData()
   },
   methods: {
+    // 加载主页数据
+    async loadHomeData() {
+      try {
+        // 并行加载多个接口数据
+        const [homeData, banners, hotLawyers, hotJobs] = await Promise.allSettled([
+          this.getHomePageData(),
+          this.getBanners(),
+          this.getHotLawyers(),
+          this.getHotJobs()
+        ])
+        
+        console.log('主页数据加载完成')
+      } catch (error) {
+        console.error('加载主页数据失败：', error)
+        // 如果API失败，使用默认数据
+        this.getRandomImages()
+      }
+    },
+    
+    // 获取主页数据
+    async getHomePageData() {
+      try {
+        const response = await getHomePageData({
+          platform: 'app',
+          userType: 'individual'
+        })
+        console.log('主页数据：', response)
+        
+        // 根据API返回的数据更新页面内容
+        if (response && response.data) {
+          // 更新通知栏内容
+          if (response.data.notices && response.data.notices.length > 0) {
+            this.noticeList = response.data.notices
+          }
+        }
+      } catch (error) {
+        console.error('获取主页数据失败：', error)
+      }
+    },
+    
+    // 获取轮播图
+    async getBanners() {
+      try {
+        const response = await getBanners({
+          position: 'home_banner',
+          active: true
+        })
+        console.log('轮播图数据：', response)
+        
+        if (response && response.data && response.data.length > 0) {
+          this.swiperList = response.data.map(banner => banner.imageUrl || banner.image)
+        } else {
+          // 如果没有轮播图数据，使用随机图片
+          this.getRandomImages()
+        }
+      } catch (error) {
+        console.error('获取轮播图失败：', error)
+        this.getRandomImages()
+      }
+    },
+    
+    // 获取热门律师
+    async getHotLawyers() {
+      try {
+        const response = await getHotLawyers({
+          limit: 5
+        })
+        console.log('热门律师数据：', response)
+        
+        if (response && response.data && response.data.length > 0) {
+          this.lawyerList = response.data.map(lawyer => ({
+            id: lawyer.id,
+            image: lawyer.avatar || lawyer.image || `${config.staticBaseUrl}/lawyer1.png`,
+            name: lawyer.name,
+            specialty: lawyer.specialty
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门律师失败：', error)
+      }
+    },
+    
+    // 获取热门职位
+    async getHotJobs() {
+      try {
+        const response = await getHotJobs({
+          limit: 5
+        })
+        console.log('热门职位数据：', response)
+        
+        if (response && response.data && response.data.length > 0) {
+          this.jobList = response.data.map(job => ({
+            id: job.id,
+            image: job.image || "https://via.placeholder.com/200x200.png/3c9cff/fff",
+            title: job.title,
+            company: job.company
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门职位失败：', error)
+      }
+    },
+    
+    // 备用方法：获取随机图片
     async getRandomImages() {
       try {
-        console.log('获取图片')
-        // 使用Picsum Photos API获取随机图片
+        console.log('获取随机图片')
         const images = []
         for (let i = 0; i < 3; i++) {
-          const width = 750 // 适配屏幕宽度
-          const height = 300 // 适配轮播图高度
-          const randomId = Math.floor(Math.random() * 1000) // 添加随机ID
+          const width = 750
+          const height = 300
+          const randomId = Math.floor(Math.random() * 1000)
           const url = `https://picsum.photos/seed/${randomId}/${width}/${height}`
           images.push(url)
         }
         this.swiperList = images
-        console.log('获取图片成功', this.swiperList)
+        console.log('获取随机图片成功', this.swiperList)
       } catch (error) {
-        console.error('获取图片失败：', error)
+        console.error('获取随机图片失败：', error)
         this.swiperList = []
       }
     },
@@ -292,6 +400,50 @@ export default {
           })
         }
       })
+    },
+    
+    // 处理职位更多点击
+    handleJobMoreClick() {
+      // 跳转到职位搜索结果页面
+      uni.navigateTo({
+        url: '/pages/user/index/job-search-result/index?keyword=热门职位',
+        fail: (err) => {
+          console.error('跳转失败：', err)
+          uni.showToast({
+            icon: 'none',
+            title: '页面跳转失败'
+          })
+        }
+      })
+    },
+    
+    // 处理职位项点击
+    handleJobItemClick(job) {
+      if (job.id) {
+        // 如果有职位ID，跳转到职位详情页
+        uni.navigateTo({
+          url: `/pages/user/index/job-detail/index?id=${job.id}`,
+          fail: (err) => {
+            console.error('跳转失败：', err)
+            uni.showToast({
+              icon: 'none',
+              title: '页面跳转失败'
+            })
+          }
+        })
+      } else {
+        // 如果没有职位ID，跳转到求职平台
+        uni.navigateTo({
+          url: '/pages/user/index/job-platform/index',
+          fail: (err) => {
+            console.error('跳转失败：', err)
+            uni.showToast({
+              icon: 'none',
+              title: '页面跳转失败'
+            })
+          }
+        })
+      }
     }
   }
 }
@@ -600,9 +752,46 @@ export default {
 
   .job-item {
     margin-right: 20rpx;
+    position: relative;
+    cursor: pointer;
 
     &:last-child {
       margin-right: 0;
+    }
+
+    .job-info-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+      padding: 20rpx 10rpx 10rpx;
+      border-radius: 0 0 16rpx 16rpx;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .job-title {
+        font-size: 24rpx;
+        color: #ffffff;
+        font-weight: 500;
+        margin-bottom: 4rpx;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180rpx;
+      }
+
+      .job-company {
+        font-size: 20rpx;
+        color: #cccccc;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180rpx;
+      }
     }
   }
 }

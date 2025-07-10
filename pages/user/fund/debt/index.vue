@@ -1,5 +1,5 @@
 <template>
-  <view class="debt-apply-page" :style="{ backgroundImage: `url(${backgroundImage})` }">
+  <view class="debt-apply-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -55,13 +55,19 @@
 <script>
 import config from '@/config/index.js'
 import { staticBaseUrl } from '@/config/index.js'
+import { uploadFile } from '@/utils/file.js'
 
 export default {
   name: 'DebtApplyPage',
   data() {
     return {
       config: config,
-      backgroundImage: staticBaseUrl + '/apply-bg.png'
+      backgroundImage: staticBaseUrl + '/apply-bg.png',
+      formData: {
+        idCardFiles: [], // 身份证文件列表
+        debtProofFiles: [] // 债务证明文件列表
+      },
+      uploading: false
     }
   },
   methods: {
@@ -75,23 +81,171 @@ export default {
         }
       })
     },
+    
+    // 身份证上传
     handleIdCardUpload() {
-      uni.showToast({
-        title: '身份证上传功能开发中',
-        icon: 'none'
+      uni.chooseImage({
+        count: 2, // 身份证正反面
+        sizeType: ['original', 'compressed'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          this.uploading = true
+          try {
+            const uploadPromises = res.tempFilePaths.map(async (filePath, index) => {
+              const uploadParams = {
+                file: filePath,
+                businessType: 'DEBT_RELIEF_ID_CARD'
+              }
+              const result = await uploadFile(uploadParams)
+              return {
+                url: result.fileUrl || result.url,
+                fileId: result.fileId || result.id,
+                type: index === 0 ? 'front' : 'back'
+              }
+            })
+            
+            const uploadResults = await Promise.all(uploadPromises)
+            this.formData.idCardFiles = uploadResults
+            
+            uni.showToast({
+              title: '身份证上传成功',
+              icon: 'success'
+            })
+          } catch (error) {
+            console.error('身份证上传失败：', error)
+            uni.showToast({
+              title: '上传失败，请重试',
+              icon: 'none'
+            })
+          } finally {
+            this.uploading = false
+          }
+        },
+        fail: (err) => {
+          console.error('选择图片失败:', err)
+          uni.showToast({
+            title: '选择图片失败',
+            icon: 'none'
+          })
+        }
       })
     },
+    
+    // 债务证明上传
     handleDebtProofUpload() {
-      uni.showToast({
-        title: '债务证明上传功能开发中',
-        icon: 'none'
+      uni.chooseImage({
+        count: 9, // 最多9张
+        sizeType: ['original', 'compressed'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          this.uploading = true
+          try {
+            const uploadPromises = res.tempFilePaths.map(async (filePath) => {
+              const uploadParams = {
+                file: filePath,
+                businessType: 'DEBT_RELIEF_PROOF'
+              }
+              const result = await uploadFile(uploadParams)
+              return {
+                url: result.fileUrl || result.url,
+                fileId: result.fileId || result.id,
+                type: 'proof'
+              }
+            })
+            
+            const uploadResults = await Promise.all(uploadPromises)
+            this.formData.debtProofFiles = [...this.formData.debtProofFiles, ...uploadResults]
+            
+            uni.showToast({
+              title: '债务证明上传成功',
+              icon: 'success'
+            })
+          } catch (error) {
+            console.error('债务证明上传失败：', error)
+            uni.showToast({
+              title: '上传失败，请重试',
+              icon: 'none'
+            })
+          } finally {
+            this.uploading = false
+          }
+        },
+        fail: (err) => {
+          console.error('选择图片失败:', err)
+          uni.showToast({
+            title: '选择图片失败',
+            icon: 'none'
+          })
+        }
       })
     },
-    handleSubmit() {
-      uni.showToast({
-        title: '提交功能开发中',
-        icon: 'none'
-      })
+    
+    // 提交申请
+    async handleSubmit() {
+      // 表单验证
+      if (this.formData.idCardFiles.length === 0) {
+        uni.showToast({
+          title: '请上传身份证照片',
+          icon: 'none'
+        })
+        return
+      }
+      
+      if (this.formData.debtProofFiles.length === 0) {
+        uni.showToast({
+          title: '请上传债务证明材料',
+          icon: 'none'
+        })
+        return
+      }
+      
+      if (this.uploading) {
+        uni.showToast({
+          title: '文件上传中，请稍候',
+          icon: 'none'
+        })
+        return
+      }
+      
+      try {
+        // 导入青年帮扶API模块
+        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
+        
+        // 准备提交数据
+        const submitData = {
+          applicationType: 'DEBT_RELIEF',
+          attachments: [
+            ...this.formData.idCardFiles,
+            ...this.formData.debtProofFiles
+          ]
+        }
+        
+        // 调用债务减免申请接口
+        const res = await youthAssistanceApi.submitDebtReliefApplication(submitData)
+        
+        if (res && res.success) {
+          uni.showToast({
+            title: '债务减免申请提交成功',
+            icon: 'success',
+            duration: 1500
+          })
+          
+          // 延时跳转到申请记录页面
+          setTimeout(() => {
+            uni.navigateTo({
+              url: '/pages/user/fund/records/index'
+            })
+          }, 1500)
+        } else {
+          throw new Error(res.message || '提交失败')
+        }
+      } catch (error) {
+        console.error('债务减免申请提交失败：', error)
+        uni.showToast({
+          title: error.message || '提交失败，请重试',
+          icon: 'none'
+        })
+      }
     }
   }
 }

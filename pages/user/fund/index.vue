@@ -30,7 +30,7 @@
     <view class="case-section">
       <view class="section-header">
         <view class="header-left">
-          <uv-image :src="`${config.staticBaseUrl}/icons/case.png`" width="40rpx" height="40rpx"
+          <uv-image :src="config.staticBaseUrl + '/icons/case.png'" width="40rpx" height="40rpx"
             mode="aspectFit"></uv-image>
           <text class="header-title">帮扶案例</text>
         </view>
@@ -57,7 +57,7 @@
       <view class="feature-left">
         <view class="feature-item" style="background-color: #A8C8FF;" @click="navigateToHelpTypes">
           <view class="feature-header"> <text class="feature-title" style="color: #3c5d9f;">帮扶类型</text> <uv-image
-              class="feature-icon" :src="`${config.staticBaseUrl}/icons/help-type.png`" width="120rpx" height="120rpx"
+              class="feature-icon" :src="config.staticBaseUrl + '/icons/help-type.png'" width="120rpx" height="120rpx"
               mode="aspectFit"></uv-image> </view>
           <view class="feature-desc"> <text style="color: #3c5d9f;">选择帮扶项目</text> <text
               style="color: #3c5d9f;">填写遇到的问题困境</text> </view>
@@ -65,7 +65,7 @@
         <view class="feature-item" style="background-color: #A8E3FF;" @click="navigateToApply">
           <view class="feature-header">
             <text class="feature-title" style="color: #4c3d9f;">帮扶申请</text>
-            <uv-image class="feature-icon" :src="`${config.staticBaseUrl}/icons/help-apply.png`" width="120rpx"
+            <uv-image class="feature-icon" :src="config.staticBaseUrl + '/icons/help-apply.png'" width="120rpx"
               height="120rpx" mode="aspectFit"></uv-image>
           </view>
           <view class="feature-desc">
@@ -80,7 +80,7 @@
           <view class="title-group" style="position: absolute; top: 50%;"> <text class="feature-title"
               style="color: #9f5f3c; font-size: 40rpx; z-index: 1;">在线申请</text> <text class="feature-subtitle"
               style="color: #9f5f3c; z-index: 1; font-size: 36rpx;">信用记录修复</text> </view> <uv-image class="feature-icon"
-            :src="`${config.staticBaseUrl}/icons/credit-repair.png`" width="200rpx" height="200rpx"
+            :src="config.staticBaseUrl + '/icons/credit-repair.png'" width="200rpx" height="200rpx"
             mode="aspectFit"></uv-image>
         </view>
         <view class="feature-desc" style="position: absolute; bottom: 12%;"> <text
@@ -94,7 +94,7 @@
         style="background: linear-gradient(to right, #FF7F7F, #FDDCDC); position: relative; height: 300rpx; border-radius: 20rpx; overflow: visible;"
         @click="navigateToCounseling">
         <view class="counseling-header" style="display: flex; align-items: center; padding: 20rpx 30rpx;">
-          <uv-image :src="`${config.staticBaseUrl}/icons/counseling.png`" width="60rpx" height="60rpx"
+          <uv-image :src="config.staticBaseUrl + '/icons/counseling.png'" width="60rpx" height="60rpx"
             mode="aspectFit"></uv-image>
           <text style="color: #A83333; font-size: 32rpx; margin-left: 12rpx;">心理咨询</text>
         </view>
@@ -109,7 +109,7 @@
         <view class="counseling-footer" style="position: absolute; bottom: 30rpx; left: 30rpx;">
           <text style="color: #A83333; font-size: 32rpx;">勇敢迈出第一步 ></text>
         </view>
-        <uv-image class="counseling-bg" :src="`${config.staticBaseUrl}/icons/counseling-bg.png`" width="240rpx"
+        <uv-image class="counseling-bg" :src="config.staticBaseUrl + '/icons/counseling-bg.png'" width="240rpx"
           height="240rpx" mode="aspectFit" style="position: absolute; right: 20rpx; bottom: 0; z-index: 1;">
         </uv-image>
       </view>
@@ -123,7 +123,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
-import request from '@/utils/request.js'
+import youthAssistanceApi from '@/api/modules/youth-assistance.js'
 
 export default {
   name: 'FundPage',
@@ -160,8 +160,7 @@ export default {
     }
   },
   onLoad() {
-    // this.getStatistics()
-    this.getCaseList()
+    this.loadPageData()
   },
   methods: {
     handleGridClick(index) {
@@ -198,81 +197,135 @@ export default {
         url: '/pages/user/fund/case/index' 
       }) 
     },
-    async getStatistics() {
+    /**
+     * 加载页面数据
+     */
+    async loadPageData() {
       try {
-        const res = await request({
-          url: '/api/help-loan/statistics',
-          method: 'GET'
-        })
-        if (res.code === 0) {
-          this.statistics = res.data
+        // 并行加载主页数据和帮扶案例
+        const [homePageResult, casesResult] = await Promise.allSettled([
+          this.getHomePageData(),
+          this.getCaseList()
+        ])
+        
+        // 处理主页数据结果
+        if (homePageResult.status === 'rejected') {
+          console.error('获取主页数据失败：', homePageResult.reason)
+        }
+        
+        // 处理案例数据结果
+        if (casesResult.status === 'rejected') {
+          console.error('获取帮扶案例失败：', casesResult.reason)
         }
       } catch (error) {
-        console.error('获取统计数据失败：', error)
+        console.error('加载页面数据失败：', error)
       }
     },
+
+    /**
+     * 获取主页数据（包括统计信息）
+     */
+    async getHomePageData() {
+      try {
+        const response = await youthAssistanceApi.getHomePage()
+        if (response.code === 0 && response.data) {
+          // 更新统计数据
+          if (response.data.statistics) {
+            this.statistics = {
+              helpedCount: response.data.statistics.helpedCount || 0,
+              helpingCount: response.data.statistics.helpingCount || 0,
+              totalAmount: response.data.statistics.totalAmount || 0,
+              monthlyNewCount: response.data.statistics.monthlyNewCount || 0
+            }
+          }
+        }
+      } catch (error) {
+        console.error('获取主页数据失败：', error)
+        // 保持默认统计数据
+      }
+    },
+
+    /**
+     * 获取帮扶案例列表
+     */
     async getCaseList() {
       try {
-        const res = await request({
-          url: '/help-loan/cases',
-          method: 'GET'
+        const response = await youthAssistanceApi.getAssistanceRecords({
+          page: 1,
+          size: 10,
+          status: 'completed' // 只获取已完成的帮扶记录作为案例展示
         })
-        if (res.code === 0 && res.data && res.data.length > 0) {
-          let cases = res.data
-          if (cases.length > 3) {
-            // 如果数据超过3个，按金额排序取前三个
-            cases = cases.sort((a, b) => b.loanAmount - a.loanAmount).slice(0, 3)
-          } else if (cases.length < 3) {
-            // 如果数据不足3个，随机重复填充到3个
-            const randomCases = []
-            while (randomCases.length < 3) {
-              const randomIndex = Math.floor(Math.random() * cases.length)
-              randomCases.push(cases[randomIndex])
-            }
-            cases = randomCases
+        
+        if (response.code === 0 && response.data && response.data.records && response.data.records.length > 0) {
+          let cases = response.data.records.map(record => ({
+            maskedName: this.maskName(record.userName || record.applicantName),
+            loanAmount: record.assistanceAmount || record.amount || 0,
+            createTime: this.formatDate(record.completedTime || record.createTime)
+          }))
+          
+          // 按金额排序并取前3个
+          cases = cases.sort((a, b) => b.loanAmount - a.loanAmount).slice(0, 3)
+          
+          // 如果不足3个，用默认数据补充
+          if (cases.length < 3) {
+            const defaultCases = [
+              { maskedName: '张**', loanAmount: 50000, createTime: '2024-03-15' },
+              { maskedName: '李**', loanAmount: 30000, createTime: '2024-03-10' },
+              { maskedName: '王**', loanAmount: 20000, createTime: '2024-03-05' }
+            ]
+            cases = [...cases, ...defaultCases.slice(cases.length)].slice(0, 3)
           }
+          
           this.caseList = cases
         } else {
-          // 默认数据
-          this.caseList = [
-            {
-              maskedName: '张**',
-              loanAmount: 50000,
-              createTime: '2024-03-15'
-            },
-            {
-              maskedName: '李**',
-              loanAmount: 30000,
-              createTime: '2024-03-10'
-            },
-            {
-              maskedName: '王**',
-              loanAmount: 20000,
-              createTime: '2024-03-05'
-            }
-          ]
+          this.setDefaultCaseList()
         }
       } catch (error) {
         console.error('获取帮扶案例列表失败：', error)
-        // 发生错误时也使用默认数据
-        this.caseList = [
-          {
-            maskedName: '张**',
-            loanAmount: 50000,
-            createTime: '2024-03-15'
-          },
-          {
-            maskedName: '李**',
-            loanAmount: 30000,
-            createTime: '2024-03-10'
-          },
-          {
-            maskedName: '王**',
-            loanAmount: 20000,
-            createTime: '2024-03-05'
-          }
-        ]
+        this.setDefaultCaseList()
       }
+    },
+
+    /**
+     * 设置默认案例列表
+     */
+    setDefaultCaseList() {
+      this.caseList = [
+        {
+          maskedName: '张**',
+          loanAmount: 50000,
+          createTime: '2024-03-15'
+        },
+        {
+          maskedName: '李**',
+          loanAmount: 30000,
+          createTime: '2024-03-10'
+        },
+        {
+          maskedName: '王**',
+          loanAmount: 20000,
+          createTime: '2024-03-05'
+        }
+      ]
+    },
+
+    /**
+     * 姓名脱敏处理
+     */
+    maskName(name) {
+      if (!name || name.length < 2) return '**'
+      if (name.length === 2) return name[0] + '*'
+      return name[0] + '*'.repeat(name.length - 1)
+    },
+
+    /**
+     * 格式化日期
+     */
+    formatDate(dateString) {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return dateString
+      return date.toISOString().split('T')[0]
     }
   }
 }

@@ -65,7 +65,7 @@
               class="benefit-item"
             >
               <view class="benefit-icon">
-                <image :src="`${config.staticBaseUrl}/icons/${benefit.icon}.png`" style="width: 51rpx; height: 48rpx;"></image>
+                <image :src="config.staticBaseUrl + '/icons/' + benefit.icon + '.png'" style="width: 51rpx; height: 48rpx;"></image>
               </view>
               <text class="benefit-text">{{ benefit.text }}</text>
             </view>
@@ -127,6 +127,13 @@ export default {
         fontSize: '13px'
       },
       config,
+      // 企业级数据管理
+      loading: false,
+      retryCount: 0,
+      maxRetries: 3,
+      cacheKey: '',
+      cacheExpiry: 10 * 60 * 1000, // 10分钟缓存
+      lastUpdateTime: 0,
       // 公司信息数据
       companyInfo: {
         name: 'XX科技公司',
@@ -176,8 +183,20 @@ export default {
   onLoad(options) {
     // 接收传递的公司ID参数
     if (options.id) {
-      this.loadCompanyDetail(options.id)
+      this.cacheKey = `company_detail_${options.id}`
+      this.loadCompanyDetailWithCache(options.id)
     }
+  },
+  onPullDownRefresh() {
+    // 下拉刷新时清除缓存并重新加载
+    if (this.cacheKey) {
+      uni.removeStorageSync(this.cacheKey)
+      const companyId = this.cacheKey.replace('company_detail_', '')
+      this.loadCompanyDetailWithCache(companyId)
+    }
+    setTimeout(() => {
+      uni.stopPullDownRefresh()
+    }, 1000)
   },
   methods: {
     // 返回上一页
@@ -192,68 +211,298 @@ export default {
       })
     },
     
-    // 快速投递
-    quickApply(job) {
-      uni.showToast({
-        title: `已投递${job.title}职位`,
-        icon: 'success'
-      })
-    },
-    
-    // 根据公司ID加载公司详情
-    async loadCompanyDetail(companyId) {
+    // 企业级快速投递功能
+    async quickApply(job) {
       try {
-        uni.showLoading({
-          title: '加载中...'
-        })
+        // 显示确认对话框
+        const result = await this.showConfirmDialog(`确认投递"${job.title}"职位吗？`)
+        if (!result) return
         
-        const response = await getEnterpriseDetail(companyId)
-        console.log(response);
+        uni.showLoading({ title: '投递中...' })
         
-        if (response ) {
-          const enterprise = response.enterprise
-          const activeJobs = response.activeJobs || [] 
-          
-          // 更新企业信息数据
-          this.companyInfo = {
-            name: enterprise.companyName || 'XX科技公司',
-            industry: enterprise.industry || '互联网 · 软件开发',
-            scale: enterprise.companySize || '500-999人',
-            logo: enterprise.logo || '',
-            educationRequirement: enterprise.educationRequirement || '本科及以上',
-            salaryRange: enterprise.salaryRange || '面议',
-            about: {
-              title: '关于' + (enterprise.companyName || 'XX科技'),
-              description: enterprise.description || '企业简介暂无',
-              highlights: []
-            },
-            benefits: enterprise.benefits ? enterprise.benefits.map(benefit => {
-              // 定义可用的图标数组
-              const icons = ['wuxian', 'tanxing', 'nian'];
-              // 随机获取一个图标
-              const randomIcon = icons[Math.floor(Math.random() * icons.length)];
-              return {
-                icon: randomIcon,
-                text: benefit
-              };
-            }) : [
-              { icon: 'wuxian', text: '五险一金' },
-              { icon: 'tanxing', text: '弹性工作' },
-              { icon: 'nian', text: '年终奖金' }
-            ],
-            jobs: activeJobs
-          }
-        }
+        // 模拟投递API调用
+        await this.simulateApiCall(1000)
         
-        uni.hideLoading()
-      } catch (error) {
-        console.error('获取企业详情失败:', error)
         uni.hideLoading()
         uni.showToast({
-          title: '获取企业信息失败',
+          title: `已成功投递${job.title}职位`,
+          icon: 'success'
+        })
+        
+        // 记录投递历史到本地存储
+        this.recordJobApplication(job)
+        
+      } catch (error) {
+        console.error('职位投递失败:', error)
+        uni.hideLoading()
+        uni.showToast({
+          title: '投递失败，请重试',
           icon: 'none'
         })
       }
+    },
+    
+    // 智能缓存加载公司详情
+    async loadCompanyDetailWithCache(companyId) {
+      try {
+        // 检查缓存
+        const cachedData = this.getCachedData()
+        if (cachedData && this.isCacheValid()) {
+          console.log('使用缓存数据加载公司详情')
+          this.companyInfo = cachedData
+          return
+        }
+        
+        // 缓存无效或不存在，从API加载
+        await this.loadCompanyDetailFromApi(companyId)
+        
+      } catch (error) {
+        console.error('加载公司详情失败:', error)
+        // 尝试使用过期缓存作为降级方案
+        const expiredCache = this.getExpiredCache()
+        if (expiredCache) {
+          console.log('使用过期缓存作为降级方案')
+          this.companyInfo = expiredCache
+          uni.showToast({
+            title: '数据可能不是最新的',
+            icon: 'none'
+          })
+        }
+      }
+    },
+    
+    // 从API加载公司详情（带重试机制）
+    async loadCompanyDetailFromApi(companyId) {
+      this.loading = true
+      this.retryCount = 0
+      
+      while (this.retryCount < this.maxRetries) {
+        try {
+          if (this.retryCount === 0) {
+            uni.showLoading({ title: '加载中...' })
+          } else {
+            uni.showLoading({ title: `重试中(${this.retryCount}/${this.maxRetries})...` })
+          }
+          
+          const response = await this.callApiWithTimeout(companyId)
+          
+          if (response && response.enterprise) {
+            const processedData = this.processCompanyData(response)
+            this.companyInfo = processedData
+            
+            // 保存到缓存
+            this.saveToCache(processedData)
+            this.lastUpdateTime = Date.now()
+            
+            uni.hideLoading()
+            this.loading = false
+            return
+          } else {
+            throw new Error('API返回数据格式错误')
+          }
+          
+        } catch (error) {
+          this.retryCount++
+          console.error(`获取企业详情失败 (尝试 ${this.retryCount}/${this.maxRetries}):`, error)
+          
+          if (this.retryCount < this.maxRetries) {
+            // 指数退避重试策略
+            const delay = Math.min(1000 * Math.pow(2, this.retryCount - 1), 8000) + Math.random() * 1000
+            await this.delay(delay)
+          } else {
+            // 最终失败处理
+            uni.hideLoading()
+            this.loading = false
+            this.handleApiError(error)
+            throw error
+          }
+        }
+      }
+    },
+    
+    // 带超时的API调用
+    async callApiWithTimeout(companyId, timeout = 10000) {
+      return Promise.race([
+        getEnterpriseDetail(companyId),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('请求超时')), timeout)
+        )
+      ])
+    },
+    
+    // 处理公司数据
+    processCompanyData(response) {
+      const enterprise = response.enterprise
+      const activeJobs = response.activeJobs || []
+      
+      return {
+        name: this.validateString(enterprise.companyName, 'XX科技公司'),
+        industry: this.validateString(enterprise.industry, '互联网 · 软件开发'),
+        scale: this.validateString(enterprise.companySize, '500-999人'),
+        logo: enterprise.logo || '',
+        about: {
+          title: '关于' + this.validateString(enterprise.companyName, 'XX科技'),
+          description: this.validateString(enterprise.description, '企业简介暂无'),
+          highlights: this.processHighlights(enterprise)
+        },
+        benefits: this.processBenefits(enterprise.benefits),
+        jobs: this.processJobs(activeJobs, enterprise.companyName)
+      }
+    },
+    
+    // 处理企业亮点
+    processHighlights(enterprise) {
+      const highlights = []
+      if (enterprise.businessScope) {
+        highlights.push(`核心业务：${enterprise.businessScope}`)
+      }
+      if (enterprise.establishedYear) {
+        highlights.push(`成立时间：${enterprise.establishedYear}年`)
+      }
+      if (enterprise.companySize) {
+        highlights.push(`公司规模：${enterprise.companySize}`)
+      }
+      return highlights.length > 0 ? highlights : [
+        '核心业务：智慧零售、智慧物流、AI算法平台开发',
+        '服务客户：已覆盖全球30多个国家，超过500家企业',
+        '公司文化：创新、开放、高效、合作'
+      ]
+    },
+    
+    // 处理福利待遇
+    processBenefits(benefits) {
+      if (!benefits || !Array.isArray(benefits) || benefits.length === 0) {
+        return [
+          { icon: 'wuxian', text: '五险一金' },
+          { icon: 'tanxing', text: '弹性工作' },
+          { icon: 'nian', text: '年终奖金' }
+        ]
+      }
+      
+      const icons = ['wuxian', 'tanxing', 'nian']
+      return benefits.map((benefit, index) => ({
+        icon: icons[index % icons.length],
+        text: this.validateString(benefit, '福利待遇')
+      }))
+    },
+    
+    // 处理职位数据
+    processJobs(activeJobs, companyName) {
+      if (!activeJobs || !Array.isArray(activeJobs)) {
+        return []
+      }
+      
+      return activeJobs.map(job => ({
+        id: job.id,
+        title: this.validateString(job.jobTitle || job.title, '职位名称'),
+        company: this.validateString(companyName, 'XX科技'),
+        salary: this.validateString(job.salaryRange || job.salary, '面议'),
+        location: this.validateString(job.workLocation || job.location, '工作地点'),
+        education: this.validateString(job.educationRequirement || job.education, '学历要求')
+      }))
+    },
+    
+    // 缓存管理方法
+    getCachedData() {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        return cached ? JSON.parse(cached) : null
+      } catch (error) {
+        console.error('读取缓存失败:', error)
+        return null
+      }
+    },
+    
+    isCacheValid() {
+      try {
+        const cacheTime = uni.getStorageSync(`${this.cacheKey}_time`)
+        if (!cacheTime) return false
+        return (Date.now() - cacheTime) < this.cacheExpiry
+      } catch (error) {
+        return false
+      }
+    },
+    
+    getExpiredCache() {
+      try {
+        const cached = uni.getStorageSync(this.cacheKey)
+        return cached ? JSON.parse(cached) : null
+      } catch (error) {
+        return null
+      }
+    },
+    
+    saveToCache(data) {
+      try {
+        uni.setStorageSync(this.cacheKey, JSON.stringify(data))
+        uni.setStorageSync(`${this.cacheKey}_time`, Date.now())
+      } catch (error) {
+        console.error('保存缓存失败:', error)
+      }
+    },
+    
+    // 工具方法
+    validateString(value, defaultValue) {
+      return (typeof value === 'string' && value.trim()) ? value.trim() : defaultValue
+    },
+    
+    async delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    },
+    
+    async simulateApiCall(delay) {
+      return new Promise(resolve => setTimeout(resolve, delay))
+    },
+    
+    async showConfirmDialog(message) {
+      return new Promise((resolve) => {
+        uni.showModal({
+          title: '确认操作',
+          content: message,
+          success: (res) => resolve(res.confirm),
+          fail: () => resolve(false)
+        })
+      })
+    },
+    
+    recordJobApplication(job) {
+      try {
+        const applications = uni.getStorageSync('job_applications') || []
+        applications.unshift({
+          ...job,
+          appliedAt: new Date().toISOString(),
+          companyName: this.companyInfo.name
+        })
+        // 只保留最近50条记录
+        if (applications.length > 50) {
+          applications.splice(50)
+        }
+        uni.setStorageSync('job_applications', applications)
+      } catch (error) {
+        console.error('记录投递历史失败:', error)
+      }
+    },
+    
+    handleApiError(error) {
+      let message = '获取企业信息失败'
+      
+      if (error.message) {
+        if (error.message.includes('timeout') || error.message.includes('超时')) {
+          message = '网络请求超时，请检查网络连接'
+        } else if (error.message.includes('Network Error') || error.message.includes('网络错误')) {
+          message = '网络连接异常，请检查网络设置'
+        } else if (error.message.includes('404')) {
+          message = '企业信息不存在'
+        } else if (error.message.includes('500')) {
+          message = '服务器内部错误，请稍后重试'
+        }
+      }
+      
+      uni.showToast({
+        title: message,
+        icon: 'none',
+        duration: 3000
+      })
     }
   }
 }

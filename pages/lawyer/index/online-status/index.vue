@@ -13,7 +13,7 @@
 
     <!-- 插画区域 -->
     <view class="illustration-area">
-      		<image :src="`${staticBaseUrl}/lvshi2.png`" class="lawyer-image" mode="aspectFit" />
+      		    <image :src="staticBaseUrl + '/lvshi2.png'" class="lawyer-image" mode="aspectFit" />
     </view>
 
     <!-- 设置卡片区域 -->
@@ -57,6 +57,7 @@
 
 <script>
 import { staticBaseUrl } from '@/config/index.js'
+import { updateLawyerOnlineStatus, getCurrentLawyerInfo } from '@/api/modules/lawyer.js'
 
 export default {
   name: 'LawyerOnlineStatus',
@@ -78,7 +79,7 @@ export default {
   computed: {
     backgroundStyle() {
       return {
-        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+        backgroundImage: 'url(' + staticBaseUrl + '/bg10.png)'
       }
     }
   },
@@ -87,6 +88,8 @@ export default {
     this.getSystemInfo()
     // 加载保存的设置
     this.loadSettings()
+    // 加载服务器端状态
+    this.loadServerStatus()
   },
   methods: {
     // 获取系统信息
@@ -117,10 +120,13 @@ export default {
     },
 
     // 保存设置
-    saveSettings() {
+    async saveSettings() {
       try {
         // 保存到本地存储
         uni.setStorageSync('lawyer_online_status', this.settings)
+
+        // 同步到服务器
+        await this.syncToServer()
 
         uni.showToast({
           title: '设置已保存',
@@ -136,6 +142,48 @@ export default {
           icon: 'error',
           duration: 2000
         })
+      }
+    },
+
+    // 同步状态到服务器
+    async syncToServer() {
+      try {
+        const status = this.settings.temporarilyUnavailable ? 'offline' :
+                      this.settings.acceptNewConsultation ? 'available' : 'busy'
+        
+        const statusMessage = this.settings.temporarilyUnavailable ? '暂不接单' :
+                             this.settings.acceptNewConsultation ? '接受新咨询' : '忙碌中'
+
+        await updateLawyerOnlineStatus({
+          isOnline: !this.settings.temporarilyUnavailable,
+          status: status,
+          statusMessage: statusMessage
+        })
+
+        console.log('状态已同步到服务器')
+      } catch (error) {
+        console.error('同步状态到服务器失败:', error)
+        throw error
+      }
+    },
+
+    // 从服务器加载状态
+    async loadServerStatus() {
+      try {
+        const response = await getCurrentLawyerInfo()
+        
+        if (response && response.onlineStatus) {
+          // 根据服务器状态更新本地设置
+          const serverStatus = response.onlineStatus
+          
+          this.settings.acceptNewConsultation = serverStatus.status === 'available'
+          this.settings.temporarilyUnavailable = serverStatus.status === 'offline'
+          
+          console.log('已从服务器加载状态:', serverStatus)
+        }
+      } catch (error) {
+        console.error('从服务器加载状态失败:', error)
+        // 失败时使用本地存储的状态
       }
     },
 

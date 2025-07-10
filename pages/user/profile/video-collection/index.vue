@@ -1,5 +1,5 @@
 <template>
-  <view class="video-collection-page" :style="{ background: `url('${config.staticBaseUrl}/bg10.png') no-repeat center center / cover` }">
+  <view class="video-collection-page" :style="{ background: 'url(' + config.staticBaseUrl + '/bg10.png) no-repeat center center / cover' }">
     <!-- 自定义状态栏 -->
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     
@@ -85,7 +85,8 @@
 
 <script>
 import { getMyFavoriteVideos } from '@/api/modules/personal-center.js'
-import { toggleFavorite } from '@/api/modules/skill-training.js'
+import { toggleFavorite, getUserFavorites } from '@/api/modules/skill-training.js'
+import { getCurrentUser } from '@/api/modules/user.js'
 import config from '@/config/index.js'
 
 export default {
@@ -101,7 +102,10 @@ export default {
       page: 1,
       size: 10,
       hasMore: true,
-      refreshing: false
+      refreshing: false,
+      retryCount: 0,
+      maxRetries: 3,
+      lastUpdateTime: null
     }
   },
   onLoad() {
@@ -119,7 +123,7 @@ export default {
       this.scrollHeight = systemInfo.windowHeight - this.statusBarHeight - navHeight
     },
     
-    // 加载收藏视频列表
+    // 加载收藏视频列表 - 企业级优化版本
     async loadFavoriteVideos(isRefresh = false) {
       if (this.loading) return
       
@@ -130,6 +134,7 @@ export default {
         if (isRefresh) {
           this.page = 1
           this.hasMore = true
+          this.retryCount = 0
         }
         
         const params = {
@@ -137,59 +142,288 @@ export default {
           size: this.size
         }
         
-        const response = await getMyFavoriteVideos(params)
+        // 使用智能重试机制获取数据
+        const videoData = await this.getDataWithIntelligentRetry(params)
         
-        // 处理响应数据
-        const videoData = response.records || []
+        // 统一数据格式化
+        const mappedVideoData = this.formatVideoData(videoData)
         
-        // 字段映射
-        const mappedVideoData = videoData.map(item => ({
-          id: item.videoId,
-          favoriteId: item.favoriteId,
-          title: item.videoTitle,
-          cover: item.videoCover,
-          duration: item.videoDuration,
-          playCount: item.viewCount,
-          isFavorite: true, // 收藏列表中的视频都是已收藏状态
-          category: item.videoCategory,
-          instructor: item.instructorName,
-          favoriteTime: item.favoriteTime
-        }))
+        // 更新视频列表
+        this.updateVideoList(mappedVideoData, isRefresh)
         
-        if (isRefresh) {
-          this.videoList = mappedVideoData
-        } else {
-          this.videoList.push(...mappedVideoData)
-        }
+        // 重置重试计数
+        this.retryCount = 0
         
-        // 更新分页状态
-        this.hasMore = mappedVideoData.length === this.size
-        this.isEmpty = this.videoList.length === 0
-        
-        if (!isRefresh && mappedVideoData.length > 0) {
-          this.page++
-        }
-        
-        // 如果是首次加载且列表为空，跳转到空状态页面
-        if (this.isEmpty) {
-          this.navigateToEmptyPage()
-          return
-        }
+        console.log('视频收藏列表加载完成，共', this.videoList.length, '条记录')
         
       } catch (error) {
         console.error('获取收藏视频失败:', error)
-        this.showError('获取收藏视频失败，请稍后重试')
-        
-        // 如果加载失败且没有视频，跳转到空状态页面
-        if (this.videoList.length === 0) {
-          setTimeout(() => {
-            this.navigateToEmptyPage()
-          }, 2000) // 延迟2秒显示错误提示后跳转
-        }
+        await this.handleLoadError(error, isRefresh)
       } finally {
         this.loading = false
         this.refreshing = false
       }
+    },
+
+    // 智能重试机制获取数据
+    async getDataWithIntelligentRetry(params) {
+      const cacheKey = `video_collection_${params.page}_${params.size}`
+      
+      // 多层数据保护策略
+      return await this.getDataWithFallback(
+        () => this.fetchVideoDataFromAPIs(params),
+        cacheKey,
+        [] // 默认空数组
+      )
+    },
+
+    // 从多个API获取视频数据
+    async fetchVideoDataFromAPIs(params) {
+      const errors = []
+      
+      // 主要API
+      try {
+        console.log('尝试获取收藏视频 - 主要API:', params)
+        const response = await getMyFavoriteVideos(params)
+        const videoData = response.records || response.data || []
+        console.log('主要API成功，获取到', videoData.length, '条记录')
+        return videoData
+      } catch (primaryError) {
+        console.warn('主要API失败:', primaryError.message)
+        errors.push({ api: 'primary', error: primaryError })
+      }
+      
+      // 备用API 1: skill-training模块
+      try {
+        const backupParams = {
+          itemType: 'video',
+          page: params.page,
+          size: params.size
+        }
+        const backupResponse = await getUserFavorites(backupParams)
+        const videoData = backupResponse.records || backupResponse.data || []
+        console.log('备用API 1成功，获取到', videoData.length, '条记录')
+        return videoData
+      } catch (backupError) {
+        console.warn('备用API 1失败:', backupError.message)
+        errors.push({ api: 'backup1', error: backupError })
+      }
+      
+      // 备用API 2: 用户信息中的收藏数据
+      try {
+        const userResponse = await getCurrentUser()
+        const userFavorites = userResponse.favoriteVideos || []
+        // 模拟分页
+        const startIndex = (params.page - 1) * params.size
+        const videoData = userFavorites.slice(startIndex, startIndex + params.size)
+        console.log('备用API 2成功，获取到', videoData.length, '条记录')
+        return videoData
+      } catch (finalError) {
+        console.error('备用API 2失败:', finalError.message)
+        errors.push({ api: 'backup2', error: finalError })
+      }
+      
+      // 所有API都失败
+      console.error('所有API都失败:', errors)
+      throw new Error('无法获取收藏视频数据')
+    },
+
+    // 多层数据保护机制
+    async getDataWithFallback(apiCall, cacheKey, defaultValue) {
+      try {
+        // 第一层：API数据（带智能重试）
+        const apiData = await this.retryWithBackoff(apiCall, 3, 1000)
+        this.cacheData(cacheKey, apiData)
+        return apiData
+      } catch (error) {
+        console.warn('API调用失败，尝试使用缓存数据:', error)
+        
+        try {
+          // 第二层：缓存数据
+          const cachedData = this.getCachedData(cacheKey)
+          if (cachedData && cachedData.length > 0) {
+            console.log('使用缓存数据，共', cachedData.length, '条记录')
+            return cachedData
+          }
+        } catch (cacheError) {
+          console.warn('缓存数据获取失败:', cacheError)
+        }
+        
+        // 第三层：默认值
+        console.log('使用默认值')
+        return defaultValue
+      }
+    },
+
+    // 智能指数退避重试算法
+    async retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return await fn()
+        } catch (error) {
+          if (attempt === maxRetries - 1) throw error
+          
+          // 指数退避 + 随机抖动，避免雷群效应
+          const exponentialDelay = baseDelay * Math.pow(2, attempt)
+          const randomJitter = Math.random() * 1000
+          const delay = Math.min(exponentialDelay + randomJitter, 8000)
+          
+          console.log(`重试第 ${attempt + 1} 次，延迟 ${Math.round(delay)}ms`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    },
+
+    // 缓存数据
+    cacheData(key, data) {
+      try {
+        const cacheItem = {
+          data: data,
+          timestamp: Date.now(),
+          expiry: 5 * 60 * 1000 // 5分钟过期
+        }
+        uni.setStorageSync(key, JSON.stringify(cacheItem))
+      } catch (error) {
+        console.warn('缓存数据失败:', error)
+      }
+    },
+
+    // 获取缓存数据
+    getCachedData(key) {
+      try {
+        const cacheStr = uni.getStorageSync(key)
+        if (!cacheStr) return null
+        
+        const cacheItem = JSON.parse(cacheStr)
+        const now = Date.now()
+        
+        // 检查是否过期
+        if (now - cacheItem.timestamp > cacheItem.expiry) {
+          uni.removeStorageSync(key)
+          return null
+        }
+        
+        return cacheItem.data
+      } catch (error) {
+        console.warn('获取缓存数据失败:', error)
+        return null
+      }
+    },
+
+    // 格式化视频数据
+    formatVideoData(videoData) {
+      return videoData.map(item => ({
+        id: item.videoId || item.id || item.itemId,
+        favoriteId: item.favoriteId || item.id,
+        title: item.videoTitle || item.title || item.name || '未知标题',
+        cover: item.videoCover || item.cover || item.thumbnail || '',
+        duration: this.formatDuration(item.videoDuration || item.duration || '00:00'),
+        playCount: this.formatPlayCount(item.viewCount || item.playCount || 0),
+        isFavorite: true, // 收藏列表中的视频都是已收藏状态
+        category: item.videoCategory || item.category || '其他',
+        instructor: item.instructorName || item.instructor || '未知讲师',
+        favoriteTime: item.favoriteTime || item.createTime || new Date().toISOString()
+      }))
+    },
+
+    // 更新视频列表
+    updateVideoList(mappedVideoData, isRefresh) {
+      if (isRefresh) {
+        this.videoList = mappedVideoData
+        this.lastUpdateTime = new Date()
+      } else {
+        this.videoList.push(...mappedVideoData)
+      }
+      
+      // 更新分页状态
+      this.hasMore = mappedVideoData.length === this.size
+      this.isEmpty = this.videoList.length === 0
+      
+      if (!isRefresh && mappedVideoData.length > 0) {
+        this.page++
+      }
+      
+      // 如果是首次加载且列表为空，跳转到空状态页面
+      if (this.isEmpty && this.page === 1) {
+        setTimeout(() => {
+          this.navigateToEmptyPage()
+        }, 500)
+      }
+    },
+
+    // 增强错误处理
+    async handleLoadError(error, isRefresh) {
+      // 尝试使用缓存数据作为降级方案
+      const cacheKey = `video_collection_${this.page}_${this.size}`
+      const cachedData = this.getCachedData(cacheKey)
+      
+      if (cachedData && cachedData.length > 0) {
+        console.log('使用缓存数据作为降级方案')
+        const mappedVideoData = this.formatVideoData(cachedData)
+        this.updateVideoList(mappedVideoData, isRefresh)
+        
+        uni.showToast({
+          title: '网络异常，显示缓存数据',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+      
+      // 错误分类处理
+      const errorMessage = this.classifyError(error)
+      this.showError(errorMessage)
+      
+      // 如果加载失败且没有视频，延迟跳转到空状态页面
+      if (this.videoList.length === 0) {
+        setTimeout(() => {
+          this.navigateToEmptyPage()
+        }, 2000)
+      }
+    },
+
+    // 错误分类
+    classifyError(error) {
+      if (!error) return '未知错误'
+      
+      const errorMsg = error.message || error.msg || error.toString()
+      const errorCode = error.code || error.status
+      
+      // 网络相关错误
+      if (errorCode === 'NETWORK_ERROR' || errorMsg.includes('网络')) {
+        return '网络连接异常，请检查网络设置'
+      }
+      
+      // 超时错误
+      if (errorCode === 'TIMEOUT' || errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+        return '请求超时，请稍后重试'
+      }
+      
+      // 权限相关错误
+      if (errorCode === 401 || errorMsg.includes('401') || errorMsg.includes('未授权')) {
+        return '登录已过期，请重新登录'
+      }
+      
+      if (errorCode === 403 || errorMsg.includes('403') || errorMsg.includes('权限')) {
+        return '访问权限不足'
+      }
+      
+      // 资源不存在
+      if (errorCode === 404 || errorMsg.includes('404')) {
+        return '请求的资源不存在'
+      }
+      
+      // 服务器错误
+      if (errorCode >= 500 || errorMsg.includes('500') || errorMsg.includes('服务器')) {
+        return '服务器内部错误，请稍后重试'
+      }
+      
+      // 数据格式错误
+      if (errorMsg.includes('格式') || errorMsg.includes('解析')) {
+        return '数据格式异常，请稍后重试'
+      }
+      
+      return '获取收藏视频失败，请稍后重试'
     },
     
     // 返回上一页
@@ -203,7 +437,7 @@ export default {
       await this.loadFavoriteVideos(true)
     },
     
-    // 切换收藏状态
+    // 切换收藏状态 - 增强版本
     async toggleFavoriteStatus(index) {
       const video = this.videoList[index]
       
@@ -212,16 +446,19 @@ export default {
         const originalStatus = video.isFavorite
         video.isFavorite = !originalStatus
         
-        // 调用API更新收藏状态
-        await toggleFavorite({
-          itemId: video.id,
-          itemType: 'video',
-          action: originalStatus ? 'remove' : 'add'
-        })
+        // 使用智能重试调用API
+        await this.retryWithBackoff(async () => {
+          await toggleFavorite({
+            itemId: video.id,
+            itemType: 'video',
+            action: originalStatus ? 'remove' : 'add'
+          })
+        }, 2, 500) // 最多重试2次，基础延迟500ms
         
+        // 操作成功反馈
         uni.showToast({
           title: video.isFavorite ? '已收藏' : '已取消收藏',
-          icon: 'none',
+          icon: video.isFavorite ? 'success' : 'none',
           duration: 1500
         })
         
@@ -229,6 +466,9 @@ export default {
         if (!video.isFavorite) {
           this.videoList.splice(index, 1)
           this.isEmpty = this.videoList.length === 0
+          
+          // 清除相关缓存
+          this.clearRelatedCache()
           
           // 如果列表变为空，跳转到空状态页面
           if (this.isEmpty) {
@@ -240,13 +480,34 @@ export default {
         
       } catch (error) {
         console.error('收藏操作失败:', error)
+        
         // 恢复原始状态
         video.isFavorite = !video.isFavorite
+        
+        // 错误分类处理
+        const errorMessage = this.classifyError(error)
         uni.showToast({
-          title: '操作失败，请稍后重试',
+          title: errorMessage,
           icon: 'none',
-          duration: 1500
+          duration: 2000
         })
+      }
+    },
+
+    // 清除相关缓存
+    clearRelatedCache() {
+      try {
+        const cacheKeys = [
+          `video_collection_${this.page}_${this.size}`,
+          'user_favorites_cache',
+          'video_collection_total_cache'
+        ]
+        
+        cacheKeys.forEach(key => {
+          uni.removeStorageSync(key)
+        })
+      } catch (error) {
+        console.warn('清除缓存失败:', error)
       }
     },
     
@@ -269,9 +530,53 @@ export default {
     
     // 跳转到空状态页面
     navigateToEmptyPage() {
+      console.log('跳转到空状态页面')
       uni.redirectTo({
         url: '/pages/user/profile/video-collection-null/index'
       })
+    },
+    
+    // 格式化播放时长
+    formatDuration(duration) {
+      if (!duration) return '00:00'
+      
+      // 如果已经是格式化的时间字符串，直接返回
+      if (typeof duration === 'string' && duration.includes(':')) {
+        return duration
+      }
+      
+      // 如果是秒数，转换为 mm:ss 格式
+      if (typeof duration === 'number') {
+        const minutes = Math.floor(duration / 60)
+        const seconds = duration % 60
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      }
+      
+      return '00:00'
+    },
+    
+    // 格式化播放次数
+    formatPlayCount(count) {
+      if (!count || count === 0) return '0'
+      
+      if (count >= 10000) {
+        return `${(count / 10000).toFixed(1)}万`
+      } else if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}k`
+      }
+      
+      return count.toString()
+    },
+    
+    // 检查数据是否需要刷新
+    shouldRefreshData() {
+      if (!this.lastUpdateTime) return true
+      
+      const now = new Date()
+      const timeDiff = now - this.lastUpdateTime
+      const fiveMinutes = 5 * 60 * 1000 // 5分钟
+      
+      return timeDiff > fiveMinutes
     }
   }
 }

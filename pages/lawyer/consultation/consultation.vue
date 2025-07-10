@@ -30,11 +30,11 @@
 			@scrolltolower="loadMore"
 			:style="{ height: scrollHeight + 'px' }"
 		>
-			<view class="consultation-item" v-for="(item, index) in consultationList" :key="index" @click="goToDetail(item.id)">
+			<view class="consultation-item" v-for="(item, index) in filteredConsultationList" :key="index" @click="goToDetail(item)">
 				<view class="consultation-info">
 					<view class="header">
 						<text class="title">{{item.title}}</text>
-						<text :class="['status', item.status]">{{item.statusText}}</text>
+						<text :class="['status', item.status]">{{getStatusText(item.status)}}</text>
 					</view>
 					<view class="desc">{{item.description}}</view>
 					<view class="meta">
@@ -44,7 +44,7 @@
 						</view>
 						<view class="time">
 							<text class="label">咨询时间：</text>
-							<text class="value">{{item.createTime}}</text>
+							<text class="value">{{formatTime(item.createTime)}}</text>
 						</view>
 					</view>
 					<view class="category">
@@ -104,143 +104,528 @@
 </template>
 
 <script>
-	export default {
-		data() {
-			return {
-				searchKey: '',
-				currentStatus: 'all',
-				statusList: [
-					{ label: '全部', value: 'all' },
-					{ label: '待回复', value: 'pending' },
-					{ label: '已回复', value: 'replied' },
-					{ label: '已关闭', value: 'closed' }
-				],
-				consultationList: [],
-				page: 1,
-				pageSize: 10,
-				loading: false,
-				noMore: false,
-				scrollHeight: 0,
-				currentConsultation: null,
-				replyForm: {
-					content: '',
-					images: []
-				}
-			}
-		},
-		onLoad() {
-			// 获取屏幕高度
-			const systemInfo = uni.getSystemInfoSync()
-			// 减去搜索栏和状态标签的高度
-			this.scrollHeight = systemInfo.windowHeight - uni.upx2px(180)
+import { 
+	getLawyerConsultations, 
+	replyConsultation, 
+	updateConsultationStatus,
+	getLawyerConsultationStats
+} from '@/api/modules/lawyer.js'
+
+export default {
+	data() {
+		return {
+			// 搜索和筛选
+			searchKey: '',
+			currentStatus: 'all',
+			statusList: [
+				{ label: '全部', value: 'all' },
+				{ label: '待回复', value: 'pending' },
+				{ label: '已回复', value: 'replied' },
+				{ label: '已关闭', value: 'closed' }
+			],
 			
-			this.loadData()
-		},
-		methods: {
-			handleSearch() {
-				this.page = 1
-				this.consultationList = []
-				this.noMore = false
-				this.loadData()
+			// 数据列表
+			consultationList: [],
+			originalList: [], // 原始数据，用于本地搜索
+			
+			// 分页相关
+			page: 1,
+			pageSize: 10,
+			loading: false,
+			refreshing: false,
+			noMore: false,
+			hasMore: true,
+			
+			// UI相关
+			scrollHeight: 0,
+			currentConsultation: null,
+			
+			// 回复表单
+			replyForm: {
+				content: '',
+				images: []
 			},
-			handleStatusChange(status) {
-				this.currentStatus = status
-				this.page = 1
-				this.consultationList = []
-				this.noMore = false
-				this.loadData()
+			
+			// 缓存管理
+			cacheKey: 'lawyer_consultations_cache',
+			cacheExpiry: 10 * 60 * 1000, // 10分钟缓存
+			lastFetchTime: 0,
+			
+			// 重试配置
+			retryConfig: {
+				maxRetries: 3,
+				baseDelay: 1000,
+				maxDelay: 10000
 			},
-			loadData() {
-				if (this.loading || this.noMore) return
-				
-				this.loading = true
-				// 模拟接口请求
-				setTimeout(() => {
-					const mockData = Array(this.pageSize).fill(0).map((_, index) => ({
-						id: this.page * this.pageSize + index,
-						title: '离婚财产分割问题咨询',
-						description: '我和丈夫结婚5年，现在准备离婚。我们有一套共同房产，还有存款和股票等财产。请问在离婚时，这些财产应该如何分割？',
-						status: ['pending', 'replied', 'closed'][Math.floor(Math.random() * 3)],
-						statusText: {
-							pending: '待回复',
-							replied: '已回复',
-							closed: '已关闭'
-						}[this.status],
-						userName: '张女士',
-						createTime: '2024-05-09 14:30',
-						category: '婚姻家事'
-					}))
-					
-					this.consultationList = [...this.consultationList, ...mockData]
-					this.loading = false
-					
-					if (this.page >= 3) {
-						this.noMore = true
-					}
-					this.page++
-				}, 1000)
-			},
-			loadMore() {
-				this.loadData()
-			},
-			goToDetail(id) {
-				uni.navigateTo({
-					url: `/pages/lawyer/consultation/detail?id=${id}`
-				})
-			},
-			handleReply(consultation) {
-				this.currentConsultation = consultation
-				this.replyForm.content = ''
-				this.replyForm.images = []
-				this.$refs.replyPopup.open()
-			},
-			closeReplyPopup() {
-				this.$refs.replyPopup.close()
-			},
-			chooseImage() {
-				uni.chooseImage({
-					count: 9 - this.replyForm.images.length,
-					success: (res) => {
-						this.replyForm.images = [...this.replyForm.images, ...res.tempFilePaths]
-					}
-				})
-			},
-			deleteImage(index) {
-				this.replyForm.images.splice(index, 1)
-			},
-			submitReply() {
-				if (!this.replyForm.content.trim()) {
-					uni.showToast({
-						title: '请输入回复内容',
-						icon: 'none'
-					})
-					return
-				}
-				
-				// 模拟提交回复
-				uni.showLoading({
-					title: '提交中...'
-				})
-				
-				setTimeout(() => {
-					uni.hideLoading()
-					uni.showToast({
-						title: '回复成功',
-						icon: 'success'
-					})
-					
-					// 更新列表数据
-					const index = this.consultationList.findIndex(item => item.id === this.currentConsultation.id)
-					if (index !== -1) {
-						this.consultationList[index].status = 'replied'
-						this.consultationList[index].statusText = '已回复'
-					}
-					
-					this.closeReplyPopup()
-				}, 1500)
+			
+			// 统计数据
+			statsData: {
+				total: 0,
+				pending: 0,
+				replied: 0,
+				closed: 0
 			}
 		}
+	},
+	
+	computed: {
+		// 筛选后的咨询列表
+		filteredConsultationList() {
+			let list = this.originalList
+			
+			// 状态筛选
+			if (this.currentStatus !== 'all') {
+				list = list.filter(item => item.status === this.currentStatus)
+			}
+			
+			// 关键词搜索
+			if (this.searchKey.trim()) {
+				const keyword = this.searchKey.trim().toLowerCase()
+				list = list.filter(item => 
+					item.title?.toLowerCase().includes(keyword) ||
+					item.description?.toLowerCase().includes(keyword) ||
+					item.userName?.toLowerCase().includes(keyword) ||
+					item.category?.toLowerCase().includes(keyword)
+				)
+			}
+			
+			return list
+		}
+	},
+	
+	async onLoad() {
+		this.calculateScrollHeight()
+		await this.initializeData()
+	},
+	
+	// 下拉刷新
+	async onPullDownRefresh() {
+		this.refreshing = true
+		await this.refreshData()
+		uni.stopPullDownRefresh()
+		this.refreshing = false
+	},
+	
+	// 触底加载更多
+	onReachBottom() {
+		this.loadMore()
+	},
+	
+	methods: {
+		/**
+		 * 初始化数据
+		 */
+		async initializeData() {
+			try {
+				// 并行加载数据
+				await Promise.allSettled([
+					this.loadConsultations(true),
+					this.loadStatistics()
+				])
+			} catch (error) {
+				console.error('初始化数据失败:', error)
+				this.showError('数据加载失败，请下拉刷新重试')
+			}
+		},
+		
+		/**
+		 * 加载咨询列表
+		 */
+		async loadConsultations(isRefresh = false) {
+			if (this.loading && !isRefresh) return
+			
+			// 检查缓存（仅在非刷新时使用）
+			if (!isRefresh && this.shouldUseCache()) {
+				const cached = this.getCache()
+				if (cached?.data) {
+					this.originalList = cached.data
+					this.consultationList = [...this.originalList]
+					this.updateStatusCounts()
+					return
+				}
+			}
+			
+			this.loading = true
+			if (isRefresh) {
+				this.page = 1
+				this.hasMore = true
+				this.noMore = false
+			}
+			
+			try {
+				const response = await this.executeWithRetry(() => 
+					getLawyerConsultations({
+						page: this.page,
+						pageSize: this.pageSize,
+						sortBy: 'created_time',
+						sortOrder: 'desc'
+					})
+				)
+				
+				if (response?.code === 200) {
+					const newData = response.data?.list || []
+					
+					if (isRefresh) {
+						this.originalList = newData
+						this.consultationList = [...newData]
+					} else {
+						this.originalList = [...this.originalList, ...newData]
+						this.consultationList = [...this.originalList]
+					}
+					
+					// 更新分页状态
+					this.hasMore = newData.length === this.pageSize
+					this.noMore = !this.hasMore
+					this.page += 1
+					this.lastFetchTime = Date.now()
+					
+					// 更新缓存
+					this.setCache({
+						data: this.originalList,
+						timestamp: this.lastFetchTime
+					})
+					
+					// 更新状态计数
+					this.updateStatusCounts()
+					
+				} else {
+					throw new Error(response?.message || '获取咨询列表失败')
+				}
+				
+			} catch (error) {
+				console.error('加载咨询列表失败:', error)
+				this.handleLoadError(error)
+			} finally {
+				this.loading = false
+				this.refreshing = false
+			}
+		},
+		
+		/**
+		 * 加载统计数据
+		 */
+		async loadStatistics() {
+			try {
+				const response = await getLawyerConsultationStats({
+					period: 'month'
+				})
+				
+				if (response?.code === 200) {
+					this.statsData = {
+						...this.statsData,
+						...response.data
+					}
+				}
+			} catch (error) {
+				console.error('加载统计数据失败:', error)
+			}
+		},
+		
+		/**
+		 * 更新状态计数
+		 */
+		updateStatusCounts() {
+			const counts = this.originalList.reduce((acc, item) => {
+				acc[item.status] = (acc[item.status] || 0) + 1
+				return acc
+			}, {})
+			
+			this.statusList.forEach(status => {
+				if (status.value !== 'all') {
+					status.count = counts[status.value] || 0
+				} else {
+					status.count = this.originalList.length
+				}
+			})
+		},
+		
+		/**
+		 * 计算滚动区域高度
+		 */
+		calculateScrollHeight() {
+			const systemInfo = uni.getSystemInfoSync()
+			const statusBarHeight = systemInfo.statusBarHeight || 0
+			const searchBoxHeight = 120 // 搜索框高度
+			const statusTabHeight = 80  // 状态标签高度
+			
+			this.scrollHeight = systemInfo.windowHeight - statusBarHeight - searchBoxHeight - statusTabHeight
+		},
+		
+		/**
+		 * 处理搜索
+		 */
+		handleSearch() {
+			// 本地搜索，不重新请求接口
+			// 因为filteredConsultationList已经包含了搜索逻辑
+		},
+		
+		/**
+		 * 处理状态切换
+		 */
+		handleStatusChange(status) {
+			this.currentStatus = status
+			// 本地筛选，不重新请求接口
+		},
+		
+		/**
+		 * 刷新数据
+		 */
+		async refreshData() {
+			await this.loadConsultations(true)
+			await this.loadStatistics()
+		},
+		
+		/**
+		 * 加载更多数据
+		 */
+		loadMore() {
+			if (!this.loading && this.hasMore && !this.noMore) {
+				this.loadConsultations(false)
+			}
+		},
+		
+		/**
+		 * 跳转到详情页面
+		 */
+		goToDetail(consultation) {
+			uni.navigateTo({
+				url: `/pages/lawyer/consultation/detail?id=${consultation.id}`
+			})
+		},
+		
+		/**
+		 * 处理回复操作
+		 */
+		handleReply(consultation) {
+			this.currentConsultation = consultation
+			this.replyForm.content = ''
+			this.replyForm.images = []
+			this.$refs.replyPopup.open()
+		},
+		
+		/**
+		 * 关闭回复弹窗
+		 */
+		closeReplyPopup() {
+			this.$refs.replyPopup.close()
+			this.currentConsultation = null
+		},
+		
+		/**
+		 * 选择图片
+		 */
+		chooseImage() {
+			uni.chooseImage({
+				count: 9 - this.replyForm.images.length,
+				sourceType: ['camera', 'album'],
+				success: (res) => {
+					this.replyForm.images = [...this.replyForm.images, ...res.tempFilePaths]
+				},
+				fail: (error) => {
+					console.error('选择图片失败:', error)
+					this.showError('选择图片失败')
+				}
+			})
+		},
+		
+		/**
+		 * 删除图片
+		 */
+		deleteImage(index) {
+			this.replyForm.images.splice(index, 1)
+		},
+		
+		/**
+		 * 提交回复
+		 */
+		async submitReply() {
+			if (!this.replyForm.content.trim()) {
+				this.showError('请输入回复内容')
+				return
+			}
+			
+			if (!this.currentConsultation) {
+				this.showError('咨询信息异常')
+				return
+			}
+			
+			try {
+				uni.showLoading({ title: '提交中...' })
+				
+				const response = await this.executeWithRetry(() => 
+					replyConsultation(this.currentConsultation.id, {
+						content: this.replyForm.content.trim(),
+						images: this.replyForm.images,
+						replyType: 'text'
+					})
+				)
+				
+				if (response?.code === 200) {
+					// 更新本地数据
+					const index = this.originalList.findIndex(item => item.id === this.currentConsultation.id)
+					if (index !== -1) {
+						this.originalList[index].status = 'replied'
+						this.originalList[index].lastReplyTime = new Date().toISOString()
+						this.originalList[index].replyCount = (this.originalList[index].replyCount || 0) + 1
+					}
+					
+					// 更新显示列表
+					this.consultationList = [...this.originalList]
+					this.updateStatusCounts()
+					
+					// 更新缓存
+					this.setCache({
+						data: this.originalList,
+						timestamp: Date.now()
+					})
+					
+					uni.hideLoading()
+					this.showSuccess('回复成功')
+					this.closeReplyPopup()
+					
+				} else {
+					throw new Error(response?.message || '回复失败')
+				}
+				
+			} catch (error) {
+				uni.hideLoading()
+				console.error('提交回复失败:', error)
+				this.handleSubmitError(error)
+			}
+		},
+		
+		/**
+		 * 缓存相关方法
+		 */
+		shouldUseCache() {
+			return this.lastFetchTime > 0 && (Date.now() - this.lastFetchTime) < this.cacheExpiry
+		},
+		
+		getCache() {
+			try {
+				return uni.getStorageSync(this.cacheKey)
+			} catch (error) {
+				console.error('获取缓存失败:', error)
+				return null
+			}
+		},
+		
+		setCache(data) {
+			try {
+				uni.setStorageSync(this.cacheKey, data)
+			} catch (error) {
+				console.error('设置缓存失败:', error)
+			}
+		},
+		
+		/**
+		 * 带重试的API请求
+		 */
+		async executeWithRetry(apiCall, retryCount = 0) {
+			try {
+				return await apiCall()
+			} catch (error) {
+				if (retryCount < this.retryConfig.maxRetries) {
+					const delay = Math.min(
+						this.retryConfig.baseDelay * Math.pow(2, retryCount) + Math.random() * 1000,
+						this.retryConfig.maxDelay
+					)
+					
+					console.log(`API调用失败，${delay.toFixed(0)}ms后进行第${retryCount + 1}次重试:`, error.message)
+					await new Promise(resolve => setTimeout(resolve, delay))
+					return this.executeWithRetry(apiCall, retryCount + 1)
+				}
+				throw error
+			}
+		},
+		
+		/**
+		 * 错误处理
+		 */
+		handleLoadError(error) {
+			let message = '加载失败，请重试'
+			
+			if (error.message?.includes('timeout') || error.message?.includes('超时')) {
+				message = '网络超时，请检查网络连接'
+			} else if (error.message?.includes('Network Error')) {
+				message = '网络连接异常'
+			} else if (error.message?.includes('401')) {
+				message = '请重新登录'
+				setTimeout(() => {
+					uni.reLaunch({ url: '/pages/login/login' })
+				}, 2000)
+			} else if (error.message?.includes('403')) {
+				message = '没有访问权限'
+			}
+			
+			this.showError(message)
+		},
+		
+		handleSubmitError(error) {
+			let message = '操作失败，请重试'
+			
+			if (error.message?.includes('timeout')) {
+				message = '网络超时，请重试'
+			} else if (error.message?.includes('401')) {
+				message = '登录已过期，请重新登录'
+				setTimeout(() => {
+					uni.reLaunch({ url: '/pages/login/login' })
+				}, 2000)
+			}
+			
+			this.showError(message)
+		},
+		
+		/**
+		 * 工具方法
+		 */
+		showError(message) {
+			uni.showToast({
+				title: message,
+				icon: 'none',
+				duration: 3000
+			})
+		},
+		
+		showSuccess(message) {
+			uni.showToast({
+				title: message,
+				icon: 'success',
+				duration: 2000
+			})
+		},
+		
+		/**
+		 * 格式化时间
+		 */
+		formatTime(timeString) {
+			if (!timeString) return ''
+			
+			const time = new Date(timeString)
+			const now = new Date()
+			const diff = now - time
+			
+			if (diff < 60000) return '刚刚'
+			if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+			if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+			if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`
+			
+			return time.toLocaleDateString()
+		},
+		
+		/**
+		 * 获取状态显示文本
+		 */
+		getStatusText(status) {
+			const statusMap = {
+				pending: '待回复',
+				replied: '已回复', 
+				closed: '已关闭'
+			}
+			return statusMap[status] || status
+		}
 	}
+}
 </script>
 
 <style lang="scss">

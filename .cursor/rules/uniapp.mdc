@@ -3,4 +3,4 @@ description:
 globs: 
 alwaysApply: true
 ---
-Always respond in 中文  优先使用uv-ui 和 自带的js工具库（挂载在$uv对象中）  禁用uv-link组件
+Always respond in 中文  优先使用uv-ui 和 自带的js工具库（挂载在$uv对象中）  禁用uv-link组件 禁止主动运行项目及运行编译打包命令
