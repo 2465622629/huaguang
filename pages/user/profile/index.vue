@@ -29,28 +29,7 @@
 					</view>
 				</view>
 				
-				<!-- 统计信息区域 -->
-				<view class="statistics-section" v-if="!statisticsInfo.loading">
-					<view class="stats-item">
-						<text class="stats-number">{{ statisticsInfo.favoriteCount }}</text>
-						<text class="stats-label">收藏</text>
-					</view>
-					<view class="stats-divider"></view>
-					<view class="stats-item">
-						<text class="stats-number">{{ formatCommission(statisticsInfo.commissionTotal) }}</text>
-						<text class="stats-label">佣金</text>
-					</view>
-					<view class="stats-divider"></view>
-					<view class="stats-item">
-						<text class="stats-number">{{ statisticsInfo.assistanceCount }}</text>
-						<text class="stats-label">帮扶</text>
-					</view>
-				</view>
-				
-				<!-- 统计信息加载状态 -->
-				<view class="statistics-loading" v-if="statisticsInfo.loading">
-					<text class="loading-text">统计信息加载中...</text>
-				</view>
+
 				
 				<!-- 快捷功能区域 -->
 				<view class="quick-actions">
@@ -118,6 +97,18 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import { getCurrentUser, getUserSettings, getFavorites, getCommissionInfo } from '@/api/modules/user.js'
+import { 
+	getUserCenterPage, 
+	getPersonalCenterAssistanceRecords,
+	getMyFavoriteVideos,
+	getMyJobApplicationRecords,
+	getCacheInfo,
+	clearCache as clearCacheAPI,
+	getMyTeam,
+	generateInvitePoster,
+	getAvailableWithdrawalAmount,
+	getWithdrawalRecords
+} from '@/api/modules/application-record.js'
 import config from '@/config/index.js'
 
 export default {
@@ -149,6 +140,12 @@ export default {
 			cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
 			retryCount: 0,
 			maxRetries: 3,
+			cacheManagement: {
+				loading: false,
+				totalSize: 0,
+				itemCount: 0,
+				lastUpdate: null
+			},
 			quickActions: [
 				{
 					type: 'help',
@@ -211,10 +208,16 @@ export default {
 		this.initPage();
 		this.loadUserInfo();
 		this.loadStatisticsInfo();
+		this.loadCacheInfo();
 	},
 	onShow() {
 		// 页面显示时检查是否需要刷新数据
 		this.checkAndRefreshData();
+		
+		// 开发环境下测试接口集成
+		if (process.env.NODE_ENV === 'development') {
+			this.testInterfaceIntegration();
+		}
 	},
 	methods: {
 		// 初始化页面
@@ -246,15 +249,27 @@ export default {
 			});
 			
 			try {
-				// 使用多层数据保护策略获取用户信息
-				const userData = await this.getUserDataWithFallback(forceRefresh);
+				// 优先尝试使用综合接口获取个人中心页面数据
+				const userCenterData = await this.getUserCenterDataWithFallback(forceRefresh);
 				
 				// 将API返回的数据映射到userInfo
 				this.userInfo = {
-					avatar: userData.avatar || '',
-					nickname: userData.nickname || '昵称',
-					memberId: userData.memberId || userData.id || '9842108'
+					avatar: userCenterData.avatar || userCenterData.userInfo?.avatar || '',
+					nickname: userCenterData.nickname || userCenterData.userInfo?.nickname || '昵称',
+					memberId: userCenterData.memberId || userCenterData.userInfo?.memberId || userCenterData.id || '9842108'
 				};
+				
+				// 如果综合接口返回了统计信息，直接使用
+				if (userCenterData.statistics) {
+					this.statisticsInfo = {
+						...this.statisticsInfo,
+						assistanceCount: userCenterData.statistics.assistanceCount || 0,
+						favoriteCount: userCenterData.statistics.favoriteCount || 0,
+						commissionTotal: userCenterData.statistics.commissionTotal || 0,
+						loading: false
+					};
+					this.cacheStatistics(this.statisticsInfo);
+				}
 				
 				// 缓存用户信息
 				this.cacheUserInfo(this.userInfo);
@@ -275,7 +290,56 @@ export default {
 			}
 		},
 
-		// 多层数据保护策略获取用户数据
+		// 使用综合接口获取个人中心数据（多层数据保护策略）
+		async getUserCenterDataWithFallback(forceRefresh) {
+			const cacheKey = 'user_center_page_data_cache';
+			
+			try {
+				// 第一层：优先使用综合个人中心页面接口
+				const userCenterData = await this.retryWithBackoff(async () => {
+					const response = await getUserCenterPage();
+					return response.data || response;
+				}, 2, 1000);
+				
+				// 缓存综合接口数据
+				this.cacheData(cacheKey, userCenterData);
+				console.log('使用综合个人中心页面接口成功');
+				return userCenterData;
+				
+			} catch (error) {
+				console.warn('综合接口失败，尝试分散接口获取:', error);
+				
+				try {
+					// 第二层：使用原有的分散接口获取数据
+					const userData = await this.getUserDataWithFallback(forceRefresh);
+					console.log('使用分散接口获取数据成功');
+					return userData;
+				} catch (backupError) {
+					console.warn('分散接口也失败:', backupError);
+				}
+				
+				try {
+					// 第三层：缓存数据
+					const cachedData = this.getCachedData(cacheKey);
+					if (cachedData) {
+						console.log('使用缓存的综合数据');
+						return cachedData;
+					}
+				} catch (cacheError) {
+					console.warn('缓存数据获取失败:', cacheError);
+				}
+				
+				// 第四层：默认值
+				console.log('使用默认用户数据');
+				return {
+					avatar: '',
+					nickname: '昵称',
+					memberId: '9842108'
+				};
+			}
+		},
+
+		// 多层数据保护策略获取用户数据（保留作为备用）
 		async getUserDataWithFallback(forceRefresh) {
 			const cacheKey = 'user_profile_data_cache';
 			
@@ -1007,19 +1071,64 @@ export default {
 		},
 		
 		// 处理快捷功能点击
-		handleQuickAction(type) {
+		async handleQuickAction(type) {
 			console.log('快捷功能点击:', type);
-			// 根据type进行相应的跳转或操作
-			switch(type) {
-				case 'help':
-					uni.navigateTo({ url: '/pages/user/profile/assistance/index' });
-					break;
-				case 'video':
-					uni.navigateTo({ url: '/pages/user/profile/video-collection/index' });
-					break;
-				case 'job':
-					uni.navigateTo({ url: '/pages/user/profile/job-hunting/index' });
-					break;
+			
+			// 显示加载提示
+			uni.showLoading({
+				title: '加载中...'
+			});
+			
+			try {
+				// 根据type进行相应的数据预加载和跳转
+				switch(type) {
+					case 'help':
+						// 预加载帮扶记录数据
+						try {
+							const assistanceData = await getPersonalCenterAssistanceRecords({ page: 1, size: 10 });
+							console.log('帮扶记录预加载成功:', assistanceData);
+							
+							// 缓存预加载的数据
+							if (assistanceData && assistanceData.code === 200) {
+								uni.setStorageSync('assistance_records_cache', JSON.stringify({
+									data: assistanceData.data,
+									timestamp: Date.now()
+								}));
+							}
+						} catch (error) {
+							console.warn('帮扶记录预加载失败:', error);
+						}
+						uni.navigateTo({ url: '/pages/user/profile/assistance/index' });
+						break;
+					case 'video':
+						// 预加载收藏视频数据
+						try {
+							const videoData = await getMyFavoriteVideos({ page: 1, size: 10 });
+							console.log('收藏视频预加载成功:', videoData);
+						} catch (error) {
+							console.warn('收藏视频预加载失败:', error);
+						}
+						uni.navigateTo({ url: '/pages/user/profile/video-collection/index' });
+						break;
+					case 'job':
+						// 预加载求职记录数据
+						try {
+							const jobData = await getMyJobApplicationRecords({ page: 1, size: 10 });
+							console.log('求职记录预加载成功:', jobData);
+						} catch (error) {
+							console.warn('求职记录预加载失败:', error);
+						}
+						uni.navigateTo({ url: '/pages/user/profile/job-hunting/index' });
+						break;
+				}
+			} catch (error) {
+				console.error('快捷功能处理失败:', error);
+				uni.showToast({
+					title: '功能暂时不可用',
+					icon: 'none'
+				});
+			} finally {
+				uni.hideLoading();
 			}
 		},
 		
@@ -1045,38 +1154,101 @@ export default {
 		},
 		
 		// 处理分销推广点击
-		handlePromotionClick(type) {
+		async handlePromotionClick(type) {
 			console.log('分销推广点击:', type);
-			// 根据type进行相应的跳转或操作
-			switch(type) {
-				case 'team':
-					uni.navigateTo({ url: '/pages/user/profile/invitation/index' });
-					break;
-				case 'poster':
-					uni.navigateTo({ url: '/pages/user/profile/invitation-poster/index' });
-					break;
-				case 'commission':
-					// 显示加载提示
-					uni.showLoading({
-						title: '加载中...'
-					});
-					
-					// 跳转到我的佣金页面
-					uni.navigateTo({
-						url: '/pages/user/profile/promotion-commission/index',
-						success: () => {
-							uni.hideLoading();
-						},
-						fail: (err) => {
-							uni.hideLoading();
-							console.error('跳转失败:', err);
-							uni.showToast({
-								title: '页面跳转失败',
-								icon: 'none'
-							});
+			
+			// 显示加载提示
+			uni.showLoading({
+				title: '加载中...'
+			});
+			
+			try {
+				// 根据type进行相应的数据预加载和跳转
+				switch(type) {
+					case 'team':
+						// 预加载团队数据
+						try {
+							const teamData = await getMyTeam();
+							console.log('团队数据预加载成功:', teamData);
+							// 可以将数据缓存到全局状态或本地存储
+							uni.setStorageSync('my_team_cache', JSON.stringify({
+								data: teamData,
+								timestamp: Date.now()
+							}));
+						} catch (error) {
+							console.warn('团队数据预加载失败:', error);
 						}
-					});
-					break;
+						uni.navigateTo({ url: '/pages/user/profile/invitation/index' });
+						break;
+					case 'poster':
+						// 预加载并生成邀请海报
+						try {
+							const posterData = await generateInvitePoster({
+								type: 'user_invitation',
+								customData: {
+									userInfo: this.userInfo,
+									timestamp: Date.now()
+								}
+							});
+							console.log('邀请海报生成成功:', posterData);
+							// 缓存海报数据
+							uni.setStorageSync('invite_poster_cache', JSON.stringify({
+								data: posterData,
+								timestamp: Date.now()
+							}));
+						} catch (error) {
+							console.warn('邀请海报生成失败:', error);
+						}
+						uni.navigateTo({ url: '/pages/user/profile/invitation-poster/index' });
+						break;
+					case 'commission':
+						// 预加载佣金相关数据
+						try {
+							const [withdrawalAmount, withdrawalRecords] = await Promise.allSettled([
+								getAvailableWithdrawalAmount(),
+								getWithdrawalRecords({ page: 1, size: 10 })
+							]);
+							
+							if (withdrawalAmount.status === 'fulfilled') {
+								console.log('可提现金额获取成功:', withdrawalAmount.value);
+								uni.setStorageSync('withdrawal_amount_cache', JSON.stringify({
+									data: withdrawalAmount.value,
+									timestamp: Date.now()
+								}));
+							}
+							
+							if (withdrawalRecords.status === 'fulfilled') {
+								console.log('提现记录获取成功:', withdrawalRecords.value);
+								uni.setStorageSync('withdrawal_records_cache', JSON.stringify({
+									data: withdrawalRecords.value,
+									timestamp: Date.now()
+								}));
+							}
+						} catch (error) {
+							console.warn('佣金数据预加载失败:', error);
+						}
+						
+						// 跳转到我的佣金页面
+						uni.navigateTo({
+							url: '/pages/user/profile/promotion-commission/index',
+							fail: (err) => {
+								console.error('跳转失败:', err);
+								uni.showToast({
+									title: '页面跳转失败',
+									icon: 'none'
+								});
+							}
+						});
+						break;
+				}
+			} catch (error) {
+				console.error('分销推广功能处理失败:', error);
+				uni.showToast({
+					title: '功能暂时不可用',
+					icon: 'none'
+				});
+			} finally {
+				uni.hideLoading();
 			}
 		},
 		
@@ -1089,15 +1261,131 @@ export default {
 			return amount.toFixed(2);
 		},
 
+		// 加载缓存信息
+		async loadCacheInfo() {
+			this.cacheManagement.loading = true;
+			
+			try {
+				// 获取服务器端缓存信息
+				const serverCacheInfo = await getCacheInfo();
+				console.log('服务器缓存信息:', serverCacheInfo);
+				
+				// 获取本地缓存信息
+				const localCacheInfo = this.getLocalCacheInfo();
+				
+				// 合并缓存信息
+				this.cacheManagement = {
+					loading: false,
+					totalSize: (serverCacheInfo.data?.totalSize || 0) + localCacheInfo.totalSize,
+					itemCount: (serverCacheInfo.data?.itemCount || 0) + localCacheInfo.itemCount,
+					lastUpdate: new Date().toLocaleString(),
+					serverCache: serverCacheInfo.data,
+					localCache: localCacheInfo
+				};
+				
+			} catch (error) {
+				console.warn('获取缓存信息失败:', error);
+				// 只使用本地缓存信息
+				const localCacheInfo = this.getLocalCacheInfo();
+				this.cacheManagement = {
+					loading: false,
+					totalSize: localCacheInfo.totalSize,
+					itemCount: localCacheInfo.itemCount,
+					lastUpdate: new Date().toLocaleString(),
+					localCache: localCacheInfo
+				};
+			}
+		},
+
+		// 获取本地缓存信息
+		getLocalCacheInfo() {
+			const cacheKeys = [
+				'user_profile_cache',
+				'user_profile_statistics_cache',
+				'user_center_page_data_cache',
+				'user_settings_cache',
+				'consultation_records_cache',
+				'video_collection_cache',
+				'assistance_records_cache',
+				'commission_records_cache',
+				'my_team_cache',
+				'invite_poster_cache',
+				'withdrawal_amount_cache',
+				'withdrawal_records_cache'
+			];
+			
+			let totalSize = 0;
+			let itemCount = 0;
+			const details = [];
+			
+			cacheKeys.forEach(key => {
+				try {
+					const data = uni.getStorageSync(key);
+					if (data) {
+						const size = new Blob([data]).size;
+						totalSize += size;
+						itemCount++;
+						details.push({
+							key,
+							size: this.formatFileSize(size),
+							lastModified: this.getCacheLastModified(key)
+						});
+					}
+				} catch (error) {
+					console.warn(`获取缓存 ${key} 信息失败:`, error);
+				}
+			});
+			
+			return {
+				totalSize,
+				itemCount,
+				details,
+				formattedSize: this.formatFileSize(totalSize)
+			};
+		},
+
+		// 获取缓存最后修改时间
+		getCacheLastModified(key) {
+			try {
+				const data = uni.getStorageSync(key);
+				if (data) {
+					const parsed = JSON.parse(data);
+					return parsed.timestamp ? new Date(parsed.timestamp).toLocaleString() : '未知';
+				}
+			} catch (error) {
+				return '未知';
+			}
+			return '未知';
+		},
+
+		// 格式化文件大小
+		formatFileSize(bytes) {
+			if (bytes === 0) return '0 B';
+			const k = 1024;
+			const sizes = ['B', 'KB', 'MB', 'GB'];
+			const i = Math.floor(Math.log(bytes) / Math.log(k));
+			return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+		},
+
 		// 清空缓存（增强版本）
-		clearCache() {
+		async clearCache() {
 			uni.showModal({
 				title: '清空缓存',
 				content: '确定要清空所有缓存数据吗？这将清除用户信息和统计信息缓存。',
-				success: (res) => {
+				success: async (res) => {
 					if (res.confirm) {
 						try {
-							// 清空用户信息缓存
+							// 先尝试调用后端清除缓存接口
+							try {
+								await clearCacheAPI({
+									cacheTypes: ['user_profile', 'statistics', 'settings', 'records']
+								});
+								console.log('后端缓存清除成功');
+							} catch (apiError) {
+								console.warn('后端缓存清除失败:', apiError);
+							}
+							
+							// 清空本地缓存
 							uni.removeStorageSync(this.cacheKey);
 							uni.removeStorageSync(this.statisticsCacheKey);
 							
@@ -1105,6 +1393,7 @@ export default {
 							const cacheKeys = [
 								'user_profile_cache',
 								'user_profile_statistics_cache',
+								'user_center_page_data_cache',
 								'user_settings_cache',
 								'consultation_records_cache',
 								'video_collection_cache',
@@ -1135,10 +1424,11 @@ export default {
 								icon: 'success'
 							});
 							
-							// 重新加载数据
+							// 重新加载数据和缓存信息
 							setTimeout(() => {
 								this.loadUserInfo(true);
 								this.loadStatisticsInfo(true);
+								this.loadCacheInfo();
 							}, 1000);
 							
 						} catch (error) {
@@ -1151,6 +1441,123 @@ export default {
 					}
 				}
 			});
+		},
+
+		// 测试接口集成（开发环境）
+		async testInterfaceIntegration() {
+			console.log('=== 开始接口集成测试 ===');
+			
+			const testResults = {
+				userCenterPage: false,
+				personalCenterAssistance: false,
+				favoriteVideos: false,
+				jobApplicationRecords: false,
+				cacheInfo: false,
+				myTeam: false,
+				generatePoster: false,
+				withdrawalAmount: false,
+				withdrawalRecords: false
+			};
+			
+			// 测试个人中心页面接口
+			try {
+				const result = await getUserCenterPage();
+				testResults.userCenterPage = true;
+				console.log('✅ 个人中心页面接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 个人中心页面接口测试失败:', error);
+			}
+			
+			// 测试帮扶记录接口
+			try {
+				const result = await getPersonalCenterAssistanceRecords({ page: 1, size: 5 });
+				testResults.personalCenterAssistance = true;
+				console.log('✅ 帮扶记录接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 帮扶记录接口测试失败:', error);
+			}
+			
+			// 测试收藏视频接口
+			try {
+				const result = await getMyFavoriteVideos({ page: 1, size: 5 });
+				testResults.favoriteVideos = true;
+				console.log('✅ 收藏视频接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 收藏视频接口测试失败:', error);
+			}
+			
+			// 测试求职记录接口
+			try {
+				const result = await getMyJobApplicationRecords({ page: 1, size: 5 });
+				testResults.jobApplicationRecords = true;
+				console.log('✅ 求职记录接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 求职记录接口测试失败:', error);
+			}
+			
+			// 测试缓存信息接口
+			try {
+				const result = await getCacheInfo();
+				testResults.cacheInfo = true;
+				console.log('✅ 缓存信息接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 缓存信息接口测试失败:', error);
+			}
+			
+			// 测试团队信息接口
+			try {
+				const result = await getMyTeam();
+				testResults.myTeam = true;
+				console.log('✅ 团队信息接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 团队信息接口测试失败:', error);
+			}
+			
+			// 测试海报生成接口
+			try {
+				const result = await generateInvitePoster({
+					type: 'test',
+					customData: { test: true }
+				});
+				testResults.generatePoster = true;
+				console.log('✅ 海报生成接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 海报生成接口测试失败:', error);
+			}
+			
+			// 测试可提现金额接口
+			try {
+				const result = await getAvailableWithdrawalAmount();
+				testResults.withdrawalAmount = true;
+				console.log('✅ 可提现金额接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 可提现金额接口测试失败:', error);
+			}
+			
+			// 测试提现记录接口
+			try {
+				const result = await getWithdrawalRecords({ page: 1, size: 5 });
+				testResults.withdrawalRecords = true;
+				console.log('✅ 提现记录接口测试成功:', result);
+			} catch (error) {
+				console.log('❌ 提现记录接口测试失败:', error);
+			}
+			
+			// 汇总测试结果
+			const successCount = Object.values(testResults).filter(Boolean).length;
+			const totalCount = Object.keys(testResults).length;
+			
+			console.log(`=== 接口集成测试完成: ${successCount}/${totalCount} 成功 ===`);
+			console.log('详细结果:', testResults);
+			
+			// 在开发环境显示测试结果
+			if (successCount < totalCount) {
+				uni.showToast({
+					title: `接口测试: ${successCount}/${totalCount} 成功`,
+					icon: 'none',
+					duration: 3000
+				});
+			}
 		}
 	}
 }

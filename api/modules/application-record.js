@@ -121,16 +121,16 @@ export const getCreditRecoveryApplicationDetail = (applicationId) => {
  * @returns {Promise} 申请列表
  */
 export const getCreditRecoveryApplicationList = (params = {}) => {
-  return get('/user/application-record/credit-recovery', { params })
+  return get('/user/application-record/credit-recovery/list', { params })
 }
 
 /**
  * 检查用户是否可以申请指定类型的帮扶
- * @param {string} assistanceType - 帮扶类型
+ * @param {string} applicationType - 申请类型
  * @returns {Promise} 检查结果
  */
-export const checkAssistanceEligibility = (assistanceType) => {
-  return get(`/user/application-record/eligibility/${assistanceType}`)
+export const checkAssistanceEligibility = (applicationType) => {
+  return get(`/user/application-record/can-apply/${applicationType}`)
 }
 
 /**
@@ -174,6 +174,171 @@ export const getApplicationProgress = (applicationId) => {
   return get(`/user/application-record/application/${applicationId}/progress`)
 }
 
+/**
+ * ===============================
+ * 个人中心扩展模块接口
+ * ===============================
+ */
+
+/**
+ * 获取个人中心页面数据
+ * @returns {Promise} 个人中心页面完整数据
+ */
+export const getUserCenterPage = () => {
+  return get('/user/personal-center/page')
+}
+
+/**
+ * 获取我的收藏视频
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页大小，默认10
+ * @returns {Promise} 收藏视频列表
+ */
+export const getMyFavoriteVideos = (params = {}) => {
+  return get('/user/personal-center/my-favorite-videos', { params })
+}
+
+/**
+ * 获取我的求职记录
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页大小，默认10
+ * @param {string} params.status - 状态筛选
+ * @returns {Promise} 求职记录列表
+ */
+export const getMyJobApplicationRecords = (params = {}) => {
+  return get('/user/personal-center/my-job-application-records', { params })
+}
+
+/**
+ * 获取我的帮扶记录（个人中心版本）
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页大小，默认10
+ * @param {string} params.status - 状态筛选
+ * @returns {Promise} 帮扶记录列表
+ */
+export const getPersonalCenterAssistanceRecords = (params = {}) => {
+  return get('/user/personal-center/my-assistance-records', { params })
+}
+
+/**
+ * ===============================
+ * 缓存管理相关接口
+ * ===============================
+ */
+
+/**
+ * 获取缓存信息
+ * @returns {Promise} 缓存信息详情
+ */
+export const getCacheInfo = () => {
+  return get('/user/personal-center/cache-info')
+}
+
+/**
+ * 清除缓存
+ * @param {Object} params - 清除参数
+ * @param {Array} params.cacheTypes - 要清除的缓存类型列表
+ * @returns {Promise} 清除结果
+ */
+export const clearCache = (params = {}) => {
+  return post('/user/personal-center/clear-cache', params)
+}
+
+/**
+ * ===============================
+ * 邀请推广相关接口
+ * ===============================
+ */
+
+/**
+ * 获取邀请链接
+ * @returns {Promise} 邀请链接信息
+ */
+export const getInviteLink = () => {
+  return get('/user/personal-center/invite-link')
+}
+
+/**
+ * 复制邀请码
+ * @returns {Promise} 邀请码信息
+ */
+export const copyInviteCode = () => {
+  return get('/user/personal-center/copy-invite-code')
+}
+
+/**
+ * 生成邀请海报
+ * @param {Object} data - 海报参数
+ * @param {string} data.type - 海报类型
+ * @param {Object} data.customData - 自定义数据
+ * @returns {Promise} 海报生成结果
+ */
+export const generateInvitePoster = (data) => {
+  return post('/user/personal-center/generate-invite-poster', data)
+}
+
+/**
+ * 获取我的团队信息
+ * @returns {Promise} 团队信息概览
+ */
+export const getMyTeam = () => {
+  return get('/user/personal-center/my-team')
+}
+
+/**
+ * 获取团队成员列表
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页大小，默认10
+ * @param {string} params.level - 层级筛选
+ * @returns {Promise} 团队成员列表
+ */
+export const getTeamMembers = (params = {}) => {
+  return get('/user/personal-center/team-members', { params })
+}
+
+/**
+ * ===============================
+ * 提现相关接口
+ * ===============================
+ */
+
+/**
+ * 获取可提现金额
+ * @returns {Promise} 可提现金额信息
+ */
+export const getAvailableWithdrawalAmount = () => {
+  return get('/user/personal-center/available-withdrawal-amount')
+}
+
+/**
+ * 申请提现
+ * @param {Object} data - 提现申请数据
+ * @param {number} data.amount - 提现金额
+ * @param {string} data.accountType - 账户类型
+ * @param {string} data.accountInfo - 账户信息
+ * @param {string} data.remark - 备注
+ * @returns {Promise} 提现申请结果
+ */
+export const applyWithdrawal = (data) => {
+  return post('/user/personal-center/apply-withdrawal', data)
+}
+
+/**
+ * 获取提现记录
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页大小，默认10
+ * @param {string} params.status - 状态筛选
+ * @returns {Promise} 提现记录列表
+ */
+export const getWithdrawalRecords = (params = {}) => {
+  return get('/user/personal-center/withdrawal-records', { params })
+}
+
 // 默认导出所有接口
 export default {
   submitYouthAssistanceApplication,
@@ -191,5 +356,23 @@ export default {
   getAllApplicationRecords,
   getApplicationDetail,
   deleteApplication,
-  getApplicationProgress
+  getApplicationProgress,
+  // 个人中心扩展模块
+  getUserCenterPage,
+  getMyFavoriteVideos,
+  getMyJobApplicationRecords,
+  getPersonalCenterAssistanceRecords,
+  // 缓存管理
+  getCacheInfo,
+  clearCache,
+  // 邀请推广
+  getInviteLink,
+  copyInviteCode,
+  generateInvitePoster,
+  getMyTeam,
+  getTeamMembers,
+  // 提现相关
+  getAvailableWithdrawalAmount,
+  applyWithdrawal,
+  getWithdrawalRecords
 }

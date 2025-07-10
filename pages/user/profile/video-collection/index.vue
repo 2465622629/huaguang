@@ -185,7 +185,8 @@ export default {
       try {
         console.log('尝试获取收藏视频 - 主要API:', params)
         const response = await getMyFavoriteVideos(params)
-        const videoData = response.records || response.data || []
+        // 修复数据解析路径：处理新的API响应格式 response.data.records
+        const videoData = response.data?.records || response.records || response.data || []
         console.log('主要API成功，获取到', videoData.length, '条记录')
         return videoData
       } catch (primaryError) {
@@ -343,12 +344,12 @@ export default {
         this.page++
       }
       
-      // 如果是首次加载且列表为空，跳转到空状态页面
-      if (this.isEmpty && this.page === 1) {
-        setTimeout(() => {
-          this.navigateToEmptyPage()
-        }, 500)
-      }
+      // 注释掉自动跳转到空状态页面的逻辑，让用户在当前页面看到空状态
+      // if (this.isEmpty && this.page === 1) {
+      //   setTimeout(() => {
+      //     this.navigateToEmptyPage()
+      //   }, 500)
+      // }
     },
 
     // 增强错误处理
@@ -374,12 +375,12 @@ export default {
       const errorMessage = this.classifyError(error)
       this.showError(errorMessage)
       
-      // 如果加载失败且没有视频，延迟跳转到空状态页面
-      if (this.videoList.length === 0) {
-        setTimeout(() => {
-          this.navigateToEmptyPage()
-        }, 2000)
-      }
+      // 注释掉自动跳转到空状态页面的逻辑，显示当前页面的空状态
+      // if (this.videoList.length === 0) {
+      //   setTimeout(() => {
+      //     this.navigateToEmptyPage()
+      //   }, 2000)
+      // }
     },
 
     // 错误分类

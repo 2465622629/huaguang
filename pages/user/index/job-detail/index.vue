@@ -239,13 +239,15 @@ export default {
         const response = await getJobDetail(jobId)
         console.log('职位详情数据:', response)
 
-        if (response && response.job) {
-          const job = response.job
-          const enterprise = response.enterprise || {}
+        if (response && response.data && response.data.job) {
+          const job = response.data.job
+          const enterprise = response.data.enterprise || {}
           
           // 处理薪资格式
           let salary = '面议'
-          if (job.salaryMin && job.salaryMax) {
+          if (job.salaryRange) {
+            salary = job.salaryRange
+          } else if (job.salaryMin && job.salaryMax) {
             const minK = Math.floor(job.salaryMin / 1000)
             const maxK = Math.floor(job.salaryMax / 1000)
             salary = `${minK}k-${maxK}k`
@@ -253,35 +255,25 @@ export default {
             salary = job.salary
           }
 
-          // 处理职责列表
+          // 处理职责列表 - 从requirements字段解析
           let responsibilities = []
-          if (job.responsibilities) {
-            if (Array.isArray(job.responsibilities)) {
-              responsibilities = job.responsibilities
-            } else if (typeof job.responsibilities === 'string') {
-              responsibilities = job.responsibilities.split('\n').filter(item => item.trim())
+          if (job.requirements) {
+            if (typeof job.requirements === 'string') {
+              responsibilities = job.requirements.split('\n').filter(item => item.trim())
+            } else if (Array.isArray(job.requirements)) {
+              responsibilities = job.requirements
             }
           }
 
-          // 处理技能要求
+          // 处理技能要求 - 从requirements字段解析技能相关的部分
           let skills = []
-          if (job.skillRequirements) {
-            if (Array.isArray(job.skillRequirements)) {
-              skills = job.skillRequirements
-            } else if (typeof job.skillRequirements === 'string') {
-              skills = job.skillRequirements.split('\n').filter(item => item.trim())
-            }
+          if (job.requirements && typeof job.requirements === 'string') {
+            // 将所有要求作为技能要求显示
+            skills = job.requirements.split('\n').filter(item => item.trim())
           }
 
-          // 处理其他要求
+          // 处理其他要求 - 暂时为空，因为接口只有一个requirements字段
           let others = []
-          if (job.otherRequirements) {
-            if (Array.isArray(job.otherRequirements)) {
-              others = job.otherRequirements
-            } else if (typeof job.otherRequirements === 'string') {
-              others = job.otherRequirements.split('\n').filter(item => item.trim())
-            }
-          }
 
           this.jobInfo = {
             title: job.title || '职位名称',

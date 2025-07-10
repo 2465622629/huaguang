@@ -307,8 +307,12 @@ export default {
           const params = this.buildRequestParams()
           const response = await this.callApiWithTimeout(params)
           
-          if (response && response.records) {
-            const processedData = this.processCompanyData(response)
+          // 增强的数据结构验证
+          console.log('API响应数据结构:', response)
+          
+          if (response && response.data && Array.isArray(response.data.records)) {
+            const processedData = this.processCompanyData(response.data)
+            console.log('处理后的企业数据:', processedData)
             
             if (this.page === 1) {
               this.companyList = processedData
@@ -316,7 +320,7 @@ export default {
               // 保存到缓存
               this.saveToCache({
                 list: processedData,
-                total: response.total || processedData.length,
+                total: response.data.total || processedData.length,
                 timestamp: Date.now()
               })
             } else {
@@ -324,7 +328,7 @@ export default {
               this.originalList.push(...processedData)
             }
             
-            this.totalCount = response.total || this.companyList.length
+            this.totalCount = response.data.total || this.companyList.length
             
             // 检查是否还有更多数据
             if (processedData.length < this.pageSize) {
@@ -338,7 +342,13 @@ export default {
             return
             
           } else {
-            throw new Error('API返回数据格式错误')
+            console.error('API响应数据格式不正确:', {
+              hasResponse: !!response,
+              hasData: !!(response && response.data),
+              hasRecords: !!(response && response.data && response.data.records),
+              isRecordsArray: !!(response && response.data && Array.isArray(response.data.records))
+            })
+            throw new Error('API返回数据格式错误: 缺少必要的data.records字段或格式不正确')
           }
           
         } catch (error) {
@@ -397,14 +407,14 @@ export default {
     },
     
     // 处理公司数据
-    processCompanyData(response) {
-      const apiData = response.records || []
-      return apiData.map(item => ({
-        id: item.id || item.enterpriseId,
-        name: this.validateString(item.companyName || item.name, '未知企业'),
-        industry: this.validateString(item.industry, '未知行业'),
-        type: this.validateString(item.companyType || item.type, ''),
-        scale: this.validateString(item.scale || item.employeeCount, ''),
+    processCompanyData(responseData) {
+      const apiData = responseData.records || []
+              return apiData.map(item => ({
+          id: item.id || item.enterpriseId,
+          name: this.validateString(item.companyName || item.name, '未知企业'),
+          industry: this.validateString(item.industry, '未知行业'),
+          type: this.validateString(item.companyType || item.type, ''),
+          scale: this.validateString(item.companySize || item.scale, ''),
         logo: item.logo || item.logoUrl || '',
         rating: item.rating || 0,
         location: item.location || item.address || '',

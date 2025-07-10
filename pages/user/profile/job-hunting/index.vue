@@ -158,20 +158,21 @@ export default {
           size: this.pageSize
         })
         
+        // 修复数据解析路径：处理新的API响应格式 response.data.records
         const applicationData = response.data || response
-        const applications = applicationData.list || applicationData.records || []
+        const applications = applicationData.records || applicationData.list || applicationData || []
         
-        // 处理数据格式
+        // 处理数据格式：正确映射嵌套的job对象字段
         const formattedApplications = applications.map(app => ({
           id: app.id || app.applicationId,
-          jobId: app.jobId,
-          jobTitle: app.jobTitle || app.title,
-          companyName: app.companyName || app.enterpriseName,
-          location: app.location || app.jobLocation,
-          salaryMin: app.salaryMin,
-          salaryMax: app.salaryMax,
+          jobId: app.jobId || app.job?.id,
+          jobTitle: app.jobTitle || app.job?.title || app.title,
+          companyName: app.companyName || app.job?.enterprise?.companyName || app.enterpriseName,
+          location: app.location || app.job?.location || app.jobLocation,
+          salaryMin: app.salaryMin || app.job?.salaryMin,
+          salaryMax: app.salaryMax || app.job?.salaryMax,
           status: app.status || 'pending',
-          createdAt: app.createdAt || app.applyTime,
+          createdAt: app.createdAt || app.appliedAt || app.applyTime,
           updatedAt: app.updatedAt,
           feedback: app.feedback,
           resumeUrl: app.resumeUrl,

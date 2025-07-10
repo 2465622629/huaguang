@@ -102,7 +102,7 @@
 
 <script>
 import config from '@/config/index.js'
-import youthAssistanceApi from '@/api/modules/youth-assistance.js'
+import { getPersonalCenterAssistanceRecords } from '@/api/modules/application-record.js'
 import userApi from '@/api/modules/user.js'
 
 export default {
@@ -126,11 +126,13 @@ export default {
 
   onLoad() {
     this.initPage()
+    // 检查是否有预加载的缓存数据
+    this.tryLoadCachedData()
     this.loadAssistanceRecords(true)
   },
 
   onShow() {
-    // 页面显示时刷新数据
+    // 页面显示时检查是否需要刷新数据
     this.refreshData()
   },
 
@@ -180,19 +182,28 @@ export default {
         
         // 处理帮扶记录
         if (recordsResult.status === 'fulfilled') {
-          const recordData = recordsResult.value.data || recordsResult.value
-          const records = recordData.list || recordData.records || []
+          const response = recordsResult.value
+          console.log('原始API响应数据:', response)
+          
+          // 正确解析API响应结构
+          const recordData = response.data || {}
+          const records = recordData.records || []
+          const total = recordData.total || 0
+          const currentPage = recordData.current || 1
+          const totalPages = recordData.pages || 0
+          
+          console.log('解析后的记录数据:', { records, total, currentPage, totalPages })
           
           // 处理数据格式，结合用户信息
           const formattedRecords = records.map(record => ({
-            id: record.id || record.recordId,
+            id: record.id || record.recordId || `record_${Date.now()}_${Math.random()}`,
             serviceType: record.serviceType || 'unknown',
             title: this.getRecordTitle(record),
             status: record.status || 'pending',
-            createdAt: record.createdAt || record.createTime,
-            description: record.description || record.remark,
-            amount: record.amount || record.assistanceAmount,
-            applicationId: record.applicationId,
+            createdAt: record.createdAt || record.createTime || new Date().toISOString(),
+            description: record.description || record.remark || '',
+            amount: record.amount || record.assistanceAmount || 0,
+            applicationId: record.applicationId || record.id,
             // 添加用户信息关联
             userName: this.userInfo?.nickname || '用户',
             userPhone: this.userInfo?.phone || ''
@@ -204,16 +215,27 @@ export default {
             this.assistanceRecords.push(...formattedRecords)
           }
           
-          // 检查是否还有更多数据
-          this.hasMore = records.length >= this.pageSize
+          // 根据API返回的分页信息判断是否还有更多数据
+          this.hasMore = currentPage < totalPages && records.length >= this.pageSize
           
           if (this.hasMore) {
             this.page++
           }
           
-          console.log('帮扶记录加载成功:', formattedRecords)
+          console.log('帮扶记录处理完成:', {
+            formattedRecords,
+            hasMore: this.hasMore,
+            currentTotal: this.assistanceRecords.length,
+            totalFromAPI: total
+          })
+          
+          // 如果是空数据，显示友好提示
+          if (formattedRecords.length === 0 && isRefresh) {
+            console.log('当前没有帮扶记录，将显示空状态')
+          }
           
         } else {
+          console.error('获取帮扶记录失败:', recordsResult.reason)
           throw recordsResult.reason
         }
         
@@ -239,13 +261,19 @@ export default {
     // 带重试机制的获取帮扶记录
     async getAssistanceRecordsWithRetry() {
       try {
-        return await youthAssistanceApi.getAssistanceRecords({
+        const response = await getPersonalCenterAssistanceRecords({
           page: this.page,
-          size: this.pageSize,
-          // 添加更多查询参数支持
-          serviceType: '', // 可以根据需要筛选服务类型
-          status: '' // 可以根据需要筛选状态
+          size: this.pageSize
         })
+        
+        console.log('帮扶记录API响应:', response)
+        
+        // 验证响应结构
+        if (response && response.code === 200) {
+          return response
+        } else {
+          throw new Error(response?.message || '获取帮扶记录失败')
+        }
       } catch (error) {
         if (this.retryCount < this.maxRetries) {
           this.retryCount++
@@ -259,10 +287,28 @@ export default {
 
     // 处理加载错误
     async handleLoadError(error, isRefresh) {
+      console.error('处理加载错误:', error)
+      
+      // 区分不同类型的错误
       const errorMessage = this.getErrorMessage(error)
+      const isNetworkError = this.isNetworkError(error)
+      
+      // 尝试使用缓存数据
+      if (isNetworkError && isRefresh) {
+        const cachedData = this.getCachedData()
+        if (cachedData) {
+          this.assistanceRecords = cachedData
+          uni.showToast({
+            title: '网络异常，已显示缓存数据',
+            icon: 'none',
+            duration: 2000
+          })
+          return
+        }
+      }
       
       // 如果是刷新操作且有重试次数，尝试使用备用方案
-      if (isRefresh && this.retryCount < this.maxRetries) {
+      if (isRefresh && this.retryCount < this.maxRetries && isNetworkError) {
         try {
           // 尝试使用用户模块的相关API作为备用
           const fallbackData = await this.getFallbackData()
@@ -299,6 +345,49 @@ export default {
           }
         })
       }
+    },
+
+    // 判断是否为网络错误
+    isNetworkError(error) {
+      const networkErrorCodes = ['NETWORK_ERROR', 'TIMEOUT', 'CONNECTION_FAILED']
+      const networkErrorMessages = ['网络', 'network', 'timeout', '超时', '连接']
+      
+      if (networkErrorCodes.includes(error.code)) {
+        return true
+      }
+      
+      const errorMessage = (error.message || '').toLowerCase()
+      return networkErrorMessages.some(keyword => errorMessage.includes(keyword))
+    },
+
+    // 获取缓存数据
+    getCachedData() {
+      try {
+        const cachedStr = uni.getStorageSync('assistance_records_cache')
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr)
+          // 检查缓存是否过期（5分钟）
+          const now = Date.now()
+          if (now - cached.timestamp < 5 * 60 * 1000) {
+            const records = cached.data?.records || []
+            return records.map(record => ({
+              id: record.id || `cached_${Date.now()}_${Math.random()}`,
+              serviceType: record.serviceType || 'unknown',
+              title: this.getRecordTitle(record),
+              status: record.status || 'pending',
+              createdAt: record.createdAt || record.createTime || new Date().toISOString(),
+              description: record.description || record.remark || '',
+              amount: record.amount || record.assistanceAmount || 0,
+              applicationId: record.applicationId || record.id,
+              userName: '用户',
+              userPhone: ''
+            }))
+          }
+        }
+      } catch (error) {
+        console.warn('获取缓存数据失败:', error)
+      }
+      return null
     },
 
     // 获取备用数据（模拟从其他API获取相关数据）
@@ -443,6 +532,15 @@ export default {
         hour: '2-digit',
         minute: '2-digit'
       })
+    },
+
+    // 尝试加载缓存数据
+    tryLoadCachedData() {
+      const cachedData = this.getCachedData()
+      if (cachedData && cachedData.length > 0) {
+        this.assistanceRecords = cachedData
+        console.log('使用预加载的缓存数据:', cachedData)
+      }
     },
 
     // 刷新数据

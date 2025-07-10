@@ -346,8 +346,8 @@ export default {
         id: lawyer.id,
         name: lawyer.name || lawyer.lawyerName || '律师',
         avatar: lawyer.avatar || lawyer.headImg || '',
-        specialty: lawyer.specialty || lawyer.specialties || '法律咨询',
-        price: this.formatPrice(lawyer.consultationPrice || lawyer.price || 0),
+        specialty: this.formatSpecialties(lawyer.specialties) || lawyer.specialty || '法律咨询',
+        price: this.formatPrice(lawyer.voiceFee || lawyer.consultationPrice || lawyer.price || 0),
         rating: lawyer.rating || lawyer.score || 0,
         experience: lawyer.experienceYears || lawyer.practiceYears || 0,
         isOnline: Boolean(lawyer.isOnline || lawyer.onlineStatus)
@@ -543,6 +543,20 @@ export default {
       uni.navigateTo({
         url: `/pages/user/index/lawyer-detail/index?lawyerId=${lawyer.id}`
       })
+    },
+
+    /**
+     * 格式化专业特长
+     */
+    formatSpecialties(specialties) {
+      if (!specialties) {
+        return ''
+      }
+      if (Array.isArray(specialties)) {
+        // 取前3个专业特长，用中文顿号分隔
+        return specialties.slice(0, 3).join('、')
+      }
+      return String(specialties)
     },
 
     /**

@@ -111,7 +111,7 @@
 </template>
 
 <script>
-import { getEnterpriseDetail } from '@/api/modules/enterprise.js'
+import { getEnterpriseDetail, applyJob } from '@/api/modules/enterprise.js'
 import config from '@/config/index.js'
 
 export default {
@@ -220,24 +220,55 @@ export default {
         
         uni.showLoading({ title: '投递中...' })
         
-        // 模拟投递API调用
-        await this.simulateApiCall(1000)
+        // 构建投递请求参数
+        const applyData = {
+          jobId: job.id,
+          coverLetter: `我对${job.title}职位很感兴趣，希望能加入贵公司团队。`
+        }
+        
+        console.log('投递职位参数:', applyData)
+        
+        // 调用真实的投递简历API
+        const response = await applyJob(applyData)
+        
+        console.log('投递API响应:', response)
         
         uni.hideLoading()
-        uni.showToast({
-          title: `已成功投递${job.title}职位`,
-          icon: 'success'
-        })
         
-        // 记录投递历史到本地存储
-        this.recordJobApplication(job)
+        // 检查投递结果
+        if (response && (response.code === 200 || response.success)) {
+          uni.showToast({
+            title: `已成功投递${job.title}职位`,
+            icon: 'success'
+          })
+          
+          // 记录投递历史到本地存储
+          this.recordJobApplication(job)
+        } else {
+          throw new Error(response?.message || '投递失败')
+        }
         
       } catch (error) {
         console.error('职位投递失败:', error)
         uni.hideLoading()
+        
+        let errorMessage = '投递失败，请重试'
+        if (error.message) {
+          if (error.message.includes('已投递') || error.message.includes('重复')) {
+            errorMessage = '您已投递过该职位'
+          } else if (error.message.includes('登录') || error.message.includes('认证')) {
+            errorMessage = '请先登录后再投递'
+          } else if (error.message.includes('简历')) {
+            errorMessage = '请先完善简历信息'
+          } else {
+            errorMessage = error.message
+          }
+        }
+        
         uni.showToast({
-          title: '投递失败，请重试',
-          icon: 'none'
+          title: errorMessage,
+          icon: 'none',
+          duration: 3000
         })
       }
     },
@@ -286,8 +317,11 @@ export default {
           
           const response = await this.callApiWithTimeout(companyId)
           
-          if (response && response.enterprise) {
-            const processedData = this.processCompanyData(response)
+          // 增强的数据结构验证
+          console.log('企业详情API响应数据结构:', response)
+          
+          if (response && response.data && response.data.enterprise) {
+            const processedData = this.processCompanyData(response.data)
             this.companyInfo = processedData
             
             // 保存到缓存
@@ -298,7 +332,12 @@ export default {
             this.loading = false
             return
           } else {
-            throw new Error('API返回数据格式错误')
+            console.error('企业详情API响应数据格式不正确:', {
+              hasResponse: !!response,
+              hasData: !!(response && response.data),
+              hasEnterprise: !!(response && response.data && response.data.enterprise)
+            })
+            throw new Error('API返回数据格式错误: 缺少必要的data.enterprise字段')
           }
           
         } catch (error) {
@@ -331,9 +370,11 @@ export default {
     },
     
     // 处理公司数据
-    processCompanyData(response) {
-      const enterprise = response.enterprise
-      const activeJobs = response.activeJobs || []
+    processCompanyData(responseData) {
+      const enterprise = responseData.enterprise
+      const activeJobs = responseData.activeJobs || []
+      
+      console.log('处理企业数据:', { enterprise, activeJobs })
       
       return {
         name: this.validateString(enterprise.companyName, 'XX科技公司'),
@@ -394,11 +435,11 @@ export default {
       
       return activeJobs.map(job => ({
         id: job.id,
-        title: this.validateString(job.jobTitle || job.title, '职位名称'),
+        title: this.validateString(job.title, '职位名称'),
         company: this.validateString(companyName, 'XX科技'),
-        salary: this.validateString(job.salaryRange || job.salary, '面议'),
-        location: this.validateString(job.workLocation || job.location, '工作地点'),
-        education: this.validateString(job.educationRequirement || job.education, '学历要求')
+        salary: this.validateString(job.salaryRange, '面议'),
+        location: this.validateString(job.location, '工作地点'),
+        education: this.validateString(job.educationRequirement, '学历要求')
       }))
     },
     
@@ -448,10 +489,6 @@ export default {
     
     async delay(ms) {
       return new Promise(resolve => setTimeout(resolve, ms))
-    },
-    
-    async simulateApiCall(delay) {
-      return new Promise(resolve => setTimeout(resolve, delay))
     },
     
     async showConfirmDialog(message) {
