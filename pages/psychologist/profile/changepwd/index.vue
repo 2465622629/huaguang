@@ -43,7 +43,7 @@
 						v-model="formData.newPassword"
 						type="text"
 						:password="!showNewPassword"
-						placeholder="新密码（6-20位）"
+						placeholder="新密码（8-20位，包含大小写字母和数字）"
 						placeholderStyle="color: #8A8A8E"
 						:suffixIcon="showNewPassword ? 'eye' : 'eye-off'"
 						suffixIconStyle="color: #8A8A8E; fontSize: 20px"
@@ -150,11 +150,16 @@ export default {
 	computed: {
 		// 表单验证状态
 		isFormValid() {
-			return this.formData.currentPassword.length > 0 &&
-				   this.formData.newPassword.length >= 6 &&
-				   this.formData.confirmPassword.length > 0 &&
-				   this.formData.newPassword === this.formData.confirmPassword &&
-				   this.formData.currentPassword !== this.formData.newPassword
+			const { currentPassword, newPassword, confirmPassword } = this.formData
+			
+			return currentPassword.length > 0 &&
+				   newPassword.length >= 8 &&
+				   /[a-z]/.test(newPassword) &&
+				   /[A-Z]/.test(newPassword) &&
+				   /\d/.test(newPassword) &&
+				   confirmPassword.length > 0 &&
+				   newPassword === confirmPassword &&
+				   currentPassword !== newPassword
 		}
 	},
 	
@@ -245,12 +250,28 @@ export default {
 				return { valid: false, message: '请输入新密码' }
 			}
 			
-			if (newPassword.length < 6) {
-				return { valid: false, message: '新密码至少需要6位字符' }
+			// 修改为与后端一致的验证规则：至少8位，包含大小写字母和数字
+			if (newPassword.length < 8) {
+				return { valid: false, message: '新密码至少需要8位字符' }
 			}
 			
 			if (newPassword.length > 20) {
 				return { valid: false, message: '新密码不能超过20位字符' }
+			}
+			
+			// 检查是否包含小写字母
+			if (!/[a-z]/.test(newPassword)) {
+				return { valid: false, message: '新密码必须包含小写字母' }
+			}
+			
+			// 检查是否包含大写字母
+			if (!/[A-Z]/.test(newPassword)) {
+				return { valid: false, message: '新密码必须包含大写字母' }
+			}
+			
+			// 检查是否包含数字
+			if (!/\d/.test(newPassword)) {
+				return { valid: false, message: '新密码必须包含数字' }
 			}
 			
 			if (!confirmPassword) {
@@ -272,13 +293,22 @@ export default {
 		handleChangeError(error) {
 			let errorMessage = '密码修改失败，请重试'
 			
+			console.log('[心理师密码修改] 错误详情:', error)
+			
 			if (error && error.response) {
 				const { status, data } = error.response
 				
+				console.log('[心理师密码修改] 响应状态:', status, '响应数据:', data)
+				
 				switch (status) {
 					case 400:
+						// 优先使用后端返回的具体错误信息
 						if (data && data.message) {
 							errorMessage = data.message
+						} else if (data && data.msg) {
+							errorMessage = data.msg
+						} else if (data && typeof data === 'string') {
+							errorMessage = data
 						} else {
 							errorMessage = '请求参数错误'
 						}
@@ -307,6 +337,8 @@ export default {
 					errorMessage = error.message
 				}
 			}
+			
+			console.log('[心理师密码修改] 最终错误信息:', errorMessage)
 			
 			uni.showToast({
 				title: errorMessage,
@@ -355,7 +387,7 @@ export default {
 				const response = await this.executeWithRetry(() => changePassword({
 					currentPassword: this.formData.currentPassword,
 					newPassword: this.formData.newPassword,
-					userType: 'psychologist' // 标识心理师用户类型
+					confirmPassword: this.formData.confirmPassword
 				}))
 				
 				uni.hideLoading()

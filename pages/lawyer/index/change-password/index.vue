@@ -42,7 +42,7 @@
 						v-model="formData.newPassword"
 						type="text"
 						:password="!showNewPassword"
-						placeholder="新密码"
+						placeholder="新密码（8-20位，包含大小写字母和数字）"
 						placeholderStyle="color: #8A8A8E"
 						:suffixIcon="showNewPassword ? 'eye' : 'eye-off'"
 						suffixIconStyle="color: #8A8A8E; fontSize: 20px"
@@ -224,10 +224,45 @@ export default {
 				return false
 			}
 			
-			// 密码强度验证
-			if (this.formData.newPassword.length < 6) {
+			// 修改为与后端一致的验证规则：至少8位，包含大小写字母和数字
+			if (this.formData.newPassword.length < 8) {
 				uni.showToast({
-					title: '新密码长度不能少于6位',
+					title: '新密码至少需要8位字符',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			if (this.formData.newPassword.length > 20) {
+				uni.showToast({
+					title: '新密码不能超过20位字符',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			// 检查是否包含小写字母
+			if (!/[a-z]/.test(this.formData.newPassword)) {
+				uni.showToast({
+					title: '新密码必须包含小写字母',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			// 检查是否包含大写字母
+			if (!/[A-Z]/.test(this.formData.newPassword)) {
+				uni.showToast({
+					title: '新密码必须包含大写字母',
+					icon: 'none'
+				})
+				return false
+			}
+			
+			// 检查是否包含数字
+			if (!/\d/.test(this.formData.newPassword)) {
+				uni.showToast({
+					title: '新密码必须包含数字',
 					icon: 'none'
 				})
 				return false
@@ -253,8 +288,9 @@ export default {
 					console.log(`修改密码API调用 - 第${attempt}次尝试`)
 					
 					const response = await changePassword({
-						oldPassword: this.formData.currentPassword,
-						newPassword: this.formData.newPassword
+						currentPassword: this.formData.currentPassword,
+						newPassword: this.formData.newPassword,
+						confirmPassword: this.formData.confirmPassword
 					})
 					
 					console.log('密码修改成功：', response)
@@ -280,22 +316,52 @@ export default {
 		handleChangeError(error) {
 			let errorMessage = '密码修改失败，请稍后重试'
 			
-			if (error && error.message) {
-				// 根据错误类型提供具体提示
-				if (error.message.includes('当前密码错误') || error.message.includes('password incorrect')) {
-					errorMessage = '当前密码输入错误，请重新输入'
-				} else if (error.message.includes('密码格式') || error.message.includes('password format')) {
-					errorMessage = '新密码格式不符合要求'
-				} else if (error.message.includes('网络') || error.message.includes('network')) {
-					errorMessage = '网络连接异常，请检查网络后重试'
-				} else if (error.message.includes('权限') || error.message.includes('permission')) {
-					errorMessage = '权限不足，请重新登录后重试'
-				} else if (error.message.includes('频繁') || error.message.includes('frequent')) {
-					errorMessage = '操作过于频繁，请稍后再试'
-				} else if (error.message.includes('服务器') || error.message.includes('server')) {
-					errorMessage = '服务器繁忙，请稍后重试'
+			console.log('[律师密码修改] 错误详情:', error)
+			
+			if (error && error.response) {
+				const { status, data } = error.response
+				
+				console.log('[律师密码修改] 响应状态:', status, '响应数据:', data)
+				
+				switch (status) {
+					case 400:
+						// 优先使用后端返回的具体错误信息
+						if (data && data.message) {
+							errorMessage = data.message
+						} else if (data && data.msg) {
+							errorMessage = data.msg
+						} else if (data && typeof data === 'string') {
+							errorMessage = data
+						} else {
+							errorMessage = '请求参数错误'
+						}
+						break
+					case 401:
+						errorMessage = '当前密码错误'
+						break
+					case 403:
+						errorMessage = '无权限修改密码'
+						break
+					case 429:
+						errorMessage = '操作过于频繁，请稍后再试'
+						break
+					case 500:
+						errorMessage = '服务器内部错误，请稍后重试'
+						break
+					default:
+						errorMessage = `网络错误 (${status})`
+				}
+			} else if (error && error.message) {
+				if (error.message.includes('timeout')) {
+					errorMessage = '请求超时，请检查网络连接'
+				} else if (error.message.includes('Network')) {
+					errorMessage = '网络连接失败，请检查网络设置'
+				} else {
+					errorMessage = error.message
 				}
 			}
+			
+			console.log('[律师密码修改] 最终错误信息:', errorMessage)
 			
 			uni.showToast({
 				title: errorMessage,

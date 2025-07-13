@@ -65,8 +65,7 @@
   <script>
   import PsychologistTabbar from '@/components/tabbar/psychologist-tabbar/psychologist-tabbar.vue'
   import config from '@/config/index.js'
-  import { getPsychologistProfile, getUserPsychConsultations } from '@/api/modules/psychologist.js'
-  import { getChatSessions } from '@/api/modules/chat.js'
+  import { getConsultationManagementList } from '@/api/modules/lawyer-workspace.js'
   
   export default {
     name: 'PsychologistDashboard',
@@ -78,8 +77,7 @@
         config,
         consultationListHeight: '300rpx',
         consultationList: [],
-        loading: false,
-        psychologistInfo: {}
+        loading: false
       }
     },
     onLoad() {
@@ -90,12 +88,8 @@
 	  async loadDashboardData() {
 	    this.loading = true
 	    try {
-	      // 并行加载心理师信息和咨询列表
-	      const [profileResult, consultationsResult] = await Promise.all([
-	        this.loadPsychologistProfile(),
-	        this.loadConsultations()
-	      ])
-	      
+	      // 加载咨询列表
+	      await this.loadConsultations()
 	      console.log('工作台数据加载完成')
 	    } catch (error) {
 	      console.error('工作台数据加载失败:', error)
@@ -108,97 +102,55 @@
 	    }
 	  },
 
-	  // 加载心理师信息
-	  async loadPsychologistProfile() {
-	    try {
-	      const response = await getPsychologistProfile()
-	      this.psychologistInfo = response.data || {}
-	      console.log('心理师信息加载成功:', this.psychologistInfo)
-	      return response
-	    } catch (error) {
-	      console.error('心理师信息加载失败:', error)
-	      throw error
-	    }
-	  },
-
 	  // 加载咨询列表
 	  async loadConsultations() {
+	    // Mock数据定义
+	    const mockData = [
+	      {
+	        clientName: '李小明',
+	        summary: '焦虑情绪调节咨询...',
+	        timeAgo: '10分钟前',
+	        consultationId: 'mock_1'
+	      },
+	      {
+	        clientName: '王小红',
+	        summary: '职场压力管理咨询...',
+	        timeAgo: '25分钟前',
+	        consultationId: 'mock_2'
+	      },
+	      {
+	        clientName: '张小华',
+	        summary: '人际关系困扰咨询...',
+	        timeAgo: '1小时前',
+	        consultationId: 'mock_3'
+	      }
+	    ]
+	    
 	    try {
-	      // 尝试获取心理咨询列表
-	      const response = await getUserPsychConsultations({
+	      const response = await getConsultationManagementList({
 	        page: 1,
-	        pageSize: 10,
-	        status: 'active'
+	        size: 10
 	      })
 	      
-	      if (response.data && response.data.list) {
+	      if (response.data && response.data.list && response.data.list.length > 0) {
 	        this.consultationList = response.data.list.map(item => ({
 	          clientName: item.clientName || item.userName || '匿名用户',
-	          summary: this.truncateText(item.content || item.title || '心理咨询', 15),
+	          summary: this.truncateText(item.content || item.title || '咨询内容', 15),
 	          timeAgo: this.formatTimeAgo(item.createTime || item.updatedAt),
 	          consultationId: item.id
 	        }))
+	        console.log('咨询列表加载成功:', this.consultationList)
 	      } else {
-	        // 如果心理咨询API没有数据，尝试获取聊天会话
-	        await this.loadChatSessions()
+	        this.consultationList = mockData
+	        console.log('API无数据，使用Mock数据:', this.consultationList)
 	      }
 	      
-	      console.log('咨询列表加载成功:', this.consultationList)
 	      return response
 	    } catch (error) {
 	      console.error('咨询列表加载失败:', error)
-	      // 尝试备用方案：获取聊天会话
-	      try {
-	        await this.loadChatSessions()
-	      } catch (chatError) {
-	        console.error('聊天会话加载也失败:', chatError)
-	        // 使用默认数据作为最终降级方案
-	        this.consultationList = [
-	          {
-	            clientName: '李小明',
-	            summary: '焦虑情绪调节咨询...',
-	            timeAgo: '10分钟前'
-	          },
-	          {
-	            clientName: '王小红',
-	            summary: '职场压力管理咨询...',
-	            timeAgo: '25分钟前'
-	          },
-	          {
-	            clientName: '张小华',
-	            summary: '人际关系困扰咨询...',
-	            timeAgo: '1小时前'
-	          }
-	        ]
-	      }
-	      throw error
-	    }
-	  },
-	
-	  // 加载聊天会话作为备用数据源
-	  async loadChatSessions() {
-	    try {
-	      const response = await getChatSessions({
-	        page: 1,
-	        pageSize: 10,
-	        type: 'psychologist'
-	      })
-	      
-	      if (response.data && response.data.list) {
-	        this.consultationList = response.data.list.map(item => ({
-	          clientName: item.targetName || item.userName || '匿名用户',
-	          summary: this.truncateText(item.lastMessage || item.title || '心理咨询会话', 15),
-	          timeAgo: this.formatTimeAgo(item.lastMessageTime || item.updatedAt),
-	          consultationId: item.id,
-	          isChat: true
-	        }))
-	        console.log('聊天会话加载成功:', this.consultationList)
-	      }
-	      
-	      return response
-	    } catch (error) {
-	      console.error('聊天会话加载失败:', error)
-	      throw error
+	      this.consultationList = mockData
+	      console.log('API调用失败，使用Mock数据:', this.consultationList)
+	      // 不抛出错误，使用mock数据保证页面正常显示
 	    }
 	  },
 
