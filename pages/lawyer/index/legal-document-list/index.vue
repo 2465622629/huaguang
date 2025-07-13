@@ -223,7 +223,7 @@ export default {
         }
         
         const response = await this.callApiWithRetry(() => getLegalDocumentList(params))
-        const newDocuments = this.formatDocumentList(response.data?.list || response.data || [])
+        const newDocuments = this.formatDocumentList(response.data?.records || response.data?.list || [])
         
         if (isRefresh || (!isLoadMore && this.currentPage === 1)) {
           this.documentList = newDocuments
@@ -232,7 +232,7 @@ export default {
         }
         
         // 更新分页状态
-        const total = response.data?.total || newDocuments.length
+        const total = response.data?.total || 0
         this.hasMore = this.documentList.length < total && newDocuments.length === this.pageSize
         
         // 缓存数据（仅首页全部数据）

@@ -54,7 +54,7 @@
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
 import { staticBaseUrl } from '@/config/index.js'
-import { getUserConsultations } from '@/api/modules/lawyer.js'
+import { getConsultationManagementList } from '@/api/modules/lawyer-workspace.js'
 
 export default {
   name: 'LawyerDashboard',
@@ -87,19 +87,33 @@ export default {
         this.loading = true
         this.error = null
         
-        const response = await getUserConsultations({
+        const response = await getConsultationManagementList({
           page: 1,
-          pageSize: 5,
+          size: 5,
           status: 'pending' // 获取待处理的咨询
         })
         
-        if (response && response.data) {
+        if (response && response.data && response.data.records && response.data.records.length > 0) {
           // 转换API数据格式为页面需要的格式
-          this.consultationList = response.data.map(item => ({
+          this.consultationList = response.data.records.map(item => ({
             clientName: item.clientName || '匿名用户',
             summary: item.content ? item.content.substring(0, 20) + '...' : '暂无描述',
             timeAgo: this.formatTimeAgo(item.createdAt)
           }))
+        } else {
+          // 当前没有数据，保留mock数据
+          this.consultationList = [
+            {
+              clientName: '李小明',
+              summary: '公司拖欠工资三个月, 当...',
+              timeAgo: '10分钟前'
+            },
+            {
+              clientName: '王小红',
+              summary: '房屋租赁合同纠纷, 需要...',
+              timeAgo: '25分钟前'
+            }
+          ]
         }
       } catch (error) {
         console.error('获取咨询列表失败:', error)

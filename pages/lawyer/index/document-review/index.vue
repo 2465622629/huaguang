@@ -1,5 +1,5 @@
 <template>
-  <view class="container" :style="backgroundStyle">
+  <view class="container">
     <!-- 状态栏占位 -->
     <view class="status-bar"></view>
     
@@ -41,9 +41,6 @@
         enable-back-to-top="true"
         show-scrollbar="false"
         @scrolltolower="loadMore"
-        @refresherrefresh="onRefresh"
-        :refresher-enabled="true"
-        :refresher-triggered="refreshing"
       >
         <!-- 文书列表项 -->
         <view 
@@ -95,7 +92,6 @@ export default {
       currentTab: 0,
       scrollViewHeight: 400,
       loading: false,
-      refreshing: false,
       hasMore: true,
       page: 1,
       pageSize: 10,
@@ -105,7 +101,7 @@ export default {
       // 筛选标签
       filterTabs: [
         { name: '全部', value: 'all' },
-        { name: '待审核', value: 'pending' },
+        { name: '待审核', value: 'pending_review' },
         { name: '已通过', value: 'approved' },
         { name: '已驳回', value: 'rejected' }
       ],
@@ -114,27 +110,48 @@ export default {
       documentList: [],
       
       // 缓存相关
-      cacheKey: 'document_review_list_cache',
       cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
       lastCacheTime: 0
     }
   },
   
   computed: {
-    // 显示的文书列表（API已处理筛选，直接返回）
+    // 显示的文书列表（结合API筛选和前端筛选）
     filteredDocuments() {
-      return this.documentList
-    },
-    backgroundStyle() {
-      return {
-        backgroundImage: `url('${staticBaseUrl}/bg10.png')`
+      console.log('当前标签索引:', this.currentTab)
+      console.log('文档列表数据:', this.documentList)
+      
+      // 如果是"全部"标签，直接返回所有数据
+      if (this.currentTab === 0) {
+        console.log('显示全部数据')
+        return this.documentList
       }
+      
+      // 获取当前筛选条件
+      const currentFilter = this.filterTabs[this.currentTab].value
+      console.log('当前筛选条件:', currentFilter)
+      
+      // 前端筛选作为后备方案（API筛选失败时使用）
+      const filtered = this.documentList.filter(doc => {
+        console.log(`文档 ${doc.title} 状态: ${doc.status}, 匹配条件: ${currentFilter}, 是否匹配: ${doc.status === currentFilter}`)
+        return doc.status === currentFilter
+      })
+      
+      console.log('筛选后的结果:', filtered)
+      return filtered
+    },
+    
+    // 当前筛选条件的缓存键
+    currentCacheKey() {
+      const filterValue = this.filterTabs[this.currentTab].value
+      return `document_review_list_cache_${filterValue}`
     }
   },
   
   mounted() {
     this.calculateScrollViewHeight()
-    this.loadDocumentList()
+    // 页面加载时强制刷新数据，不使用缓存
+    this.loadDocumentList(true)
   },
   
   methods: {
@@ -151,13 +168,17 @@ export default {
     
     // 加载文档审核列表
     async loadDocumentList(isRefresh = false, isLoadMore = false) {
+      console.log('loadDocumentList called:', { isRefresh, isLoadMore, loading: this.loading })
+      
       // 防止重复请求
-      if (this.loading && !isRefresh) return
+      if (this.loading && !isRefresh) {
+        console.log('请求被阻止：正在加载中')
+        return
+      }
       
       try {
         // 设置加载状态
         if (isRefresh) {
-          this.refreshing = true
           this.page = 1
           this.hasMore = true
         } else if (isLoadMore) {
@@ -168,10 +189,10 @@ export default {
           this.loading = true
         }
         
-        // 检查缓存（仅首次加载且非刷新时）
+        // 检查缓存（仅在非刷新、非加载更多、且是首页时）
         if (!isRefresh && !isLoadMore && this.page === 1) {
           const cachedData = this.getCachedData()
-          if (cachedData) {
+          if (cachedData && cachedData.length > 0) {
             this.documentList = cachedData
             this.loading = false
             console.log('使用缓存数据加载文档列表')
@@ -188,11 +209,13 @@ export default {
         }
         
         // 调用API获取数据
+        console.log('发起API请求，参数:', params)
         const response = await this.callApiWithRetry(() => getDocumentReviewList(params))
+        console.log('API响应:', response)
         
         // 处理API响应
         if (response && response.code === 200) {
-          const newDocuments = this.formatDocumentList(response.data?.list || [])
+          const newDocuments = this.formatDocumentList(response.data?.records || [])
           
           if (isRefresh || (!isLoadMore && this.page === 1)) {
             this.documentList = newDocuments
@@ -210,7 +233,7 @@ export default {
             this.setCachedData(this.documentList)
           }
           
-          console.log(`文档列表加载成功，当前页：${this.page}，总数：${currentTotal}/${total}`)
+          console.log(`文档列表加载成功，当前页：${this.page}，总数：${currentTotal}/${total}，筛选条件：${currentFilter}`)
         } else {
           throw new Error(response?.message || '获取文档列表失败')
         }
@@ -224,7 +247,6 @@ export default {
       } finally {
         // 重置加载状态
         this.loading = false
-        this.refreshing = false
       }
     },
     
@@ -253,29 +275,33 @@ export default {
     
     // 格式化文档列表数据
     formatDocumentList(documents) {
-      return documents.map(doc => ({
-        id: doc.id || doc.documentId,
+      console.log('原始文档数据:', documents)
+      const formattedDocs = documents.map(doc => ({
+        id: doc.documentId || doc.id,
         title: doc.title || doc.documentTitle || '未知文书',
-        createTime: this.formatDateTime(doc.createTime || doc.createdAt),
+        createTime: this.formatDateTime(doc.createdAt || doc.createTime),
         status: this.mapApiStatus(doc.status || doc.reviewStatus),
         originalData: doc // 保存原始数据以备后用
       }))
+      console.log('格式化后的文档数据:', formattedDocs)
+      return formattedDocs
     },
     
     // API状态映射到前端状态
     mapApiStatus(apiStatus) {
       const statusMap = {
-        'PENDING': 'pending',
+        'PENDING': 'pending_review',
         'APPROVED': 'approved',
         'REJECTED': 'rejected',
-        'pending': 'pending',
+        'pending': 'pending_review',
+        'pending_review': 'pending_review',
         'approved': 'approved',
         'rejected': 'rejected',
-        '0': 'pending',
+        '0': 'pending_review',
         '1': 'approved',
         '2': 'rejected'
       }
-      return statusMap[apiStatus] || 'pending'
+      return statusMap[apiStatus] || 'pending_review'
     },
     
     // 格式化日期时间
@@ -362,14 +388,14 @@ export default {
     // 缓存管理
     getCachedData(allowExpired = false) {
       try {
-        const cached = uni.getStorageSync(this.cacheKey)
+        const cached = uni.getStorageSync(this.currentCacheKey)
         if (!cached) return null
         
         const { data, timestamp } = JSON.parse(cached)
         const now = Date.now()
         
         if (!allowExpired && (now - timestamp > this.cacheExpiry)) {
-          uni.removeStorageSync(this.cacheKey)
+          uni.removeStorageSync(this.currentCacheKey)
           return null
         }
         
@@ -386,7 +412,7 @@ export default {
           data,
           timestamp: Date.now()
         }
-        uni.setStorageSync(this.cacheKey, JSON.stringify(cacheData))
+        uni.setStorageSync(this.currentCacheKey, JSON.stringify(cacheData))
       } catch (error) {
         console.warn('设置缓存失败:', error)
       }
@@ -401,9 +427,17 @@ export default {
     async handleTabChange(index) {
       if (this.currentTab === index) return
       
+      console.log(`切换筛选标签：${this.filterTabs[index].name}`)
+      
+      // 更新当前标签
       this.currentTab = index
+      
+      // 重置分页状态
       this.page = 1
       this.hasMore = true
+      
+      // 清空当前列表数据，显示加载状态
+      this.documentList = []
       
       // 重新加载数据
       await this.loadDocumentList()
@@ -412,7 +446,7 @@ export default {
     // 获取状态样式类
     getStatusClass(status) {
       const statusMap = {
-        'pending': 'status-pending',
+        'pending_review': 'status-pending',
         'approved': 'status-approved', 
         'rejected': 'status-rejected'
       }
@@ -422,7 +456,7 @@ export default {
     // 获取状态文本
     getStatusText(status) {
       const statusMap = {
-        'pending': '待审核',
+        'pending_review': '待审核',
         'approved': '已通过',
         'rejected': '已驳回'
       }
@@ -448,12 +482,6 @@ export default {
       })
     },
     
-    // 下拉刷新
-    async onRefresh() {
-      console.log('开始下拉刷新')
-      await this.loadDocumentList(true)
-    },
-    
     // 加载更多
     async loadMore() {
       if (this.loading || !this.hasMore) return
@@ -468,10 +496,17 @@ export default {
 <style lang="scss" scoped>
 .container {
   min-height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow-y: auto;
   
+  background-image: url('https://huaguang-admin.djjp.cn/static/bg10.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 // 状态栏占位
@@ -482,7 +517,7 @@ export default {
 
 // 自定义导航栏
 .custom-navbar {
-  background: rgba(239, 247, 255, 0.9);
+  // background: rgba(239, 247, 255, 0.9);
   backdrop-filter: blur(10px);
   padding: 20rpx 30rpx;
   
@@ -515,7 +550,7 @@ export default {
   display: flex;
   padding: 40rpx 30rpx;
   gap: 20rpx;
-  background: rgba(239, 247, 255, 0.9);
+  // background: rgba(239, 247, 255, 0.9);
   backdrop-filter: blur(10px);
   
   .tab-item {

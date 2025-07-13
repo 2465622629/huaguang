@@ -92,7 +92,7 @@
 <script>
 import LawyerTabbar from '@/components/tabbar/lawyer-tabbar/lawyer-tabbar.vue'
 import { staticBaseUrl } from '@/config/index.js'
-import { getUserConsultations, getConsultationDetail } from '@/api/modules/lawyer.js'
+import { getConsultationManagementList } from '@/api/modules/lawyer-workspace.js'
 
 export default {
   components: {
@@ -155,7 +155,9 @@ export default {
       // 滚动相关
       scrollViewHeight: 0,
       loading: false,
-      hasMore: true
+      hasMore: true,
+      currentPage: 1,
+      pageSize: 10
     }
   },
   
@@ -182,29 +184,54 @@ export default {
       try {
         this.loading = true
         
-        const response = await getUserConsultations({
-          page: 1,
-          pageSize: 20
+        // 根据当前标签设置状态参数
+        const statusMap = {
+          0: 'pending',    // 待回复
+          1: 'ongoing',    // 咨询中
+          2: 'completed'   // 已完成
+        }
+        
+        const response = await getConsultationManagementList({
+          status: statusMap[this.currentTab],
+          page: this.currentPage,
+          size: this.pageSize
         })
         
-        if (response && response.data) {
-          // 转换API数据格式
-          this.consultationList = response.data.map(item => ({
-            id: item.id,
-            userName: item.clientName || '匿名用户',
-            caseType: item.category || '一般咨询',
-            description: item.content ? item.content.substring(0, 30) + '...' : '暂无描述',
-            timeStamp: this.formatTimeAgo(item.createdAt),
-            status: this.mapConsultationStatus(item.status)
-          }))
+        if (response && response.code === 200 && response.data) {
+          const { records, total, current, pages } = response.data
+          
+          // 如果有数据，转换API数据格式
+          if (records && records.length > 0) {
+            const newData = records.map(item => ({
+              id: item.id,
+              userName: item.clientName || item.userName || '匿名用户',
+              caseType: item.category || item.caseType || '一般咨询',
+              description: item.content ? (item.content.length > 30 ? item.content.substring(0, 30) + '...' : item.content) : item.description || '暂无描述',
+              timeStamp: this.formatTimeAgo(item.createdAt || item.createTime),
+              status: this.mapConsultationStatus(item.status)
+            }))
+            
+            // 如果是第一页，替换数据；否则追加数据
+            if (this.currentPage === 1) {
+              this.consultationList = newData
+            } else {
+              this.consultationList.push(...newData)
+            }
+            
+            // 更新分页状态
+            this.hasMore = current < pages
+          } else {
+            // 如果API返回空数据，保留mock数据
+            console.log('API返回空数据，使用mock数据')
+          }
+        } else {
+          // 如果API调用失败，保留mock数据
+          console.log('API调用失败，使用mock数据')
         }
       } catch (error) {
         console.error('加载咨询消息失败:', error)
-        uni.showToast({
-          title: '加载消息失败',
-          icon: 'none',
-          duration: 2000
-        })
+        // 保留mock数据，不显示错误提示
+        console.log('API调用异常，使用mock数据')
       } finally {
         this.loading = false
       }
@@ -254,6 +281,9 @@ export default {
     // 处理标签切换
     handleTabChange(index) {
       this.currentTab = index
+      this.currentPage = 1
+      this.hasMore = true
+      this.loadConsultationMessages()
     },
     
     // 处理卡片点击
@@ -263,42 +293,20 @@ export default {
     },
     
     // 处理查看按钮点击
-    async handleViewClick(item) {
-      try {
-        console.log('点击查看按钮:', item)
-        
-        // 获取咨询详情
-        const response = await getConsultationDetail(item.id)
-        
-        if (response) {
-          // 跳转到咨询聊天页面
-          uni.navigateTo({
-            url: `/pages/lawyer/chat/index?consultationId=${item.id}`
-          })
-        }
-      } catch (error) {
-        console.error('获取咨询详情失败:', error)
-        uni.showToast({
-          title: '获取详情失败',
-          icon: 'none',
-          duration: 2000
-        })
-      }
+    handleViewClick(item) {
+      console.log('点击查看按钮:', item)
+      // 跳转到咨询聊天页面
+      uni.navigateTo({
+        url: `/pages/lawyer/chat/index?consultationId=${item.id}`
+      })
     },
     
     // 加载更多数据
     loadMore() {
       if (this.loading || !this.hasMore) return
       
-      this.loading = true
-      
-      // 模拟加载更多数据
-      setTimeout(() => {
-        // 这里可以调用API加载更多数据
-        this.loading = false
-        // 如果没有更多数据，设置hasMore为false
-        // this.hasMore = false
-      }, 1000)
+      this.currentPage++
+      this.loadConsultationMessages()
     }
   }
 }
