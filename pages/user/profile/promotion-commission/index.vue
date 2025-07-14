@@ -115,7 +115,7 @@
 
 <script>
 import { staticBaseUrl } from '@/config/index.js'
-import { getCommissionInfo, getCommissionRecords, applyWithdraw } from '@/api/modules/user.js'
+import { getMyCommission, getCommissionRecords, applyWithdrawal } from '@/api/modules/user.js'
 
 export default {
 	name: 'PromotionCommission',
@@ -138,7 +138,7 @@ export default {
 			// 佣金记录
 			commissionRecords: [],
 			recordsPage: 1,
-			recordsPageSize: 20,
+			recordsPageSize: 10, // 与API响应示例的size保持一致
 			hasMoreRecords: true
 		}
 	},
@@ -196,16 +196,19 @@ export default {
 			this.loading = true
 			
 			try {
-				const response = await getCommissionInfo()
-				// 修复数据解析路径：处理新的API响应格式 response.data.commissionOverview
+				const response = await getMyCommission()
+				// 适配新的API响应格式：response.data.commissionOverview
 				const data = response.data || response
 				const overview = data.commissionOverview || data
 				
 				this.commissionData = {
-					totalAmount: overview.totalCommission || overview.totalAmount || 0,
+					totalAmount: overview.totalCommission || 0,
 					withdrawnAmount: overview.withdrawnAmount || 0,
-					pendingAmount: overview.availableAmount || overview.pendingAmount || 0,
-					availableAmount: overview.availableAmount || 0
+					pendingAmount: overview.availableAmount || 0,
+					availableAmount: overview.availableAmount || 0,
+					frozenAmount: overview.frozenAmount || 0,
+					monthlyCommission: overview.monthlyCommission || 0,
+					yesterdayCommission: overview.yesterdayCommission || 0
 				}
 				
 				console.log('佣金信息加载成功:', this.commissionData)
@@ -218,7 +221,10 @@ export default {
 					totalAmount: 0,
 					withdrawnAmount: 0,
 					pendingAmount: 0,
-					availableAmount: 0
+					availableAmount: 0,
+					frozenAmount: 0,
+					monthlyCommission: 0,
+					yesterdayCommission: 0
 				}
 				
 				uni.showToast({
@@ -245,21 +251,22 @@ export default {
 			try {
 				const response = await getCommissionRecords({
 					page: this.recordsPage,
-					pageSize: this.recordsPageSize
+					size: this.recordsPageSize
 				})
 				
-				// 修复数据解析路径：处理新的API响应格式 response.data.records
+				// 适配新的API响应格式：response.data.records
 				const recordsData = response.data || response
-				const records = recordsData.records || recordsData.list || recordsData || []
+				const records = recordsData.records || []
 				
-				// 处理数据格式：正确映射新API响应字段
+				// 处理数据格式：映射API响应字段
 				const formattedRecords = records.map(record => ({
 					id: record.id,
-					type: record.commissionSource || record.type || record.commissionType || '推广分成',
-					time: record.recordTime || record.createdAt || record.time,
-					amount: record.commissionAmount || record.amount,
+					type: record.commissionSource || '推广分成',
+					time: record.recordTime,
+					amount: record.commissionAmount,
 					status: record.status,
-					description: record.description || record.remark
+					statusDisplay: record.statusDisplay,
+					description: record.description
 				}))
 				
 				if (isRefresh) {
@@ -268,8 +275,12 @@ export default {
 					this.commissionRecords.push(...formattedRecords)
 				}
 				
-				// 检查是否还有更多数据
-				this.hasMoreRecords = records.length >= this.recordsPageSize
+				// 检查是否还有更多数据 - 基于API响应的分页信息
+				const total = recordsData.total || 0
+				const currentPage = recordsData.current || this.recordsPage
+				const totalPages = recordsData.pages || 0
+				
+				this.hasMoreRecords = currentPage < totalPages && records.length >= this.recordsPageSize
 				
 				if (this.hasMoreRecords) {
 					this.recordsPage++
@@ -411,7 +422,7 @@ export default {
 					amount: parseFloat(this.commissionData.pendingAmount)
 				}
 				
-				await applyWithdraw(withdrawData)
+				await applyWithdrawal(withdrawData)
 				
 				uni.showToast({
 					title: '提现申请已提交',

@@ -12,7 +12,7 @@
           name="arrow-left" 
           size="42" 
           color="#50A0E0"
-          bold="true"
+          :bold="true"
           @click="goBack"
         ></uv-icon>
       </template>
@@ -280,10 +280,13 @@ export default {
   },
   
   onShow() {
-    // 检查数据是否需要刷新
-    const now = Date.now()
-    if (now - this.lastLoadTime > this.cacheExpiry) {
-      this.loadSkillTrainingData()
+    // 检查数据是否需要刷新（但不在初次加载时执行）
+    if (this.lastLoadTime > 0) {
+      const now = Date.now()
+      if (now - this.lastLoadTime > this.cacheExpiry) {
+        console.log('缓存过期，重新加载数据')
+        this.loadSkillTrainingData()
+      }
     }
   },
   
@@ -324,6 +327,10 @@ export default {
         this.handleApiError(error)
       } finally {
         this.isLoading = false
+        // 确保初次加载后设置lastLoadTime，避免onShow重复加载
+        if (this.lastLoadTime === 0) {
+          this.lastLoadTime = Date.now()
+        }
       }
     },
 
@@ -334,17 +341,28 @@ export default {
       try {
         console.log('开始加载技能培训数据...')
         
-        // 并行加载主页数据和分类数据
-        const [homeResult, categoriesResult] = await Promise.allSettled([
-          this.executeWithRetry(() => skillTrainingApi.getSkillTrainingHome()),
-          this.executeWithRetry(() => skillTrainingApi.getAllCategories({ includeCount: true }))
-        ])
-
-        console.log('技能培训API响应:', { homeResult, categoriesResult })
+        // 先单独加载热门课程数据
+        let homeResult, categoriesResult
+        
+        try {
+          homeResult = await this.executeWithRetry(() => skillTrainingApi.getHotCourses({ limit: 20 }))
+          console.log('热门课程API响应:', homeResult)
+        } catch (error) {
+          console.error('热门课程API调用失败:', error)
+          homeResult = { status: 'rejected', reason: error }
+        }
+        
+        try {
+          categoriesResult = await this.executeWithRetry(() => skillTrainingApi.getAllCategories())
+          console.log('分类API响应:', categoriesResult)
+        } catch (error) {
+          console.error('分类API调用失败:', error)
+          categoriesResult = { status: 'rejected', reason: error }
+        }
 
         // 处理分类数据
-        if (categoriesResult.status === 'fulfilled' && categoriesResult.value?.data) {
-          const categories = categoriesResult.value.data
+        if (categoriesResult && categoriesResult.data) {
+          const categories = categoriesResult.data
           this.tabsList = [
             { name: '全部', categoryId: 'all', courseCount: 0 },
             ...categories.map(category => ({
@@ -353,48 +371,20 @@ export default {
               courseCount: category.courseCount || 0
             }))
           ]
-        } else if (homeResult.status === 'fulfilled' && homeResult.value?.categories) {
-          // 使用主页API返回的分类数据作为备用
-          this.tabsList = [
-            { name: '全部', categoryId: 'all', courseCount: 0 },
-            ...homeResult.value.categories.map(category => ({
-              name: category.name,
-              categoryId: category.id,
-              courseCount: category.courseCount || 0
-            }))
-          ]
+        } else {
+          console.warn('使用默认分类数据')
+          this.tabsList = this.defaultTabsList
         }
 
         // 处理课程数据
-        if (homeResult.status === 'fulfilled' && homeResult.value?.courses) {
-          this.coursesList = homeResult.value.courses.map(course => ({
-            id: course.id,
-            title: course.title || course.courseName,
-            duration: this.formatDuration(course.duration || course.videoDuration),
-            playCount: this.formatPlayCount(course.viewCount || course.playCount),
-            isFavorite: course.isFavorited || course.isFavorite || false,
-            category: course.categoryId || course.category,
-            thumbnail: course.thumbnail || course.coverImage || '',
-            instructor: course.instructor?.name || course.instructorName || '未知讲师',
-            rating: course.rating || course.score || 0,
-            price: course.price || 0,
-            originalPrice: course.originalPrice || 0
-          }))
+        if (homeResult && homeResult.data) {
+          this.coursesList = this.formatCourseData(homeResult.data)
           this.originalCoursesList = [...this.coursesList]
+          console.log('课程数据加载成功:', this.coursesList.length)
         } else {
-          // 如果主页API失败，尝试加载热门课程
-          try {
-            const hotCoursesResult = await this.executeWithRetry(() => 
-              skillTrainingApi.getHotCourses({ page: 1, size: 20 })
-            )
-            
-            if (hotCoursesResult?.data) {
-              this.coursesList = this.formatCourseData(hotCoursesResult.data)
-              this.originalCoursesList = [...this.coursesList]
-            }
-          } catch (fallbackError) {
-            console.error('加载热门课程也失败:', fallbackError)
-          }
+          console.warn('使用默认课程数据')
+          this.coursesList = this.defaultCoursesList
+          this.originalCoursesList = [...this.coursesList]
         }
 
         // 更新统计信息
@@ -422,6 +412,9 @@ export default {
         if (this.tabsList.length === 0) {
           this.tabsList = this.defaultTabsList
         }
+        
+        // 即使失败也要设置lastLoadTime，避免重复请求
+        this.lastLoadTime = Date.now()
       }
     },
 
@@ -474,25 +467,24 @@ export default {
         if (selectedTab.categoryId === 'all') {
           moreCoursesResult = await this.executeWithRetry(() => 
             skillTrainingApi.getHotCourses({ 
-              page: this.currentPage, 
-              size: this.pageSize 
+              limit: this.pageSize 
             })
           )
         } else {
           moreCoursesResult = await this.executeWithRetry(() => 
             skillTrainingApi.getCoursesByCategory(selectedTab.categoryId, {
-              page: this.currentPage,
-              size: this.pageSize
+              limit: this.pageSize
             })
           )
         }
         
-        if (moreCoursesResult?.data && moreCoursesResult.data.length > 0) {
+        if (moreCoursesResult?.data) {
           const newCourses = this.formatCourseData(moreCoursesResult.data)
           this.coursesList.push(...newCourses)
           
           // 检查是否还有更多数据
-          if (moreCoursesResult.data.length < this.pageSize) {
+          const courseList = moreCoursesResult.data.records || moreCoursesResult.data
+          if (!courseList || courseList.length < this.pageSize) {
             this.hasMore = false
           }
         } else {
@@ -657,18 +649,21 @@ export default {
     },
 
     /**
-     * 格式化课程数据
+     * 格式化课程数据 - 适配API响应格式
      */
     formatCourseData(courses) {
-      return courses.map(course => ({
+      // 处理分页响应格式 data.records
+      const courseList = courses.records || courses
+      
+      return courseList.map(course => ({
         id: course.id,
         title: course.title || course.courseName,
-        duration: this.formatDuration(course.duration || course.videoDuration),
-        playCount: this.formatPlayCount(course.viewCount || course.playCount),
+        duration: course.durationFormatted || this.formatDuration(course.durationMinutes || course.duration || course.videoDuration),
+        playCount: course.viewCountFormatted || this.formatPlayCount(course.viewCount || course.playCount),
         isFavorite: course.isFavorited || course.isFavorite || false,
-        category: course.categoryId || course.category,
-        thumbnail: course.thumbnail || course.coverImage || '',
-        instructor: course.instructor?.name || course.instructorName || '未知讲师',
+        category: course.categoryName || course.category || course.categoryId,
+        thumbnail: course.coverImage || course.thumbnail || '',
+        instructor: course.instructorName || course.instructor?.name || '未知讲师',
         rating: course.rating || course.score || 0,
         price: course.price || 0,
         originalPrice: course.originalPrice || 0
@@ -692,20 +687,34 @@ export default {
     },
 
     /**
-     * 格式化播放时长
+     * 格式化播放时长 - 支持秒数和分钟数
      */
-    formatDuration(seconds) {
-      if (!seconds) return '00:00'
+    formatDuration(duration) {
+      if (!duration) return '00:00'
       
       // 如果传入的是已格式化的字符串，直接返回
-      if (typeof seconds === 'string' && seconds.includes(':')) {
-        return seconds
+      if (typeof duration === 'string' && duration.includes(':')) {
+        return duration
       }
       
-      const totalSeconds = parseInt(seconds)
-      const minutes = Math.floor(totalSeconds / 60)
-      const remainingSeconds = totalSeconds % 60
-      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+      const durationNumber = parseInt(duration)
+      
+      // 如果数值较大（>100），可能是秒数；较小可能是分钟数
+      if (durationNumber > 100) {
+        // 按秒数处理
+        const minutes = Math.floor(durationNumber / 60)
+        const seconds = durationNumber % 60
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      } else {
+        // 按分钟数处理（API返回的durationMinutes字段）
+        const hours = Math.floor(durationNumber / 60)
+        const minutes = durationNumber % 60
+        if (hours > 0) {
+          return `${hours}:${minutes.toString().padStart(2, '0')}`
+        } else {
+          return `${minutes}:00`
+        }
+      }
     },
 
     /**
@@ -756,12 +765,11 @@ export default {
             this.isLoading = true
             const categoryResult = await this.executeWithRetry(() => 
               skillTrainingApi.getCoursesByCategory(selectedTab.categoryId, {
-                page: 1,
-                size: this.pageSize
+                limit: this.pageSize
               })
             )
             
-            if (categoryResult?.data && categoryResult.data.length > 0) {
+            if (categoryResult?.data) {
               this.coursesList = this.formatCourseData(categoryResult.data)
               
               // 更新原始数据
