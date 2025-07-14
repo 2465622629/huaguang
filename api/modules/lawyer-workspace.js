@@ -131,11 +131,11 @@ export const submitDocumentReview = (data) => {
 
 /**
  * 获取法律文书详情
- * @param {string} documentId 文档ID
+ * @param {number} documentId 文档ID
  * @returns {Promise} 文档详情
  */
 export const getDocumentDetail = (documentId) => {
-  return get(`/lawyer/workspace/documents/${documentId}/detail`)
+  return get(`/legal/documents/${documentId}`)
 }
 
 /**

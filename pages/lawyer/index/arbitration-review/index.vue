@@ -161,7 +161,7 @@ export default {
       statusBarHeight: 0,
       scrollViewHeight: 0,
       loading: false,
-      documentId: '',
+      documentId: null,
       arbitrationApplication: {
         id: '',
         title: '劳动仲裁申请书',
@@ -202,7 +202,7 @@ export default {
     this.getSystemInfo()
     // 获取文档ID参数
     if (options && options.documentId) {
-      this.documentId = options.documentId
+      this.documentId = parseInt(options.documentId, 10)
       this.loadArbitrationDetail()
     } else {
       // 如果没有传入documentId，使用默认数据进行演示
@@ -225,8 +225,8 @@ export default {
 
     // 加载仲裁申请书详情（企业级API集成）
     async loadArbitrationDetail() {
-      if (!this.documentId) {
-        console.log('文档ID为空，跳过API调用')
+      if (!this.documentId || this.documentId <= 0) {
+        console.log('文档ID为空或无效，跳过API调用')
         return
       }
 
@@ -243,6 +243,7 @@ export default {
           if (response && response.data) {
             // 格式化API数据到本地数据结构
             this.formatApplicationData(response.data)
+            this.loading = false
             console.log('仲裁申请书详情加载成功')
           } else {
             throw new Error('API返回数据格式错误')
@@ -279,10 +280,14 @@ export default {
       try {
         // 更新基本信息
         if (apiData.title) this.arbitrationApplication.title = apiData.title
-        if (apiData.createTime) this.arbitrationApplication.createTime = this.formatDateTime(apiData.createTime)
+        if (apiData.createdAt) this.arbitrationApplication.createTime = this.formatDateTime(apiData.createdAt)
         if (apiData.status) this.arbitrationApplication.status = this.formatStatus(apiData.status)
         
-        // 更新申请人信息
+        // 更新申请人信息 - API中的user字段对应申请人信息
+        if (apiData.user) {
+          if (apiData.user.realName) this.arbitrationApplication.applicant.name = apiData.user.realName
+          if (apiData.user.phone) this.arbitrationApplication.applicant.phone = apiData.user.phone
+        }
         if (apiData.applicant) {
           Object.assign(this.arbitrationApplication.applicant, apiData.applicant)
         }
@@ -297,7 +302,10 @@ export default {
           this.arbitrationApplication.requests = apiData.requests
         }
         
-        // 更新事实与理由
+        // 更新事实与理由 - API中的content字段对应事实与理由
+        if (apiData.content) {
+          this.arbitrationApplication.factsAndReasons = apiData.content
+        }
         if (apiData.factsAndReasons) {
           this.arbitrationApplication.factsAndReasons = apiData.factsAndReasons
         }
@@ -375,9 +383,9 @@ export default {
 
     // 提交审核结果（企业级API集成）
     async submitReview(reviewResult, reviewComment = '') {
-      if (!this.documentId) {
+      if (!this.documentId || this.documentId <= 0) {
         uni.showToast({
-          title: '文档ID缺失',
+          title: '文档ID缺失或无效',
           icon: 'none'
         })
         return false
@@ -402,6 +410,7 @@ export default {
           if (response && response.success) {
             // 更新本地状态
             this.arbitrationApplication.status = reviewResult === 'approved' ? '已通过' : '已驳回'
+            this.loading = false
             
             uni.showToast({
               title: reviewResult === 'approved' ? '审核通过' : '已驳回',

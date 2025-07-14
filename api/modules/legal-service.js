@@ -61,18 +61,18 @@ export const downloadLegalTemplate = (templateId) => {
 }
 
 /**
- * 获取专属导师列表
+ * 获取心理师列表
  * @param {Object} params - 查询参数
  * @param {string} [params.sortBy='default'] - 排序方式
  * @param {string} [params.specialty] - 擅长领域
  * @param {string} [params.gender] - 性别
  * @param {number} [params.page=1] - 页码
  * @param {number} [params.size=10] - 每页大小
- * @returns {Promise} 专属导师列表
+ * @returns {Promise} 心理师列表
  */
 export const getPsychologistList = (params = {}) => {
   const { page = 1, size = 10, sortBy = 'default', ...otherParams } = params
-  return get('/legal/psychologists', {
+  return get('/psychologist/list', {
     page,
     size,
     sortBy,
@@ -82,11 +82,11 @@ export const getPsychologistList = (params = {}) => {
 
 /**
  * 获取订单详情页面
- * @param {number} orderId - 订单ID
+ * @param {string} orderNo - 订单号
  * @returns {Promise} 订单详情页面数据
  */
-export const getOrderDetailPage = (orderId) => {
-  return get(`/legal/orders/${orderId}/detail`)
+export const getOrderDetailPage = (orderNo) => {
+  return get(`/legal/orders/${orderNo}/detail`)
 }
 
 /**
@@ -121,14 +121,7 @@ export const getLawyerDetail = (lawyerId) => {
   return get(`/legal/lawyers/${lawyerId}`)
 }
 
-/**
- * 获取律师详情扩展版
- * @param {number} lawyerId - 律师ID
- * @returns {Promise} 律师详细信息扩展版
- */
-export const getLawyerDetailExtended = (lawyerId) => {
-  return get(`/legal/lawyers/${lawyerId}/extended`)
-}
+
 
 /**
  * 获取法律帮助主页数据
@@ -179,7 +172,7 @@ export const getConsultationLawyerList = (params = {}) => {
  * @returns {Promise} 律师咨询订单页面数据
  */
 export const getLawyerConsultationOrderPage = (lawyerId) => {
-  return get(`/legal/lawyers/${lawyerId}/consultation/order`)
+  return get(`/legal/consultation/order/${lawyerId}`)
 }
 
 /**
@@ -210,7 +203,6 @@ export default {
   getOrderDetailPage,
   getLawyerList,
   getLawyerDetail,
-  getLawyerDetailExtended,
   getLegalHelpHome,
   getLegalDocumentDetail,
   downloadLegalDocument,
