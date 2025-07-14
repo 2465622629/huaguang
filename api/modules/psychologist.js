@@ -20,7 +20,7 @@ import { get, post, put, del } from '../request.js'
  * @returns {Promise} 心理师列表
  */
 export const getPsychologists = (params) => {
-  return get('/psychologists', params)
+  return get('/psychologist/list', params)
 }
 
 /**
@@ -29,7 +29,7 @@ export const getPsychologists = (params) => {
  * @returns {Promise} 心理师详情
  */
 export const getPsychologistDetail = (psychologistId) => {
-  return get(`/psychologists/${psychologistId}`)
+  return get(`/psychologist/${psychologistId}/detail`)
 }
 
 /**
@@ -38,7 +38,7 @@ export const getPsychologistDetail = (psychologistId) => {
  * @returns {Promise} 服务列表
  */
 export const getPsychologistServices = (psychologistId) => {
-  return get(`/psychologists/${psychologistId}/services`)
+  return get(`/psychologist/${psychologistId}/services`)
 }
 
 /**
@@ -50,7 +50,7 @@ export const getPsychologistServices = (psychologistId) => {
  * @returns {Promise} 案例列表
  */
 export const getPsychologistCases = (psychologistId, params) => {
-  return get(`/psychologists/${psychologistId}/cases`, params)
+  return get(`/psychologist/${psychologistId}/cases`, params)
 }
 
 /**
@@ -62,7 +62,7 @@ export const getPsychologistCases = (psychologistId, params) => {
  * @returns {Promise} 评价列表
  */
 export const getPsychologistReviews = (psychologistId, params) => {
-  return get(`/psychologists/${psychologistId}/reviews`, params)
+  return get(`/psychologist/${psychologistId}/reviews`, params)
 }
 
 /**
@@ -87,7 +87,7 @@ export const bookPsychologistConsultation = (data) => {
  * @returns {Promise} 可预约时间段
  */
 export const getPsychologistAvailableSlots = (psychologistId, date) => {
-  return get(`/psychologists/${psychologistId}/available-slots`, { date })
+  return get(`/psychologist/${psychologistId}/available-slots`, { date })
 }
 
 /**

@@ -51,7 +51,7 @@
 
 <script>
 import config from '@/config/index.js'
-import { getPsychologistProfile } from '@/api/modules/psychologist.js'
+import { getIncomeStatistics, applyWithdrawal } from '@/api/modules/lawyer-workspace.js'
 
 export default {
   name: 'IncomeManagement',
@@ -62,7 +62,6 @@ export default {
       todayIncome: '0.00',
       scrollViewHeight: 400,
       loading: false,
-      psychologistInfo: {},
       incomeRecords: [
         {
           date: '2025年4月12日 15:20',
@@ -116,25 +115,25 @@ export default {
     async loadIncomeData() {
       this.loading = true
       try {
-        const response = await getPsychologistProfile()
-        this.psychologistInfo = response.data || {}
+        const response = await getIncomeStatistics()
+        const incomeData = response.data || {}
         
-        // 从心理师信息中提取收入数据
-        if (this.psychologistInfo.incomeInfo) {
-          this.totalIncome = this.formatCurrency(this.psychologistInfo.incomeInfo.totalIncome || 0)
-          this.todayIncome = this.formatCurrency(this.psychologistInfo.incomeInfo.todayIncome || 0)
-        }
+        // 更新收入统计数据
+        this.totalIncome = this.formatCurrency(incomeData.totalIncome || 0)
+        this.todayIncome = this.formatCurrency(incomeData.todayIncome || 0)
         
-        // 如果有收入记录，更新列表
-        if (this.psychologistInfo.incomeRecords && this.psychologistInfo.incomeRecords.length > 0) {
-          this.incomeRecords = this.psychologistInfo.incomeRecords.map(record => ({
-            date: this.formatDateTime(record.createTime || record.date),
-            description: record.description || record.serviceType || '心理咨询服务',
-            amount: this.formatCurrency(record.amount || 0, false)
+        // 处理收入明细列表
+        if (incomeData.incomeDetails && incomeData.incomeDetails.length > 0) {
+          this.incomeRecords = incomeData.incomeDetails.map(record => ({
+            date: this.formatDateTime(record.transactionTime),
+            description: record.serviceDescription || record.serviceType || '法律咨询服务',
+            amount: this.formatCurrency(record.amount || 0, false),
+            orderNo: record.orderNo || '',
+            clientName: record.clientName || ''
           }))
         }
         
-        console.log('收入数据加载成功:', this.psychologistInfo)
+        console.log('收入数据加载成功:', incomeData)
       } catch (error) {
         console.error('收入数据加载失败:', error)
         uni.showToast({
@@ -197,25 +196,52 @@ export default {
       uni.showModal({
         title: '确认提现',
         content: `确认提现今日收入 ¥${this.todayIncome} 吗？`,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            // 这里可以调用提现API
-            uni.showLoading({
-              title: '提现申请中...'
-            })
-            
-            setTimeout(() => {
-              uni.hideLoading()
-              uni.showToast({
-                title: '提现申请已提交',
-                icon: 'success'
-              })
-              // 重新加载数据
-              this.loadIncomeData()
-            }, 1500)
+            await this.processWithdrawal(todayAmount)
           }
         }
       })
+    },
+
+    // 处理提现申请
+    async processWithdrawal(amount) {
+      uni.showLoading({
+        title: '提现申请中...'
+      })
+      
+      try {
+        const withdrawalData = {
+          amount: amount,
+          withdrawalMethod: 'bank_card', // 默认银行卡提现
+          accountInfo: '默认账户' // 实际项目中可能需要用户选择或配置
+        }
+        
+        const response = await applyWithdrawal(withdrawalData)
+        
+        uni.hideLoading()
+        
+        if (response.code === 0) {
+          uni.showToast({
+            title: '提现申请已提交',
+            icon: 'success'
+          })
+          // 重新加载数据
+          this.loadIncomeData()
+        } else {
+          uni.showToast({
+            title: response.message || '提现申请失败',
+            icon: 'none'
+          })
+        }
+      } catch (error) {
+        uni.hideLoading()
+        console.error('提现申请失败:', error)
+        uni.showToast({
+          title: '提现申请失败，请重试',
+          icon: 'none'
+        })
+      }
     },
     
     // 计算滚动视图高度

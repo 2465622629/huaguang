@@ -350,12 +350,16 @@ export const getCourseDetails = (courseId) => {
  * @param {string} [params.keyword] 搜索关键词
  * @param {string} [params.category] 课程分类
  * @param {string} [params.level] 课程难度
- * @param {string} [params.sortBy] 排序方式
- * @param {number} [params.page=1] 页码
- * @param {number} [params.size=10] 每页大小
+ * @param {string} params.sortBy 排序方式（必需）
+ * @param {number} params.page 页码（必需）
+ * @param {number} params.size 每页大小（必需）
  * @returns {Promise} 搜索结果
  */
 export const searchCourses = (params = {}) => {
+  // 确保必需参数存在
+  if (!params.sortBy || !params.page || !params.size) {
+    throw new Error('sortBy、page 和 size 参数为必需')
+  }
   return get('/skill-training/courses/search', params)
 }
 

@@ -1,4 +1,4 @@
-import { get, post } from '../request'
+import { get, post } from '../request.js'
 
 /**
  * 提交用户反馈

@@ -3,7 +3,7 @@
  * @description 包含青年帮扶基金相关的所有接口，如信用修复、帮扶申请、帮扶记录等。
  */
 
-import request from '../request';
+import request from '../request.js';
 
 const youthAssistanceApi = {
   /**

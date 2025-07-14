@@ -3,7 +3,7 @@
  * @description 包含统计与数据相关的所有接口，如统计趋势、平台数据、数据导出、实时统计等。
  */
 
-import request from '../request';
+import request from '../request.js';
 
 const statisticsApi = {
   /**

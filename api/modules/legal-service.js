@@ -1,4 +1,4 @@
-import { get, post, put, del } from '../request'
+import { get, post, put, del } from '../request.js'
 
 /**
  * 法律服务模块 API
@@ -92,14 +92,18 @@ export const getOrderDetailPage = (orderId) => {
 /**
  * 获取律师列表
  * @param {Object} params - 查询参数
- * @param {string} [params.filterType='all'] - 筛选类型
+ * @param {string} params.filterType - 筛选类型（必需）
  * @param {string} [params.specialty] - 专业领域
  * @param {number} [params.page=1] - 页码
  * @param {number} [params.size=10] - 每页大小
  * @returns {Promise} 律师列表
  */
 export const getLawyerList = (params = {}) => {
-  const { page = 1, size = 10, filterType = 'all', ...otherParams } = params
+  // 确保必需参数存在
+  if (!params.filterType) {
+    throw new Error('filterType 参数为必需')
+  }
+  const { page = 1, size = 10, filterType, ...otherParams } = params
   return get('/legal/lawyers', {
     page,
     size,

@@ -181,17 +181,17 @@
 
 <script>
 import { staticBaseUrl } from '@/config/index.js'
-// 导入聊天相关API
+// 导入聊天相关API - 更新为存在的接口
 import { 
   getLawyerChatPageData, 
-  getSessionMessages, 
-  sendTextMessage, 
-  sendImageMessage, 
-  sendFileMessage,
+  getChatMessages, 
+  sendMessage, 
   uploadChatFile,
-  markSessionMessagesAsRead,
-  getSessionDetails,
-  createOrGetSession
+  markMessagesAsRead,
+  getChatSessionDetail,
+  createChatSession,
+  getChatSessions,
+  getUnreadCount
 } from '@/api/modules/chat.js'
 import { getCurrentLawyerInfo } from '@/api/modules/lawyer.js'
 
@@ -291,11 +291,14 @@ export default {
       this.themeType = options.theme
     }
     
-    // 设置缓存键
-    this.cacheKey = `lawyer_chat_${this.sessionId}_${this.consultationId}`
+    // 设置缓存键 - 优化缓存策略
+    this.cacheKey = `lawyer_chat_${this.sessionId || this.consultationId}_${this.lawyerId}`
     
     // 初始化聊天数据
     await this.initializeChatData()
+    
+    // 初始化完成后获取未读消息数量
+    this.getUnreadMessageCount()
   },
   
   computed: {
@@ -371,6 +374,7 @@ export default {
     // 清理计时器
     if (this.sessionTimer) {
       clearInterval(this.sessionTimer)
+      this.sessionTimer = null
     }
     
     // 标记所有消息为已读
@@ -378,6 +382,9 @@ export default {
     
     // 保存聊天状态
     this.saveChatState()
+    
+    // 清理资源
+    this.clearResources()
   },
   
   methods: {
@@ -441,7 +448,7 @@ export default {
     async loadSessionDetails() {
       try {
         const response = await this.callApiWithRetry(async () => {
-          return await getSessionDetails(this.sessionId)
+          return await getChatSessionDetail(this.sessionId)
         })
         
         if (response && response.data) {
@@ -468,18 +475,19 @@ export default {
     async createOrGetSessionFromConsultation() {
       try {
         const response = await this.callApiWithRetry(async () => {
-          return await createOrGetSession({
-            consultationId: this.consultationId,
+          return await createChatSession({
+            targetId: this.lawyerId,
             targetType: 'lawyer',
-            targetId: this.lawyerId
+            serviceType: 'consultation'
           })
         })
         
         if (response && response.data) {
-          this.sessionId = response.data.sessionId
+          this.sessionId = response.data.id
           this.sessionInfo = {
             ...this.sessionInfo,
-            ...response.data.sessionInfo
+            clientName: response.data.participantInfos?.find(p => p.userType === 'user')?.realName || '用户',
+            clientAvatar: response.data.participantInfos?.find(p => p.userType === 'user')?.avatarUrl || ''
           }
         }
         
@@ -516,21 +524,17 @@ export default {
         console.log('加载聊天消息, sessionId:', this.sessionId, 'loadMore:', loadMore)
         
         const params = {
+          messageType: 'all',
           page: loadMore ? this.currentPage + 1 : 1,
-          pageSize: this.pageSize
-        }
-        
-        // 如果是加载更多，添加最后一条消息ID作为参考点
-        if (loadMore && this.lastMessageId) {
-          params.beforeMessageId = this.lastMessageId
+          size: this.pageSize
         }
         
         const response = await this.callApiWithRetry(async () => {
-          return await getSessionMessages(this.sessionId, params)
+          return await getChatMessages(this.sessionId, params)
         })
         
         if (response && response.data) {
-          const newMessages = this.formatMessages(response.data.messages || [])
+          const newMessages = this.formatMessages(response.data.records || [])
           
           if (loadMore) {
             // 加载更多，插入到消息列表前面
@@ -544,7 +548,7 @@ export default {
           }
           
           // 更新分页状态
-          this.hasMoreMessages = response.data.hasMore || false
+          this.hasMoreMessages = response.data.current < response.data.total
           
           // 更新最后消息ID
           if (newMessages.length > 0) {
@@ -565,24 +569,27 @@ export default {
       }
     },
     
-    // 格式化消息数据
+    // 格式化消息数据 - 优化字段映射
     formatMessages(messages) {
       return messages.map(msg => ({
-        id: msg.id || Date.now() + Math.random(),
-        content: msg.content || msg.text || '',
-        type: msg.type || 'text', // text/image/file/audio/video_invite
-        senderId: msg.senderId || msg.sender_id,
-        senderType: msg.senderType || msg.sender_type, // user/lawyer
-        senderName: msg.senderName || msg.sender_name || '用户',
-        senderAvatar: msg.senderAvatar || msg.sender_avatar || '',
-        timestamp: msg.timestamp || msg.created_at || Date.now(),
-        status: msg.status || 'sent', // sending/sent/delivered/read/failed
-        mediaUrl: msg.mediaUrl || msg.media_url,
-        fileName: msg.fileName || msg.file_name,
-        fileSize: msg.fileSize || msg.file_size,
-        duration: msg.duration || 0, // 音频/视频时长
-        isRecalled: msg.isRecalled || msg.is_recalled || false,
-        replyToMessage: msg.replyToMessage || msg.reply_to_message
+        id: msg.id || msg.messageId || Date.now() + Math.random(),
+        content: msg.content || msg.text || msg.message || '',
+        type: msg.type || msg.messageType || 'text', // text/image/file/audio/video_invite
+        senderId: msg.senderId || msg.sender_id || msg.from_id,
+        senderType: msg.senderType || msg.sender_type || msg.from_type, // user/lawyer
+        senderName: msg.senderName || msg.sender_name || msg.from_name || '用户',
+        senderAvatar: msg.senderAvatar || msg.sender_avatar || msg.from_avatar || '',
+        timestamp: msg.timestamp || msg.created_at || msg.send_time || Date.now(),
+        status: msg.status || msg.message_status || 'sent', // sending/sent/delivered/read/failed
+        mediaUrl: msg.mediaUrl || msg.media_url || msg.file_url || msg.url,
+        fileName: msg.fileName || msg.file_name || msg.filename,
+        fileSize: msg.fileSize || msg.file_size || msg.size,
+        duration: msg.duration || msg.audio_duration || 0, // 音频/视频时长
+        isRecalled: msg.isRecalled || msg.is_recalled || msg.recalled || false,
+        replyToMessage: msg.replyToMessage || msg.reply_to_message || msg.reply_to,
+        // 新增字段支持
+        readStatus: msg.readStatus || msg.read_status || 'unread',
+        deliveryStatus: msg.deliveryStatus || msg.delivery_status || 'pending'
       }))
     },
 
@@ -622,10 +629,11 @@ export default {
         this.inputMessage = ''
         this.scrollToBottom()
         
-        // 发送消息到服务器
+        // 发送消息到服务器 - 使用通用sendMessage接口
         const response = await this.callApiWithRetry(async () => {
-          return await sendTextMessage({
-            sessionId: this.sessionId,
+          return await sendMessage({
+            conversationId: this.sessionId,
+            messageType: 'text',
             content: messageText
           })
         })
@@ -637,9 +645,9 @@ export default {
             // 发送成功，更新消息信息
             this.messages[messageIndex] = {
               ...tempMessage,
-              id: response.data.messageId || tempMessage.id,
+              id: response.data.id || tempMessage.id,
               status: 'sent',
-              timestamp: response.data.timestamp || tempMessage.timestamp
+              timestamp: response.data.createdAt || tempMessage.timestamp
             }
           } else {
             // 发送失败
@@ -722,18 +730,20 @@ export default {
         this.messages.push(tempMessage)
         this.scrollToBottom()
         
-        // 上传图片
+        // 上传图片 - 使用正确的上传接口
         const uploadResponse = await this.callApiWithRetry(async () => {
           return await uploadChatFile(imagePath, 'image')
         })
         
-        if (uploadResponse && uploadResponse.data && uploadResponse.data.url) {
-          // 发送图片消息
+        if (uploadResponse && uploadResponse.data && uploadResponse.data.fileUrl) {
+          // 发送图片消息 - 使用通用sendMessage接口
           const sendResponse = await this.callApiWithRetry(async () => {
-            return await sendImageMessage({
-              sessionId: this.sessionId,
-              imageUrl: uploadResponse.data.url,
-              caption: ''
+            return await sendMessage({
+              conversationId: this.sessionId,
+              messageType: 'image',
+              fileUrl: uploadResponse.data.fileUrl,
+              fileName: uploadResponse.data.fileName,
+              fileSize: uploadResponse.data.fileSize
             })
           })
           
@@ -742,9 +752,9 @@ export default {
           if (messageIndex !== -1) {
             this.messages[messageIndex] = {
               ...tempMessage,
-              id: sendResponse.data?.messageId || tempMessage.id,
+              id: sendResponse.data?.id || tempMessage.id,
               status: 'sent',
-              mediaUrl: uploadResponse.data.url
+              mediaUrl: uploadResponse.data.fileUrl
             }
           }
         }
@@ -834,7 +844,10 @@ export default {
           .map(msg => msg.id)
         
         if (unreadMessageIds.length > 0) {
-          await markSessionMessagesAsRead(this.sessionId, unreadMessageIds)
+          await markMessagesAsRead({
+            conversationId: this.sessionId,
+            messageIds: unreadMessageIds
+          })
           
           // 更新本地消息状态
           this.messages.forEach(msg => {
@@ -1133,8 +1146,51 @@ export default {
        if (index !== -1) {
          this.messages.splice(index, 1)
        }
-     }
-  }
+     },
+     
+
+     
+     // 获取未读消息数量
+     async getUnreadMessageCount() {
+       try {
+         const response = await this.callApiWithRetry(async () => {
+           return await getUnreadCount()
+         })
+         
+         if (response && response.data) {
+           return response.data || 0
+         }
+         
+       } catch (error) {
+         console.warn('获取未读消息数量失败:', error)
+         return 0
+       }
+     },
+      
+      // 清理资源
+      clearResources() {
+        // 清理发送中的消息
+        this.sendingMessages.clear()
+        this.messageRetryCount.clear()
+        
+        // 清理上传进度
+        this.uploadProgress = {}
+        
+        // 重置状态
+        this.isLoading = false
+        this.isLoadingMessages = false
+        this.isSendingMessage = false
+        this.isUploadingFile = false
+        
+        // 清理错误状态
+        this.errorState = {
+          hasError: false,
+          errorType: '',
+          errorMessage: '',
+          canRetry: false
+        }
+      }
+   }
 }
 </script>
 

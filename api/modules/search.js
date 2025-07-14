@@ -24,12 +24,37 @@ export const recordSearchBehavior = (data) => {
  * @param {string} [params.q] 搜索关键词
  * @param {string} [params.location] 地区
  * @param {string} [params.salary] 薪资范围
- * @param {number} [params.page=1] 页码
- * @param {number} [params.size=10] 每页数量
+ * @param {number} params.page 页码（必需）
+ * @param {number} params.size 每页数量（必需）
+ * @param {string} params.sortBy 排序方式（必需）
  * @returns {Promise} 搜索结果
  */
 export const searchJobsSimple = (params = {}) => {
+  // 确保必需参数存在
+  if (!params.page || !params.size || !params.sortBy) {
+    throw new Error('page、size 和 sortBy 参数为必需')
+  }
   return get('/search/jobs', params)
+}
+
+/**
+ * 通过POST请求搜索职位，支持复杂查询
+ * @param {Object} data 搜索数据
+ * @param {string} [data.q] 搜索关键词
+ * @param {string} [data.location] 地区
+ * @param {string} [data.salary] 薪资范围
+ * @param {number} data.page 页码（必需）
+ * @param {number} data.size 每页数量（必需）
+ * @param {string} data.sortBy 排序方式（必需）
+ * @param {Object} [data.filters] 高级筛选条件
+ * @returns {Promise} 搜索结果
+ */
+export const searchJobsPost = (data = {}) => {
+  // 确保必需参数存在
+  if (!data.page || !data.size || !data.sortBy) {
+    throw new Error('page、size 和 sortBy 参数为必需')
+  }
+  return post('/search/jobs', data)
 }
 
 /**

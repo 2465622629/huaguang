@@ -8,12 +8,16 @@ import { get, post, put, del } from '../request.js'
 /**
  * 获取心理测试列表
  * @param {Object} params 查询参数
- * @param {number} [params.page=1] 页码
- * @param {number} [params.size=10] 每页大小
+ * @param {number} params.page 页码（必需）
+ * @param {number} params.size 每页大小（必需）
  * @param {string} [params.keyword] 搜索关键词
  * @returns {Promise} 心理测试列表
  */
 export const getTestList = (params = {}) => {
+  // 确保必需参数存在
+  if (!params.page || !params.size) {
+    throw new Error('page 和 size 参数为必需')
+  }
   return get('/psychological-tests/list', params)
 }
 
