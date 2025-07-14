@@ -81,7 +81,15 @@
 <script>
 import config from '@/config/index.js'
 import { getCurrentUser, getCommissionInfo } from '@/api/modules/user.js'
-import { getMyTeam, getTeamMembers, getInviteCode, getInviteLink } from '@/api/modules/personal-center.js'
+import { 
+	getMyTeam, 
+	getTeamMembers, 
+	copyInviteCode, 
+	getInviteLink, 
+	getInviteInfo, 
+	getInviteStats,
+	generateInvitePosterGeneral 
+} from '@/api/modules/personal-center.js'
 
 export default {
 	data() {
@@ -167,51 +175,93 @@ export default {
 			
 			while (retryCount < maxRetries) {
 				try {
-					// 优先使用专门的邀请码API
-					let inviteCodeData = null;
+					// 优先使用getInviteInfo获取完整邀请信息
 					try {
-						const inviteCodeResponse = await this.apiWithRetry(() => getInviteCode());
-						inviteCodeData = inviteCodeResponse.data || inviteCodeResponse;
-						this.invitationCode = inviteCodeData.code || inviteCodeData.inviteCode;
-						console.log('[邀请页面] 从邀请码API获取成功:', this.invitationCode);
-					} catch (inviteError) {
-						console.warn('[邀请页面] 邀请码API失败，尝试备用方案:', inviteError);
-					}
-					
-					// 如果邀请码API失败，从用户信息中获取
-					if (!this.invitationCode) {
-						const userResponse = await this.apiWithRetry(() => getCurrentUser());
-						const userData = userResponse.data || userResponse;
-						this.invitationCode = userData.invitationCode || this.generateInvitationCode(userData.id);
-						console.log('[邀请页面] 从用户信息获取邀请码:', this.invitationCode);
-					}
-					
-					// 获取团队信息（优先使用团队API）
-					let teamData = null;
-					try {
-						const teamResponse = await this.apiWithRetry(() => getMyTeam());
-						teamData = teamResponse.data || teamResponse;
-						this.invitedCount = teamData.directInviteCount || teamData.invitedCount || 0;
-						this.totalTeamCount = teamData.totalTeamCount || teamData.teamCount || 0;
-						console.log('[邀请页面] 从团队API获取统计数据成功');
-					} catch (teamError) {
-						console.warn('[邀请页面] 团队API失败，尝试佣金API:', teamError);
+						const inviteInfoResponse = await this.apiWithRetry(() => getInviteInfo());
+						const inviteInfoData = inviteInfoResponse.data || inviteInfoResponse;
 						
-						// 备用方案：从佣金信息中获取
+						// 从邀请信息API获取邀请码和基础数据
+						this.invitationCode = inviteInfoData.inviteCode;
+						this.invitedCount = inviteInfoData.inviteCount || 0;
+						
+						console.log('[邀请页面] 从邀请信息API获取成功:', {
+							inviteCode: this.invitationCode,
+							inviteCount: this.invitedCount
+						});
+						
+						// 获取邀请统计数据
 						try {
-							const commissionResponse = await this.apiWithRetry(() => getCommissionInfo());
-							const commissionData = commissionResponse.data || commissionResponse;
-							this.invitedCount = commissionData.invitedCount || 0;
-							this.totalTeamCount = commissionData.teamCount || 0;
-							console.log('[邀请页面] 从佣金API获取统计数据成功');
-						} catch (commissionError) {
-							console.warn('[邀请页面] 佣金API也失败，使用默认值:', commissionError);
+							const inviteStatsResponse = await this.apiWithRetry(() => getInviteStats());
+							const inviteStatsData = inviteStatsResponse.data || inviteStatsResponse;
+							
+							// 更新统计数据
+							this.invitedCount = inviteStatsData.totalInvites || this.invitedCount;
+							this.totalTeamCount = inviteStatsData.totalInvites || this.invitedCount; // 如果没有团队总数，使用邀请总数
+							
+							console.log('[邀请页面] 从邀请统计API获取成功:', {
+								totalInvites: inviteStatsData.totalInvites,
+								monthlyInvites: inviteStatsData.monthlyInvites
+							});
+						} catch (statsError) {
+							console.warn('[邀请页面] 邀请统计API失败，使用基础数据:', statsError);
+						}
+						
+					} catch (inviteInfoError) {
+						console.warn('[邀请页面] 邀请信息API失败，尝试备用方案:', inviteInfoError);
+						
+						// 备用方案1：使用copyInviteCode获取邀请码
+						try {
+							const inviteCodeResponse = await this.apiWithRetry(() => copyInviteCode());
+							const inviteCodeData = inviteCodeResponse.data || inviteCodeResponse;
+							this.invitationCode = inviteCodeData || inviteCodeData.code || inviteCodeData.inviteCode;
+							console.log('[邀请页面] 从邀请码API获取成功:', this.invitationCode);
+						} catch (inviteCodeError) {
+							console.warn('[邀请页面] 邀请码API失败:', inviteCodeError);
+						}
+						
+						// 备用方案2：从团队信息中获取统计数据
+						try {
+							const teamResponse = await this.apiWithRetry(() => getMyTeam());
+							const teamData = teamResponse.data || teamResponse;
+							
+							// 从团队API获取邀请码（如果之前没获取到）
+							if (!this.invitationCode && teamData.inviteCodeInfo) {
+								this.invitationCode = teamData.inviteCodeInfo.inviteCode;
+							}
+							
+							// 优先使用inviteCodeInfo中的数据
+							if (teamData.inviteCodeInfo) {
+								this.invitedCount = teamData.inviteCodeInfo.inviteCount || 0;
+								this.totalTeamCount = teamData.inviteCodeInfo.totalTeamMembers || 0;
+							}
+							
+							// 如果inviteCodeInfo中没有数据，使用teamStatistics
+							if (teamData.teamStatistics && this.totalTeamCount === 0) {
+								this.totalTeamCount = teamData.teamStatistics.totalMembers || 0;
+								// 如果inviteCount没有设置，使用一级成员数作为直接邀请数
+								if (this.invitedCount === 0) {
+									this.invitedCount = teamData.teamStatistics.firstLevelCount || 0;
+								}
+							}
+							
+							console.log('[邀请页面] 从团队API获取成功:', {
+								inviteCode: this.invitationCode,
+								invitedCount: this.invitedCount,
+								totalTeamCount: this.totalTeamCount
+							});
+						} catch (teamError) {
+							console.warn('[邀请页面] 团队API失败，使用默认值:', teamError);
+							
+							// 最后备用方案：生成邀请码，使用默认统计
+							if (!this.invitationCode) {
+								this.invitationCode = this.generateInvitationCode();
+							}
 							this.invitedCount = 0;
 							this.totalTeamCount = 0;
 						}
 					}
 					
-					console.log('[邀请页面] 邀请信息加载成功:', {
+					console.log('[邀请页面] 邀请信息加载完成:', {
 						invitationCode: this.invitationCode,
 						invitedCount: this.invitedCount,
 						totalTeamCount: this.totalTeamCount
@@ -262,7 +312,37 @@ export default {
 			
 			while (retryCount < maxRetries) {
 				try {
-					// 优先使用团队成员API获取真实数据
+					// 第一页时优先使用getMyTeam获取完整团队数据
+					if (this.currentPage === 1) {
+						try {
+							const teamResponse = await this.apiWithRetry(() => getMyTeam());
+							const teamData = teamResponse.data || teamResponse;
+							
+							// 从getMyTeam获取团队成员
+							if (teamData.teamMembers && Array.isArray(teamData.teamMembers)) {
+								const formattedUsers = teamData.teamMembers.map(member => ({
+									id: member.memberId,
+									name: member.memberName || '未知用户',
+									avatar: member.avatarUrl || '',
+									level: this.parseLevelFromText(member.memberLevel),
+									levelText: member.memberLevel || '普通用户',
+									joinDate: this.formatJoinDate(member.joinTime),
+									contributedCommission: member.contributedCommission || 0,
+									status: member.status || 'active'
+								}));
+								
+								this.userList = formattedUsers;
+								this.hasMore = formattedUsers.length === this.pageSize;
+								
+								console.log(`[邀请页面] 从getMyTeam获取团队成员成功，共${formattedUsers.length}个用户`);
+								return; // 成功则退出重试循环
+							}
+						} catch (teamError) {
+							console.warn('[邀请页面] getMyTeam失败，尝试getTeamMembers:', teamError);
+						}
+					}
+					
+					// 备用方案：使用分页的团队成员API
 					const params = {
 						page: this.currentPage,
 						size: this.pageSize
@@ -273,7 +353,11 @@ export default {
 					
 					// 处理API返回的数据格式
 					let users = [];
-					if (teamMembersData.list) {
+					if (teamMembersData.records) {
+						// MyBatis Plus分页格式
+						users = teamMembersData.records;
+						this.hasMore = this.userList.length + users.length < teamMembersData.total;
+					} else if (teamMembersData.list) {
 						users = teamMembersData.list;
 					} else if (Array.isArray(teamMembersData)) {
 						users = teamMembersData;
@@ -283,13 +367,13 @@ export default {
 					
 					// 格式化用户数据
 					const formattedUsers = users.map(user => ({
-						id: user.id || user.userId,
-						name: user.name || user.nickname || user.username || '未知用户',
-						avatar: user.avatar || user.avatarUrl || '',
-						level: user.level || 1,
-						levelText: this.getLevelText(user.level || 1),
+						id: user.memberId || user.id || user.userId,
+						name: user.memberName || user.name || user.nickname || user.username || '未知用户',
+						avatar: user.avatarUrl || user.avatar || '',
+						level: this.parseLevelFromText(user.memberLevel) || user.level || 1,
+						levelText: user.memberLevel || this.getLevelText(user.level || 1),
 						joinDate: this.formatJoinDate(user.joinTime || user.createTime || user.inviteTime),
-						inviteTime: user.inviteTime || user.createTime,
+						contributedCommission: user.contributedCommission || 0,
 						status: user.status || 'active'
 					}));
 					
@@ -300,11 +384,12 @@ export default {
 					}
 					
 					// 判断是否还有更多数据
-					this.hasMore = formattedUsers.length === this.pageSize;
 					if (teamMembersData.hasMore !== undefined) {
 						this.hasMore = teamMembersData.hasMore;
 					} else if (teamMembersData.total !== undefined) {
 						this.hasMore = this.userList.length < teamMembersData.total;
+					} else {
+						this.hasMore = formattedUsers.length === this.pageSize;
 					}
 					
 					console.log(`[邀请页面] 团队成员列表加载成功，当前共${this.userList.length}个用户`);
@@ -440,6 +525,22 @@ export default {
 			return levelMap[level] || '普通用户';
 		},
 		
+		// 从等级文本解析数字等级
+		parseLevelFromText(levelText) {
+			if (!levelText) return 1;
+			
+			const levelMap = {
+				'一级用户': 1,
+				'二级用户': 2,
+				'三级用户': 3,
+				'高级用户': 4,
+				'VIP用户': 5,
+				'普通用户': 1
+			};
+			
+			return levelMap[levelText] || 1;
+		},
+		
 		// 格式化加入日期
 		formatJoinDate(dateString) {
 			if (!dateString) {
@@ -501,20 +602,35 @@ export default {
 			}
 			
 			try {
-				// 尝试获取完整的邀请链接
+				// 优先使用copyInviteCode API获取最新邀请码
 				let copyContent = this.invitationCode;
+				let latestInviteCode = this.invitationCode;
 				
+				try {
+					const inviteCodeResponse = await this.apiWithRetry(() => copyInviteCode());
+					const inviteCodeData = inviteCodeResponse.data || inviteCodeResponse;
+					latestInviteCode = inviteCodeData || inviteCodeData.code || inviteCodeData.inviteCode || this.invitationCode;
+					copyContent = latestInviteCode;
+					console.log('[邀请页面] 获取最新邀请码成功:', latestInviteCode);
+				} catch (codeError) {
+					console.warn('[邀请页面] 获取邀请码API失败，使用当前邀请码:', codeError);
+				}
+				
+				// 尝试获取完整的邀请链接
 				try {
 					const inviteLinkResponse = await this.apiWithRetry(() => getInviteLink());
 					const inviteLinkData = inviteLinkResponse.data || inviteLinkResponse;
 					
-					if (inviteLinkData.link || inviteLinkData.url) {
-						copyContent = `邀请码：${this.invitationCode}\n邀请链接：${inviteLinkData.link || inviteLinkData.url}`;
+					if (inviteLinkData && (inviteLinkData.link || inviteLinkData.url || typeof inviteLinkData === 'string')) {
+						const inviteLink = inviteLinkData.link || inviteLinkData.url || inviteLinkData;
+						copyContent = `邀请码：${latestInviteCode}\n邀请链接：${inviteLink}`;
+						console.log('[邀请页面] 获取邀请链接成功');
 					}
 				} catch (linkError) {
 					console.warn('[邀请页面] 获取邀请链接失败，仅复制邀请码:', linkError);
 				}
 				
+				// 执行复制操作
 				uni.setClipboardData({
 					data: copyContent,
 					success: () => {
@@ -522,6 +638,11 @@ export default {
 							title: copyContent.includes('链接') ? '邀请信息已复制' : '邀请码已复制',
 							icon: 'success'
 						});
+						
+						// 更新当前显示的邀请码
+						if (latestInviteCode !== this.invitationCode) {
+							this.invitationCode = latestInviteCode;
+						}
 						
 						console.log('[邀请页面] 复制成功:', copyContent);
 					},
@@ -542,8 +663,8 @@ export default {
 		},
 		
 		// 跳转到邀请海报页面
-		goToPoster() {
-			console.log('[邀请页面] 跳转到邀请海报页面');
+		async goToPoster() {
+			console.log('[邀请页面] 开始生成邀请海报');
 			
 			// 检查邀请码是否已加载
 			if (!this.invitationCode) {
@@ -554,21 +675,75 @@ export default {
 				return;
 			}
 			
-			// 跳转到邀请海报页面，传递邀请码等参数
-			uni.navigateTo({
-				url: `/pages/user/profile/invitation-poster/index?code=${this.invitationCode}&invited=${this.invitedCount}&team=${this.totalTeamCount}`
+			// 显示加载中
+			uni.showLoading({
+				title: '生成海报中...',
+				mask: true
 			});
+			
+			try {
+				// 调用生成邀请海报API
+				const posterResponse = await this.apiWithRetry(() => generateInvitePosterGeneral());
+				const posterData = posterResponse.data || posterResponse;
+				
+				// 获取海报URL
+				const posterUrl = posterData.posterUrl || posterData.url || posterData;
+				
+				if (posterUrl) {
+					console.log('[邀请页面] 海报生成成功:', posterUrl);
+					
+					// 跳转到邀请海报页面，传递海报URL和其他参数
+					uni.navigateTo({
+						url: `/pages/user/profile/invitation-poster/index?posterUrl=${encodeURIComponent(posterUrl)}&code=${this.invitationCode}&invited=${this.invitedCount}&team=${this.totalTeamCount}`
+					});
+				} else {
+					// 如果API返回成功但没有海报URL，使用默认跳转
+					console.warn('[邀请页面] 海报生成成功但未返回URL，使用默认跳转');
+					uni.navigateTo({
+						url: `/pages/user/profile/invitation-poster/index?code=${this.invitationCode}&invited=${this.invitedCount}&team=${this.totalTeamCount}`
+					});
+				}
+				
+			} catch (error) {
+				console.error('[邀请页面] 生成海报失败:', error);
+				
+				// 海报生成失败，仍然可以跳转到海报页面，让页面内部处理
+				uni.showToast({
+					title: '海报生成失败，将使用默认模板',
+					icon: 'none',
+					duration: 2000
+				});
+				
+				setTimeout(() => {
+					uni.navigateTo({
+						url: `/pages/user/profile/invitation-poster/index?code=${this.invitationCode}&invited=${this.invitedCount}&team=${this.totalTeamCount}`
+					});
+				}, 2000);
+			} finally {
+				uni.hideLoading();
+			}
 		},
 		
 		// 跳转到用户详情
 		goToUserDetail(user) {
 			console.log('[邀请页面] 查看用户详情:', user);
 			
-			// 显示用户详情信息
-			const content = `用户：${user.name}\n等级：${user.levelText}\n加入时间：${user.joinDate}`;
+			// 显示用户详情信息，包含佣金贡献
+			let content = `用户：${user.name}\n等级：${user.levelText}\n加入时间：${user.joinDate}`;
+			
+			// 如果有佣金贡献信息，添加到详情中
+			if (user.contributedCommission !== undefined) {
+				content += `\n贡献佣金：¥${user.contributedCommission.toFixed(2)}`;
+			}
+			
+			// 如果有状态信息，添加到详情中
+			if (user.status) {
+				const statusText = user.status === 'active' ? '活跃' : '非活跃';
+				content += `\n状态：${statusText}`;
+			}
 			
 			uni.showModal({
-				title: '用户详情',
+				title: '团队成员详情',
 				content: content,
 				showCancel: false,
 				confirmText: '知道了'

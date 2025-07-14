@@ -89,7 +89,7 @@ import config from '@/config/index.js'
 import { getLegalOrderDetail } from '@/api/modules/legal.js'
 import { getCourseOrderDetail } from '@/api/modules/skill-training.js'
 import { getPsychologyOrderDetail } from '@/api/modules/order.js'
-import { createPaymentOrder, getPaymentStatus, alipayPayment, wechatPayment, balancePayment } from '@/api/modules/payment.js'
+import { createWechatPayOrder, queryWechatPayOrder, closeWechatPayOrder } from '@/api/modules/payment.js'
 
 export default {
   name: 'OrderDetail',
@@ -710,32 +710,65 @@ export default {
       }
     },
     
-    // 创建支付订单（带重试）
+    // 创建微信支付订单（带重试）
     async createPaymentOrderWithRetry() {
       for (let attempt = 0; attempt <= this.maxPaymentRetries; attempt++) {
         try {
-          console.log(`创建支付订单尝试 ${attempt + 1}/${this.maxPaymentRetries + 1}`)
+          console.log(`创建微信支付订单尝试 ${attempt + 1}/${this.maxPaymentRetries + 1}`)
           
-          const paymentData = {
-            orderNo: this.orderData.orderNo,
-            orderType: this.orderData.orderType,
-            amount: this.orderInfo.amount,
-            paymentMethod: 'alipay', // 默认支付宝，可扩展为用户选择
-            subject: `${this.orderInfo.serviceType} - ${this.expertInfo.name}`,
-            description: `订单号: ${this.orderData.orderNo}`
+          // 订单类型映射：前端 -> 后端API
+          const orderTypeMap = {
+            'legal': 'consultation',      // 法律咨询
+            'course': 'course',           // 课程学习
+            'psychology': 'consultation'  // 心理咨询（也归为咨询类型）
           }
           
-          const response = await createPaymentOrder(paymentData)
+          const paymentData = {
+            relatedOrderId: this.orderData.orderNo,
+            relatedOrderType: orderTypeMap[this.orderData.orderType] || 'consultation',
+            amount: this.orderInfo.amount,
+            description: `${this.orderInfo.serviceType} - ${this.expertInfo.name}`,
+            payType: 'APP' // 微信小程序支付类型
+          }
           
-          if (response && response.paymentOrderNo) {
-            console.log('支付订单创建成功:', response)
-            return response
+          console.log('微信支付订单数据:', paymentData)
+          const response = await createWechatPayOrder(paymentData)
+          
+          console.log('微信支付订单响应:', response)
+          
+          // 检查响应格式：统一 API 响应格式为 { code, data, message }
+          if (response && response.code === 200 && response.data) {
+            const orderData = response.data
+            console.log('微信支付订单创建成功:', orderData)
+            
+            // 返回包含支付所需信息的数据
+            return {
+              paymentOrderNo: orderData.outTradeNo,
+              prepayId: orderData.prepayId,
+              paySign: orderData.paySign,
+              timeStamp: orderData.timeStamp,
+              nonceStr: orderData.nonceStr,
+              signType: orderData.signType || 'RSA',
+              package: orderData.package
+            }
+          } else if (response && response.outTradeNo) {
+            // 兼容直接返回订单数据的情况
+            console.log('微信支付订单创建成功（直接格式）:', response)
+            return {
+              paymentOrderNo: response.outTradeNo,
+              prepayId: response.prepayId,
+              paySign: response.paySign,
+              timeStamp: response.timeStamp,
+              nonceStr: response.nonceStr,
+              signType: response.signType || 'RSA',
+              package: response.package
+            }
           } else {
-            throw new Error('支付订单响应无效')
+            throw new Error('微信支付订单响应格式无效')
           }
           
         } catch (error) {
-          console.error(`创建支付订单第 ${attempt + 1} 次尝试失败:`, error)
+          console.error(`创建微信支付订单第 ${attempt + 1} 次尝试失败:`, error)
           
           if (attempt === this.maxPaymentRetries) {
             throw error
@@ -743,48 +776,57 @@ export default {
           
           // 指数退避重试
           const delay = Math.min(1000 * Math.pow(2, attempt), 5000) + Math.random() * 500
-          console.log(`等待 ${delay.toFixed(0)}ms 后重试创建支付订单...`)
+          console.log(`等待 ${delay.toFixed(0)}ms 后重试创建微信支付订单...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
     },
     
-    // 发起支付
+    // 发起微信支付
     async initiatePayment(paymentData) {
       try {
         uni.showLoading({
-          title: '正在跳转支付...'
+          title: '正在调起微信支付...'
         })
         
-        // 根据支付方式调用不同的支付接口
-        let paymentResult = null
+        console.log('调起微信支付，参数:', paymentData)
         
-        if (paymentData.paymentMethod === 'alipay') {
-          paymentResult = await alipayPayment({
-            paymentOrderNo: paymentData.paymentOrderNo
+        // 调用微信支付
+        const wxPayResult = await new Promise((resolve, reject) => {
+          uni.requestPayment({
+            provider: 'wxpay',
+            timeStamp: paymentData.timeStamp,
+            nonceStr: paymentData.nonceStr,
+            package: paymentData.package,
+            signType: paymentData.signType,
+            paySign: paymentData.paySign,
+            success: (res) => {
+              console.log('微信支付成功:', res)
+              resolve(res)
+            },
+            fail: (err) => {
+              console.error('微信支付失败:', err)
+              if (err.errMsg && err.errMsg.includes('cancel')) {
+                reject(new Error('用户取消支付'))
+              } else {
+                reject(new Error(err.errMsg || '微信支付失败'))
+              }
+            }
           })
-        } else if (paymentData.paymentMethod === 'wechat') {
-          paymentResult = await wechatPayment({
-            paymentOrderNo: paymentData.paymentOrderNo,
-            openid: 'user_openid' // 需要获取用户openid
-          })
-        } else if (paymentData.paymentMethod === 'balance') {
-          paymentResult = await balancePayment({
-            paymentOrderNo: paymentData.paymentOrderNo
-          })
-        }
+        })
         
         uni.hideLoading()
         
-        if (paymentResult) {
-          console.log('支付发起成功:', paymentResult)
-          return paymentResult
+        if (wxPayResult) {
+          console.log('微信支付调起成功:', wxPayResult)
+          return wxPayResult
         } else {
-          throw new Error('支付发起失败')
+          throw new Error('微信支付调起失败')
         }
         
       } catch (error) {
         uni.hideLoading()
+        console.error('微信支付调起错误:', error)
         throw error
       }
     },
@@ -803,17 +845,37 @@ export default {
         pollCount++
         
         try {
-          const status = await getPaymentStatus(this.paymentOrderNo)
-          console.log(`支付状态轮询 ${pollCount}/${maxPollCount}:`, status)
+          const response = await queryWechatPayOrder(this.paymentOrderNo)
+          console.log(`微信支付状态轮询 ${pollCount}/${maxPollCount}:`, response)
           
-          if (status && status.status === 'paid') {
-            // 支付成功
-            this.handlePaymentSuccess(status)
-            this.stopPaymentStatusPolling()
-          } else if (status && status.status === 'failed') {
-            // 支付失败
-            this.handlePaymentFailure(status)
-            this.stopPaymentStatusPolling()
+          let status = null
+          
+          // 检查响应格式：统一 API 响应格式为 { code, data, message }
+          if (response && response.code === 200 && response.data) {
+            status = response.data
+          } else if (response && response.tradeState) {
+            // 兼容直接返回状态数据的情况
+            status = response
+          }
+          
+          if (status) {
+            // 微信支付状态映射：SUCCESS-支付成功，REFUND-转入退款，NOTPAY-未支付，CLOSED-已关闭，REVOKED-已撤销，USERPAYING-用户支付中，PAYERROR-支付失败
+            if (status.tradeState === 'SUCCESS') {
+              // 支付成功
+              this.handlePaymentSuccess(status)
+              this.stopPaymentStatusPolling()
+            } else if (status.tradeState === 'PAYERROR' || status.tradeState === 'CLOSED' || status.tradeState === 'REVOKED') {
+              // 支付失败
+              this.handlePaymentFailure(status)
+              this.stopPaymentStatusPolling()
+            } else if (status.tradeState === 'NOTPAY' || status.tradeState === 'USERPAYING') {
+              // 继续轮询
+              console.log('支付中，继续轮询...')
+            } else if (pollCount >= maxPollCount) {
+              // 轮询超时
+              this.handlePaymentTimeout()
+              this.stopPaymentStatusPolling()
+            }
           } else if (pollCount >= maxPollCount) {
             // 轮询超时
             this.handlePaymentTimeout()
@@ -821,7 +883,7 @@ export default {
           }
           
         } catch (error) {
-          console.error('支付状态查询失败:', error)
+          console.error('微信支付状态查询失败:', error)
           
           if (pollCount >= maxPollCount) {
             this.handlePaymentTimeout()
@@ -836,7 +898,7 @@ export default {
       if (this.paymentPollingTimer) {
         clearInterval(this.paymentPollingTimer)
         this.paymentPollingTimer = null
-        console.log('支付状态轮询已停止')
+        console.log('微信支付状态轮询已停止')
       }
     },
     
@@ -901,16 +963,20 @@ export default {
     
     // 处理支付错误
     handlePaymentError(error) {
-      console.error('支付错误:', error)
+      console.error('微信支付错误:', error)
       
-      let errorMessage = '支付失败，请重试'
+      let errorMessage = '微信支付失败，请重试'
       
       if (error.message && error.message.includes('timeout')) {
         errorMessage = '网络超时，请检查网络连接后重试'
-      } else if (error.message && error.message.includes('balance')) {
-        errorMessage = '余额不足，请选择其他支付方式'
-      } else if (error.message && error.message.includes('cancelled')) {
+      } else if (error.message && error.message.includes('用户取消支付')) {
+        errorMessage = '用户取消支付'
+      } else if (error.message && error.message.includes('cancel')) {
         errorMessage = '支付已取消'
+      } else if (error.message && error.message.includes('微信支付')) {
+        errorMessage = error.message
+      } else if (error.message && error.message.includes('订单')) {
+        errorMessage = '订单创建失败，请重试'
       }
       
       uni.showToast({
@@ -953,7 +1019,7 @@ export default {
           return '开始咨询'
         }
       } else {
-        return '立即支付并提交咨询'
+        return '微信支付并提交咨询'
       }
     },
     

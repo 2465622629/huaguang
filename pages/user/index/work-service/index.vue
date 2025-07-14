@@ -12,26 +12,14 @@
       <view class="service-card job-search-card" @click="handleJobSearch">
         <image :src="config.staticBaseUrl + '/find_jobs.png'" mode="aspectFit" class="card-replacement-image"></image>
         
-        <!-- 动态统计信息覆盖层 -->
-        <view class="stats-overlay">
-          <view class="stats-item">
-            <text class="stats-number">{{ jobStats.hotJobsCount }}+</text>
-            <text class="stats-label">热门职位</text>
-          </view>
-        </view>
+        
       </view>
 
       <!-- 我要招人卡片 -->
       <view class="service-card recruitment-card" @click="handleRecruitment">
         <image :src="config.staticBaseUrl + '/find_peop.png'" mode="aspectFit" class="card-replacement-image"></image>
         
-        <!-- 动态统计信息覆盖层 -->
-        <view class="stats-overlay">
-          <view class="stats-item">
-            <text class="stats-number">{{ enterpriseStats.activeEnterprises }}+</text>
-            <text class="stats-label">活跃企业</text>
-          </view>
-        </view>
+        
       </view>
     </view>
 

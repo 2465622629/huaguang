@@ -17,6 +17,33 @@ export const generateInvitePoster = () => {
 }
 
 /**
+ * 生成推广海报
+ * 生成包含邀请码的推广海报
+ * @returns {Promise} 返回海报URL
+ */
+export const generateInvitePosterGeneral = () => {
+  return post('/user/invite/poster')
+}
+
+/**
+ * 获取邀请信息
+ * 获取当前用户的邀请码和邀请链接等信息
+ * @returns {Promise} 返回邀请信息
+ */
+export const getInviteInfo = () => {
+  return get('/user/invite/info')
+}
+
+/**
+ * 获取邀请统计
+ * 获取当前用户的邀请统计信息，包括邀请人数、佣金等
+ * @returns {Promise} 返回邀请统计信息
+ */
+export const getInviteStats = () => {
+  return get('/user/invite/stats')
+}
+
+/**
  * 清除缓存
  * 清除用户的应用缓存
  * @returns {Promise} 返回清除结果
@@ -43,12 +70,12 @@ export const applyWithdrawal = (withdrawalData) => {
  * 获取提现记录
  * 分页获取用户的提现记录
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @param {string} [params.status] - 状态筛选
  * @returns {Promise} 返回提现记录列表
  */
-export const getWithdrawalRecords = (params = {}) => {
+export const getWithdrawalRecords = (params) => {
   return get('/user/personal-center/withdrawal-records', params)
 }
 
@@ -56,12 +83,12 @@ export const getWithdrawalRecords = (params = {}) => {
  * 获取团队成员列表
  * 分页获取用户的团队成员列表
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @param {string} [params.status] - 状态筛选
  * @returns {Promise} 返回团队成员列表
  */
-export const getTeamMembers = (params = {}) => {
+export const getTeamMembers = (params) => {
   return get('/user/personal-center/team-members', params)
 }
 
@@ -87,12 +114,12 @@ export const getMyTeam = () => {
  * 获取我的求职记录
  * 分页获取用户的求职申请记录
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @param {string} [params.status] - 状态筛选
  * @returns {Promise} 返回求职记录列表
  */
-export const getMyJobApplicationRecords = (params = {}) => {
+export const getMyJobApplicationRecords = (params) => {
   return get('/user/personal-center/my-job-application-records', params)
 }
 
@@ -100,11 +127,11 @@ export const getMyJobApplicationRecords = (params = {}) => {
  * 获取我的收藏视频
  * 分页获取用户收藏的视频课程
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @returns {Promise} 返回收藏视频列表
  */
-export const getMyFavoriteVideos = (params = {}) => {
+export const getMyFavoriteVideos = (params) => {
   return get('/user/personal-center/my-favorite-videos', params)
 }
 
@@ -121,13 +148,13 @@ export const getMyCommission = () => {
  * 获取我的帮扶记录
  * 分页获取用户的帮扶记录
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @param {string} [params.status] - 状态筛选
  * @returns {Promise} 返回帮扶记录列表
  */
-export const getMyHelpRecords = (params = {}) => {
-  return get('/user/personal-center/my-help-records', params)
+export const getMyAssistanceRecords = (params) => {
+  return get('/user/personal-center/my-assistance-records', params)
 }
 
 /**
@@ -146,29 +173,28 @@ export const getInviteLink = () => {
  * @returns {Promise} 返回空状态页面数据
  */
 export const getEmptyStateData = (type) => {
-  return get('/user/personal-center/empty-state', { type })
+  return get(`/user/personal-center/empty-state/${type}`)
 }
 
 /**
- * 获取邀请码
+ * 复制邀请码
  * 获取用户的邀请码用于复制
  * @returns {Promise} 返回邀请码
  */
-export const getInviteCode = () => {
-  return get('/user/personal-center/invite-code')
+export const copyInviteCode = () => {
+  return get('/user/personal-center/copy-invite-code')
 }
 
 /**
  * 获取佣金记录
  * 分页获取用户的佣金记录
  * @param {Object} params - 查询参数
- * @param {number} [params.page=1] - 页码
- * @param {number} [params.size=10] - 每页大小
- * @param {string} [params.type] - 佣金类型筛选
+ * @param {number} params.page - 页码（必需）
+ * @param {number} params.size - 每页大小（必需）
  * @param {string} [params.status] - 状态筛选
  * @returns {Promise} 返回佣金记录列表
  */
-export const getCommissionRecords = (params = {}) => {
+export const getCommissionRecords = (params) => {
   return get('/user/personal-center/commission-records', params)
 }
 
@@ -186,13 +212,16 @@ export const getCacheInfo = () => {
  * 获取用户当前可提现的金额
  * @returns {Promise} 返回可提现金额信息
  */
-export const getWithdrawableAmount = () => {
-  return get('/user/personal-center/withdrawable-amount')
+export const getAvailableWithdrawalAmount = () => {
+  return get('/user/personal-center/available-withdrawal-amount')
 }
 
 // 导出所有个人中心相关API
 export default {
   generateInvitePoster,
+  generateInvitePosterGeneral,
+  getInviteInfo,
+  getInviteStats,
   clearCache,
   applyWithdrawal,
   getWithdrawalRecords,
@@ -202,11 +231,11 @@ export default {
   getMyJobApplicationRecords,
   getMyFavoriteVideos,
   getMyCommission,
-  getMyHelpRecords,
+  getMyAssistanceRecords,
   getInviteLink,
   getEmptyStateData,
-  getInviteCode,
+  copyInviteCode,
   getCommissionRecords,
   getCacheInfo,
-  getWithdrawableAmount
+  getAvailableWithdrawalAmount
 }

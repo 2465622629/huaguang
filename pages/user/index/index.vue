@@ -362,6 +362,19 @@ export default {
         })
         return
       }
+      else if (item.title === '技能培训') {
+        uni.navigateTo({
+          url: '/pages/user/index/skill-training/index',
+          fail: (err) => {
+            console.error('跳转失败：', err)
+            uni.showToast({
+              icon: 'none',
+              title: '页面跳转失败'
+            })
+          }
+        })
+        return
+      }
 
       // 其他项目显示toast提示
       uni.showToast({

@@ -20,7 +20,7 @@ export const getChatSessions = (params) => {
 /**
  * 创建或获取聊天会话
  * @param {Object} data 会话数据
- * @param {string} data.targetId 目标用户ID
+ * @param {number} data.targetId 目标用户ID
  * @param {string} data.targetType 目标类型（lawyer/psychologist/enterprise）
  * @param {string} [data.serviceType] 服务类型
  * @returns {Promise} 会话信息
@@ -31,7 +31,7 @@ export const createChatSession = (data) => {
 
 /**
  * 获取聊天会话详情
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 会话详情
  */
 export const getChatSessionDetail = (conversationId) => {
@@ -40,7 +40,7 @@ export const getChatSessionDetail = (conversationId) => {
 
 /**
  * 删除聊天会话
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 删除结果
  */
 export const deleteChatSession = (conversationId) => {
@@ -49,7 +49,7 @@ export const deleteChatSession = (conversationId) => {
 
 /**
  * 获取聊天消息列表
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @param {Object} params 查询参数
  * @param {string} params.messageType 消息类型（必需）
  * @param {number} params.page 页码（必需）
@@ -63,13 +63,13 @@ export const getChatMessages = (conversationId, params) => {
 /**
  * 发送消息（通用接口）
  * @param {Object} data 消息数据
- * @param {string} data.conversationId 会话ID
+ * @param {number} data.conversationId 会话ID
  * @param {string} data.messageType 消息类型（text/file/image/audio）
  * @param {string} [data.content] 文本内容
  * @param {string} [data.fileUrl] 文件URL
  * @param {string} [data.fileName] 文件名
  * @param {number} [data.fileSize] 文件大小
- * @param {string} [data.replyToMessageId] 回复的消息ID
+ * @param {number} [data.replyToMessageId] 回复的消息ID
  * @returns {Promise} 发送结果
  */
 export const sendMessage = (data) => {
@@ -79,7 +79,7 @@ export const sendMessage = (data) => {
 /**
  * 标记消息为已读
  * @param {Object} data 标记数据
- * @param {string} data.conversationId 会话ID
+ * @param {number} data.conversationId 会话ID
  * @param {Array} [data.messageIds] 消息ID列表
  * @returns {Promise} 标记结果
  */
@@ -94,7 +94,7 @@ export const markMessagesAsRead = (data) => {
  * @returns {Promise} 上传结果
  */
 export const uploadChatFile = (file, fileType) => {
-  return upload('/chat/upload', file, 'file', { fileType })
+  return upload(`/chat/upload?fileType=${encodeURIComponent(fileType)}`, file, 'file')
 }
 
 /**
@@ -105,7 +105,7 @@ export const uploadChatFile = (file, fileType) => {
  * @returns {Promise} 发送结果
  */
 export const sendEnterpriseResume = (params) => {
-  return post('/chat/send-resume', null, params)
+  return post('/chat/send-resume', {}, params)
 }
 
 /**
@@ -116,7 +116,7 @@ export const sendEnterpriseResume = (params) => {
  * @returns {Promise} 发送结果
  */
 export const sendPsychTestResult = (params) => {
-  return post('/chat/send-test-result', null, params)
+  return post('/chat/send-test-result', {}, params)
 }
 
 /**
@@ -129,7 +129,7 @@ export const getUnreadCount = () => {
 
 /**
  * 获取会话未读消息数量
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 未读消息数量
  */
 export const getSessionUnreadCount = (conversationId) => {
@@ -138,7 +138,7 @@ export const getSessionUnreadCount = (conversationId) => {
 
 /**
  * 搜索消息
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @param {Object} params 搜索参数
  * @param {string} params.keyword 搜索关键词
  * @returns {Promise} 搜索结果
@@ -149,7 +149,7 @@ export const searchMessages = (conversationId, params) => {
 
 /**
  * 获取律师咨询聊天页面数据
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 律师咨询聊天页面数据
  */
 export const getLawyerChatPageData = (conversationId) => {
@@ -158,7 +158,7 @@ export const getLawyerChatPageData = (conversationId) => {
 
 /**
  * 获取企业咨询聊天页面数据
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 企业咨询聊天页面数据
  */
 export const getEnterpriseChatPageData = (conversationId) => {
@@ -167,7 +167,7 @@ export const getEnterpriseChatPageData = (conversationId) => {
 
 /**
  * 获取心理咨询聊天页面数据
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 心理咨询聊天页面数据
  */
 export const getPsychChatPageData = (conversationId) => {
@@ -176,7 +176,7 @@ export const getPsychChatPageData = (conversationId) => {
 
 /**
  * 获取聊天页面数据
- * @param {string} conversationId 会话ID
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 聊天页面数据
  */
 export const getChatPageData = (conversationId) => {

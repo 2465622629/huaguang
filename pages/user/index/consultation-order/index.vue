@@ -318,6 +318,22 @@ export default {
       console.log('创建法律咨询订单，数据:', orderData)
       const response = await createLegalConsultationOrder(orderData)
       
+      console.log('法律咨询订单响应:', response)
+      
+      // 检查响应格式：统一 API 响应格式为 { code, data, message }
+      if (response && response.code === 200 && response.data) {
+        const orderData = response.data
+        if (orderData.orderNo || orderData.id) {
+          return {
+            orderNo: orderData.orderNo || orderData.id,
+            orderId: orderData.id || orderData.orderNo,
+            type: 'legal',
+            ...orderData
+          }
+        }
+      }
+      
+      // 兼容直接返回订单数据的情况
       if (response && (response.orderNo || response.id)) {
         return {
           orderNo: response.orderNo || response.id,
@@ -347,6 +363,22 @@ export default {
       console.log('创建心理咨询订单，数据:', orderData)
       const response = await bookPsychologistConsultation(orderData)
       
+      console.log('心理咨询订单响应:', response)
+      
+      // 检查响应格式：统一 API 响应格式为 { code, data, message }
+      if (response && response.code === 200 && response.data) {
+        const orderData = response.data
+        if (orderData.appointmentId || orderData.id) {
+          return {
+            orderNo: orderData.appointmentId || orderData.id,
+            orderId: orderData.id || orderData.appointmentId,
+            type: 'psychology',
+            ...orderData
+          }
+        }
+      }
+      
+      // 兼容直接返回订单数据的情况
       if (response && (response.appointmentId || response.id)) {
         return {
           orderNo: response.appointmentId || response.id,
@@ -387,6 +419,8 @@ export default {
     handleOrderError(error) {
       let errorMessage = '订单创建失败，请重试'
       
+      console.error('订单创建错误详情:', error)
+      
       if (error.message) {
         if (error.message.includes('timeout')) {
           errorMessage = '网络超时，请检查网络连接'
@@ -394,9 +428,20 @@ export default {
           errorMessage = '订单信息有误，请重新选择'
         } else if (error.message.includes('401')) {
           errorMessage = '请先登录后再创建订单'
+        } else if (error.message.includes('403')) {
+          errorMessage = '权限不足，请联系客服'
         } else if (error.message.includes('500')) {
           errorMessage = '服务器繁忙，请稍后重试'
+        } else if (error.message.includes('创建失败')) {
+          errorMessage = '订单创建失败，请检查专家信息是否正确'
         }
+      }
+      
+      // 如果有接口返回的具体错误信息，优先使用
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message
+      } else if (error.data && error.data.message) {
+        errorMessage = error.data.message
       }
       
       uni.showToast({

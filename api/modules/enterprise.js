@@ -68,207 +68,11 @@ export const updateEnterpriseDetailInfo = (data) => {
   return put('/enterprise/profile', data)
 }
 
-/**
- * 获取企业员工列表
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.department] 部门
- * @param {string} [params.role] 角色
- * @param {string} [params.keyword] 搜索关键词
- * @returns {Promise} 员工列表
- */
-export const getEnterpriseEmployees = (params) => {
-  return get('/enterprise/employees', params)
-}
 
-/**
- * 添加企业员工
- * @param {Object} data 员工数据
- * @param {string} data.name 姓名
- * @param {string} data.phone 手机号
- * @param {string} data.email 邮箱
- * @param {string} data.department 部门
- * @param {string} data.position 职位
- * @param {string} data.role 角色
- * @param {Array} [data.permissions] 权限列表
- * @returns {Promise} 添加结果
- */
-export const addEnterpriseEmployee = (data) => {
-  return post('/enterprise/employees', data)
-}
 
-/**
- * 更新企业员工信息
- * @param {string} employeeId 员工ID
- * @param {Object} data 员工数据
- * @param {string} [data.name] 姓名
- * @param {string} [data.phone] 手机号
- * @param {string} [data.email] 邮箱
- * @param {string} [data.department] 部门
- * @param {string} [data.position] 职位
- * @param {string} [data.role] 角色
- * @param {Array} [data.permissions] 权限列表
- * @param {boolean} [data.active] 是否激活
- * @returns {Promise} 更新结果
- */
-export const updateEnterpriseEmployee = (employeeId, data) => {
-  return put(`/enterprise/employees/${employeeId}`, data)
-}
 
-/**
- * 删除企业员工
- * @param {string} employeeId 员工ID
- * @returns {Promise} 删除结果
- */
-export const deleteEnterpriseEmployee = (employeeId) => {
-  return del(`/enterprise/employees/${employeeId}`)
-}
 
-/**
- * 获取企业服务列表
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.serviceType] 服务类型
- * @param {string} [params.status] 状态
- * @returns {Promise} 服务列表
- */
-export const getEnterpriseServices = (params) => {
-  return get('/enterprise/services', params)
-}
 
-/**
- * 申请企业服务
- * @param {Object} data 服务申请数据
- * @param {string} data.serviceType 服务类型
- * @param {string} data.title 服务标题
- * @param {string} data.description 服务描述
- * @param {string} data.urgency 紧急程度
- * @param {Array} [data.attachments] 附件列表
- * @param {string} [data.preferredProvider] 首选服务商
- * @returns {Promise} 申请结果
- */
-export const applyEnterpriseService = (data) => {
-  return post('/enterprise/services', data)
-}
-
-/**
- * 获取企业服务详情
- * @param {string} serviceId 服务ID
- * @returns {Promise} 服务详情
- */
-export const getEnterpriseServiceDetail = (serviceId) => {
-  return get(`/enterprise/services/${serviceId}`)
-}
-
-/**
- * 更新企业服务状态
- * @param {string} serviceId 服务ID
- * @param {Object} data 状态数据
- * @param {string} data.status 状态
- * @param {string} [data.comment] 备注
- * @returns {Promise} 更新结果
- */
-export const updateEnterpriseServiceStatus = (serviceId, data) => {
-  return put(`/enterprise/services/${serviceId}/status`, data)
-}
-
-/**
- * 获取企业咨询记录
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.consultationType] 咨询类型
- * @param {string} [params.status] 状态
- * @param {string} [params.startDate] 开始日期
- * @param {string} [params.endDate] 结束日期
- * @returns {Promise} 咨询记录
- */
-export const getEnterpriseConsultations = (params) => {
-  return get('/enterprise/consultations', params)
-}
-
-/**
- * 获取企业统计数据
- * @param {Object} params 查询参数
- * @param {string} [params.period] 统计周期（day/week/month/year）
- * @param {string} [params.startDate] 开始日期
- * @param {string} [params.endDate] 结束日期
- * @returns {Promise} 统计数据
- */
-export const getEnterpriseStatistics = (params) => {
-  return get('/enterprise/statistics', params)
-}
-
-/**
- * 获取企业账单列表
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.status] 账单状态
- * @param {string} [params.startDate] 开始日期
- * @param {string} [params.endDate] 结束日期
- * @returns {Promise} 账单列表
- */
-export const getEnterpriseBills = (params) => {
-  return get('/enterprise/bills', params)
-}
-
-/**
- * 获取企业账单详情
- * @param {string} billId 账单ID
- * @returns {Promise} 账单详情
- */
-export const getEnterpriseBillDetail = (billId) => {
-  return get(`/enterprise/bills/${billId}`)
-}
-
-/**
- * 支付企业账单
- * @param {string} billId 账单ID
- * @param {Object} data 支付数据
- * @param {string} data.paymentMethod 支付方式
- * @param {string} [data.remark] 备注
- * @returns {Promise} 支付结果
- */
-export const payEnterpriseBill = (billId, data) => {
-  return post(`/enterprise/bills/${billId}/pay`, data)
-}
-
-/**
- * 获取企业合同列表
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.status] 合同状态
- * @param {string} [params.contractType] 合同类型
- * @returns {Promise} 合同列表
- */
-export const getEnterpriseContracts = (params) => {
-  return get('/enterprise/contracts', params)
-}
-
-/**
- * 获取企业合同详情
- * @param {string} contractId 合同ID
- * @returns {Promise} 合同详情
- */
-export const getEnterpriseContractDetail = (contractId) => {
-  return get(`/enterprise/contracts/${contractId}`)
-}
-
-/**
- * 签署企业合同
- * @param {string} contractId 合同ID
- * @param {Object} data 签署数据
- * @param {string} data.signatureImage 签名图片
- * @param {string} [data.comment] 签署意见
- * @returns {Promise} 签署结果
- */
-export const signEnterpriseContract = (contractId, data) => {
-  return post(`/enterprise/contracts/${contractId}/sign`, data)
-}
 
 /**
  * 企业注册接口
@@ -402,14 +206,14 @@ export const uploadResume = (file) => {
 
 /**
  * 向指定职位投递简历
+ * @param {string|number} jobId 职位ID
  * @param {Object} data 投递数据
- * @param {string|number} data.jobId 职位ID
  * @param {string} [data.resumeUrl] 简历文件URL
  * @param {string} [data.coverLetter] 求职信
  * @returns {Promise} 投递结果
  */
-export const applyJob = (data) => {
-  return post('/enterprise/jobs/apply', data)
+export const applyJob = (jobId, data) => {
+  return post(`/enterprise/jobs/${jobId}/apply`, data)
 }
 
 /**
@@ -462,6 +266,7 @@ export const getJobDetail = (jobId) => {
  * @param {string} [params.educationRequirement] 学历要求
  * @param {number} [params.page=1] 页码
  * @param {number} [params.size=10] 每页大小
+ * @param {string} params.sortBy 排序方式
  * @returns {Promise} 搜索结果
  */
 export const searchJobs = (params) => {
@@ -471,8 +276,7 @@ export const searchJobs = (params) => {
 /**
  * 获取热门职位列表
  * @param {Object} params 查询参数
- * @param {number} [params.page=1] 页码
- * @param {number} [params.size=10] 每页大小
+ * @param {number} params.limit 限制数量
  * @returns {Promise} 热门职位列表
  */
 export const getHotJobs = (params) => {
@@ -510,103 +314,38 @@ export const getUserApplications = (params) => {
  * @returns {Promise} 企业收到的投递记录
  */
 export const getEnterpriseApplications = (params) => {
-  return get('/enterprise/applications/received', params)
+  return get('/enterprise/applications/enterprise', params)
 }
 
 // 导出所有企业相关API
-/**
- * 获取个性化推荐职位
- * @param {Object} params 推荐参数
- * @param {number} [params.page=1] 页码
- * @param {number} [params.pageSize=20] 每页大小
- * @param {string} [params.sortType='recommended'] 排序类型
- * @param {Array} [params.filters=[]] 筛选条件
- * @param {Object} [params.userPreferences={}] 用户偏好
- * @returns {Promise} 推荐职位列表
- */
-export const getRecommendedJobs = (params) => {
-  return get('/enterprise/jobs/recommended', params)
-}
 
-/**
- * 获取用户求职偏好设置
- * @returns {Promise} 用户偏好数据
- */
-export const getUserJobPreferences = () => {
-  return get('/user/preferences')
-}
-
-/**
- * 上报用户行为数据
- * @param {Object} data 行为数据
- * @param {string} data.action 行为类型（view/apply/favorite/share）
- * @param {string|number} data.jobId 职位ID
- * @param {number} data.timestamp 时间戳
- * @param {Object} [data.extra] 额外数据
- * @returns {Promise} 上报结果
- */
-export const reportUserBehavior = (data) => {
-  return post('/user/behavior/report', data)
-}
-
-/**
- * 获取热门搜索关键词
- * @param {Object} params 查询参数
- * @param {number} [params.limit=10] 返回数量限制
- * @returns {Promise} 热门关键词列表
- */
-export const getHotSearchKeywords = (params) => {
-  return get('/enterprise/search/hot-keywords', params)
-}
 
 export default {
+  // 企业基本信息管理接口
   getEnterpriseInfo,
   updateEnterpriseInfo,
-  getEnterpriseEmployees,
-  addEnterpriseEmployee,
-  updateEnterpriseEmployee,
-  deleteEnterpriseEmployee,
-  getEnterpriseServices,
-  applyEnterpriseService,
-  getEnterpriseServiceDetail,
-  updateEnterpriseServiceStatus,
-  getEnterpriseConsultations,
-  getEnterpriseStatistics,
-  getEnterpriseBills,
-  getEnterpriseBillDetail,
-  payEnterpriseBill,
-  getEnterpriseContracts,
-  getEnterpriseContractDetail,
-  signEnterpriseContract,
-  // 新增的企业管理接口
   getCurrentEnterpriseInfo,
   updateEnterpriseDetailInfo,
   registerEnterprise,
   deleteEnterpriseAccount,
-  // 企业招聘相关接口
+  // 企业列表和详情接口
   getEnterpriseList,
+  getEnterpriseDetail,
+  getEnterpriseWorkspace,
   // 职位管理接口
+  createJob,
   updateJob,
   deleteJob,
   getEnterpriseJobs,
-  createJob,
   incrementJobViewCount,
-  // 简历投递接口
+  // 职位搜索和查询接口
+  searchJobs,
+  getJobDetail,
+  getHotJobs,
+  // 简历投递管理接口
   uploadResume,
   applyJob,
   updateApplicationStatus,
-  // 企业招聘工作台接口
-  getEnterpriseDetail,
-  getEnterpriseWorkspace,
-  // 职位搜索和推荐接口
-  getJobDetail,
-  searchJobs,
-  getHotJobs,
-  getRecommendedJobs,
-  getUserJobPreferences,
-  reportUserBehavior,
-  getHotSearchKeywords,
-  // 申请记录管理接口
   getApplicationDetail,
   getUserApplications,
   getEnterpriseApplications

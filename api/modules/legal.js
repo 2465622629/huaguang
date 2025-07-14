@@ -9,14 +9,8 @@ import { get, post, put, del } from '../request.js'
  * 获取法律咨询律师列表
  * @param {Object} params 查询参数
  * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.specialty] 专业领域
- * @param {string} [params.location] 所在地区
- * @param {string} [params.keyword] 搜索关键词
- * @param {string} [params.sortBy] 排序方式
- * @param {number} [params.minPrice] 最低价格
- * @param {number} [params.maxPrice] 最高价格
- * @param {number} [params.minRating] 最低评分
+ * @param {number} [params.size] 每页数量
+ * @param {string} [params.category] 服务分类
  * @returns {Promise} 法律咨询律师列表
  */
 export const getLegalConsultationLawyers = (params) => {
@@ -39,40 +33,7 @@ export const getLegalHomeData = (params = {}) => {
  * @returns {Promise} 律师详情
  */
 export const getLawyerDetail = (lawyerId) => {
-  return get(`/lawyers/${lawyerId}`)
-}
-
-/**
- * 获取律师服务列表
- * @param {string} lawyerId 律师ID
- * @returns {Promise} 服务列表
- */
-export const getLawyerServices = (lawyerId) => {
-  return get(`/lawyers/${lawyerId}/services`)
-}
-
-/**
- * 获取律师案例
- * @param {string} lawyerId 律师ID
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @returns {Promise} 案例列表
- */
-export const getLawyerCases = (lawyerId, params) => {
-  return get(`/lawyers/${lawyerId}/cases`, params)
-}
-
-/**
- * 获取律师评价
- * @param {string} lawyerId 律师ID
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @returns {Promise} 评价列表
- */
-export const getLawyerReviews = (lawyerId, params) => {
-  return get(`/lawyers/${lawyerId}/reviews`, params)
+  return get(`/legal/lawyers/${lawyerId}`)
 }
 
 /**
@@ -100,23 +61,13 @@ export const getLegalOrderDetail = (orderNo) => {
 }
 
 /**
- * 获取用户法律咨询列表
- * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.status] 状态筛选
- * @returns {Promise} 咨询列表
- */
-export const getUserLegalConsultations = (params) => {
-  return get('/user/legal-consultations', params)
-}
-
-/**
  * 获取法律文书列表
  * @param {Object} params 查询参数
  * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.category] 分类
+ * @param {number} [params.size] 每页数量
+ * @param {string} [params.status] 状态筛选
+ * @param {string} [params.type] 类型筛选
+ * @param {string} [params.keyword] 关键词搜索
  * @returns {Promise} 法律文书列表
  */
 export const getLegalDocuments = (params) => {
@@ -142,17 +93,6 @@ export const downloadLegalDocument = (documentId) => {
 }
 
 /**
- * 获取法律模板列表
- * @param {Object} params 查询参数
- * @param {string} [params.category] 分类
- * @param {string} [params.keyword] 搜索关键词
- * @returns {Promise} 模板列表
- */
-export const getLegalTemplates = (params) => {
-  return get('/legal/templates', params)
-}
-
-/**
  * 下载法律模板
  * @param {string} templateId 模板ID
  * @returns {Promise} 下载结果
@@ -164,9 +104,9 @@ export const downloadLegalTemplate = (templateId) => {
 /**
  * 获取法律文书审核列表
  * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
  * @param {string} [params.status] 状态筛选
+ * @param {number} [params.page] 页码
+ * @param {number} [params.size] 每页数量
  * @returns {Promise} 审核列表
  */
 export const getLegalDocumentReviews = (params) => {
@@ -188,9 +128,7 @@ export const reviewLegalDocument = (data) => {
 /**
  * 获取帮扶案例列表
  * @param {Object} params 查询参数
- * @param {number} [params.page] 页码
- * @param {number} [params.pageSize] 每页数量
- * @param {string} [params.category] 分类
+ * @param {number} [params.limit] 限制数量
  * @returns {Promise} 案例列表
  */
 export const getAssistanceCases = (params) => {
@@ -198,17 +136,21 @@ export const getAssistanceCases = (params) => {
 }
 
 /**
- * 评价律师服务
- * @param {Object} data 评价数据
- * @param {string} data.lawyerId 律师ID
- * @param {string} data.consultationId 咨询ID
- * @param {number} data.rating 评分
- * @param {string} data.comment 评价内容
- * @param {Array} [data.tags] 标签
- * @returns {Promise} 评价结果
+ * 获取咨询订单页面
+ * @param {string} lawyerId 律师ID
+ * @returns {Promise} 咨询订单页面数据
  */
-export const rateLawyer = (data) => {
-  return post('/lawyer/reviews', data)
+export const getLegalConsultationOrderPage = (lawyerId) => {
+  return get(`/legal/consultation/order/${lawyerId}`)
+}
+
+/**
+ * 支付并提交咨询订单
+ * @param {Object} data 支付数据
+ * @returns {Promise} 支付结果
+ */
+export const payLegalOrder = (data) => {
+  return post('/legal/orders/pay', data)
 }
 
 // 导出所有法律服务相关API
@@ -216,19 +158,15 @@ export default {
   getLegalConsultationLawyers,
   getLegalHomeData,
   getLawyerDetail,
-  getLawyerServices,
-  getLawyerCases,
-  getLawyerReviews,
   createLegalConsultationOrder,
   getLegalOrderDetail,
-  getUserLegalConsultations,
   getLegalDocuments,
   getLegalDocumentDetail,
   downloadLegalDocument,
-  getLegalTemplates,
   downloadLegalTemplate,
   getLegalDocumentReviews,
   reviewLegalDocument,
   getAssistanceCases,
-  rateLawyer
+  getLegalConsultationOrderPage,
+  payLegalOrder
 }

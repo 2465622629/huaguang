@@ -237,7 +237,7 @@
 			 */
 			async loadHomeData() {
 				const promises = [
-					this.loadBanners(),
+					// this.loadBanners(),
 					this.loadNavigations(),
 					this.loadServiceCards(),
 					this.loadHotLawyers(),
@@ -257,15 +257,15 @@
 			/**
 			 * 加载轮播图数据
 			 */
-			async loadBanners() {
-				try {
-					const response = await this.executeWithRetry(() => getBanners({ active: true }))
-					this.banners = response.data || []
-				} catch (error) {
-					console.error('加载轮播图失败：', error)
-					this.banners = this.getDefaultBanners()
-				}
-			},
+			// async loadBanners() {
+			// 	try {
+			// 		const response = await this.executeWithRetry(() => getBanners({ active: true }))
+			// 		this.banners = response.data || []
+			// 	} catch (error) {
+			// 		console.error('加载轮播图失败：', error)
+			// 		this.banners = this.getDefaultBanners()
+			// 	}
+			// },
 
 			/**
 			 * 加载功能导航数据

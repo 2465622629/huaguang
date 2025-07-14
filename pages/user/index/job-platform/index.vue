@@ -267,6 +267,10 @@ export default {
 <style lang="scss" scoped>
 .job-platform-page {
   min-height: 100vh;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
 }
 
 /* 自定义导航栏 */
