@@ -309,8 +309,9 @@ export default {
           sortBy: 'rating'
         })
         
-        if (response && Array.isArray(response)) {
-          return this.formatLawyerData(response)
+        // 正确提取响应数据：response.data 而不是 response
+        if (response && response.data && Array.isArray(response.data)) {
+          return this.formatLawyerData(response.data)
         }
         
         throw new Error('法律咨询API响应格式不正确')
@@ -321,8 +322,9 @@ export default {
         // 备用方案：使用热门律师API
         try {
           const backupResponse = await getHotLawyers({ limit: 15 })
-          if (backupResponse && Array.isArray(backupResponse)) {
-            return this.formatLawyerData(backupResponse)
+          // 正确提取响应数据：backupResponse.data 而不是 backupResponse
+          if (backupResponse && backupResponse.data && Array.isArray(backupResponse.data)) {
+            return this.formatLawyerData(backupResponse.data)
           }
         } catch (backupError) {
           console.error('备用律师API也失败:', backupError)
@@ -341,8 +343,9 @@ export default {
           sortBy: 'rating'
         })
         
-        if (response && Array.isArray(response)) {
-          return this.formatPsychologistData(response)
+        // 正确提取响应数据：response.data 而不是 response
+        if (response && response.data && Array.isArray(response.data)) {
+          return this.formatPsychologistData(response.data)
         }
         
         throw new Error('心理师API响应格式不正确')

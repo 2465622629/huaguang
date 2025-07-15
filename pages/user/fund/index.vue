@@ -74,7 +74,7 @@
           </view>
         </view>
       </view>
-      <view class="feature-item" style="background-color: #FFB217;" @click="navigateToCreditRecovery">
+      <view class="feature-item" style="background-color: #FFB217; position: relative;" @click="navigateToCreditRecovery">
         <view class="feature-header"
           style="display: flex; flex-direction: column; justify-content: center; height: 200rpx;">
           <view class="title-group" style="position: absolute; top: 50%;"> <text class="feature-title"
@@ -188,11 +188,11 @@ export default {
         })
       }
     },
-    navigateToApply() { uni.navigateTo({ url: '/pages/user/fund/apply/index' }) }, 
-    navigateToHelpTypes() { uni.navigateTo({ url: '/pages/user/fund/help-types/index' }) }, 
-    navigateToCounseling() { uni.navigateTo({ url: '/pages/user/fund/counseling/index' }) }, 
+    navigateToApply() { uni.navigateTo({ url: '/pages/user/fund/apply/index' }) },
+    navigateToHelpTypes() { uni.navigateTo({ url: '/pages/user/fund/help-types/index' }) },
+    navigateToCounseling() { uni.navigateTo({ url: '/pages/user/fund/counseling/index' }) },
     navigateToCreditRecovery() { uni.navigateTo({ url: '/pages/user/fund/credit-recovery/index' }) },
-    navigateToCase() { 
+    navigateToCase() {
       // uni.navigateTo({ 
       //   url: '/pages/user/fund/case/index' 
       // }) 
@@ -207,12 +207,12 @@ export default {
           this.getHomePageData(),
           this.getCaseList()
         ])
-        
+
         // 处理主页数据结果
         if (homePageResult.status === 'rejected') {
           console.error('获取主页数据失败：', homePageResult.reason)
         }
-        
+
         // 处理案例数据结果
         if (casesResult.status === 'rejected') {
           console.error('获取帮扶案例失败：', casesResult.reason)
@@ -255,17 +255,17 @@ export default {
           size: 10,
           status: 'completed' // 只获取已完成的帮扶记录作为案例展示
         })
-        
+
         if (response.code === 0 && response.data && response.data.records && response.data.records.length > 0) {
           let cases = response.data.records.map(record => ({
             maskedName: this.maskName(record.userName || record.applicantName),
             loanAmount: record.assistanceAmount || record.amount || 0,
             createTime: this.formatDate(record.completedTime || record.createTime)
           }))
-          
+
           // 按金额排序并取前3个
           cases = cases.sort((a, b) => b.loanAmount - a.loanAmount).slice(0, 3)
-          
+
           // 如果不足3个，用默认数据补充
           if (cases.length < 3) {
             const defaultCases = [
@@ -275,7 +275,7 @@ export default {
             ]
             cases = [...cases, ...defaultCases.slice(cases.length)].slice(0, 3)
           }
-          
+
           this.caseList = cases
         } else {
           this.setDefaultCaseList()

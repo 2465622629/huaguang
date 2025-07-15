@@ -47,33 +47,24 @@
         </view>
         
         <!-- 答案选项 -->
-        <view class="options-section">
-          <view
-            v-for="(option, index) in currentQuestion.options"
-            :key="index"
-            class="option-btn"
-            :class="{ 
-              'option-selected': currentQuestion.type === 'multiple_choice' 
-                ? (Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value))
-                : answers[currentQuestionIndex] === option.value 
-            }"
-            @click="selectAnswer(option.value)"
-          >
-            <uv-icon v-if="currentQuestion.type === 'multiple_choice'" 
-              :name="(Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value)) ? 'checkbox-fill' : 'checkbox'" 
-              :color="(Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value)) ? '#FA5353' : '#CCCCCC'"
-              size="18"
-              style="margin-right: 8px;"
-            ></uv-icon>
-            <uv-icon v-else 
-              :name="answers[currentQuestionIndex] === option.value ? 'radiobox-fill' : 'radiobox-blank'" 
-              :color="answers[currentQuestionIndex] === option.value ? '#FA5353' : '#CCCCCC'"
-              size="18"
-              style="margin-right: 8px;"
-            ></uv-icon>
-            <text>{{ option.text }}</text>
+        <scroll-view scroll-y class="options-section" :show-scrollbar="false">
+          <view class="options-container">
+            <view
+              v-for="(option, index) in currentQuestion.options"
+              :key="index"
+              class="option-btn"
+              :class="{ 
+                'option-selected': currentQuestion.type === 'multiple_choice' 
+                  ? (Array.isArray(answers[currentQuestionIndex]) && answers[currentQuestionIndex].includes(option.value))
+                  : answers[currentQuestionIndex] === option.value 
+              }"
+              @click="selectAnswer(option.value)"
+            >
+             
+              <text>{{ option.text }}</text>
+            </view>
           </view>
-        </view>
+        </scroll-view>
         
         <!-- 导航按钮 -->
         <view class="navigation-section">
@@ -85,9 +76,24 @@
             <text>回到上一题</text>
           </view>
           
-          <view v-if="isLastQuestion && answers[currentQuestionIndex]" class="finish-btn" @click="finishTest">
+          <!-- {{ AURA-X: Modify - 简化条件判断，确保下一题按钮正确显示 }} -->
+          <view 
+            v-if="!isLastQuestion" 
+            class="next-btn" 
+            :class="{ 'btn-disabled': !hasAnsweredCurrentQuestion }"
+            @click="goToNextQuestion"
+          >
+            <text>下一题</text>
+          </view>
+          
+          <view v-if="isLastQuestion && hasAnsweredCurrentQuestion" class="finish-btn" @click="finishTest">
             <text>完成测试</text>
           </view>
+          
+          <!-- 调试信息暂时移除 -->
+          <!-- <view class="debug-info">
+            <text>调试信息</text>
+          </view> -->
         </view>
       </template>
       
@@ -336,6 +342,14 @@ export default {
     },
     isLastQuestion() {
       return this.currentQuestionIndex === this.questions.length - 1
+    },
+    // {{ AURA-X: Add - 检查当前题目是否已回答，用于控制导航按钮显示 }}
+    hasAnsweredCurrentQuestion() {
+      const answer = this.answers[this.currentQuestionIndex]
+      if (this.currentQuestion && this.currentQuestion.type === 'multiple_choice') {
+        return Array.isArray(answer) && answer.length > 0
+      }
+      return answer !== null && answer !== undefined
     }
   },
   methods: {
@@ -541,27 +555,34 @@ export default {
       this.clearTestProgress()
     },
 
-    // 答题逻辑 - 增强版本
-    selectAnswer(optionIndex) {
+    // 答题逻辑 - 修复Vue响应式更新问题 {{ AURA-X: Modify - 使用Vue.set确保响应式更新 }}
+    selectAnswer(optionValue) {
       const currentQ = this.currentQuestion
+      console.log('选择答案:', optionValue, '题目类型:', currentQ.type)
       
       if (currentQ.type === 'multiple_choice') {
-        // 多选题处理
-        if (!Array.isArray(this.answers[this.currentQuestionIndex])) {
-          this.answers[this.currentQuestionIndex] = []
+        // 多选题处理 - 使用响应式方法
+        let answerArray = this.answers[this.currentQuestionIndex]
+        if (!Array.isArray(answerArray)) {
+          answerArray = []
         }
         
-        const answerArray = this.answers[this.currentQuestionIndex]
-        const index = answerArray.indexOf(optionIndex)
+        const index = answerArray.indexOf(optionValue)
         
         if (index > -1) {
           answerArray.splice(index, 1) // 取消选择
+          console.log('取消选择:', optionValue, '当前答案:', answerArray)
         } else {
-          answerArray.push(optionIndex) // 添加选择
+          answerArray.push(optionValue) // 添加选择
+          console.log('添加选择:', optionValue, '当前答案:', answerArray)
         }
+        
+        // 使用Vue.set确保响应式更新
+        this.$set(this.answers, this.currentQuestionIndex, [...answerArray])
       } else {
         // 单选题处理
-        this.answers[this.currentQuestionIndex] = optionIndex
+        this.$set(this.answers, this.currentQuestionIndex, optionValue)
+        console.log('单选答案:', optionValue)
       }
       
       // 实时保存进度
@@ -578,6 +599,25 @@ export default {
     goToPrevQuestion() {
       if (!this.isFirstQuestion) {
         this.currentQuestionIndex--
+        // 保存进度
+        this.saveTestProgress()
+      }
+    },
+
+    // {{ AURA-X: Add - 添加下一题方法，解决多选题无法前进问题 }}
+    goToNextQuestion() {
+      // 检查是否已回答当前题目
+      if (!this.hasAnsweredCurrentQuestion) {
+        uni.showToast({
+          title: '请先回答当前问题',
+          icon: 'none',
+          duration: 1500
+        })
+        return
+      }
+      
+      if (!this.isLastQuestion) {
+        this.currentQuestionIndex++
         // 保存进度
         this.saveTestProgress()
       }
@@ -972,7 +1012,7 @@ export default {
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  // {{ AURA-X: Modify - 移除overflow:hidden以支持内部滚动 }}
   
   // 状态栏
   .status-bar {
@@ -1068,7 +1108,8 @@ export default {
   .test-card {
     margin: 40rpx auto;
     width: 75%;
-    min-height: 55vh;
+    height: calc(100vh - 350rpx); // {{ AURA-X: Modify - 设置固定高度以支持内部滚动 }}
+    max-height: 70vh;
     background-color: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(10px);
     border-radius: 48rpx;
@@ -1153,13 +1194,18 @@ export default {
       }
     }
     
-    // 答案选项
+    // 答案选项 - {{ AURA-X: Modify - 添加滚动容器支持 }}
     .options-section {
       flex: 2;
-      display: flex;
-      flex-direction: column;
-      gap: 40rpx;
       margin-bottom: 60rpx;
+      max-height: 40vh; // 限制最大高度，超出时滚动
+      
+      .options-container {
+        display: flex;
+        flex-direction: column;
+        gap: 40rpx;
+        padding: 10rpx 0; // 上下留白，提升滚动体验
+      }
       
       .option-btn {
         min-height: 100rpx;
@@ -1218,6 +1264,34 @@ export default {
         &.prev-disabled {
           opacity: 0.5;
           pointer-events: none;
+        }
+      }
+      
+      // {{ AURA-X: Add - 添加下一题按钮样式 }}
+      .next-btn {
+        background-color: #C8647A;
+        border-radius: 40rpx;
+        padding: 20rpx 40rpx;
+        transition: all 0.3s ease;
+        
+        text {
+          font-size: 28rpx;
+          color: #FFFFFF;
+          font-weight: bold;
+        }
+        
+        &:active {
+          opacity: 0.8;
+          transform: scale(0.98);
+        }
+        
+        &.btn-disabled {
+          background-color: #DDA0AF;
+          opacity: 0.6;
+          
+          text {
+            color: rgba(255, 255, 255, 0.7);
+          }
         }
       }
       

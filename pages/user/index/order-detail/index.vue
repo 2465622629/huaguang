@@ -728,7 +728,7 @@ export default {
             relatedOrderType: orderTypeMap[this.orderData.orderType] || 'consultation',
             amount: this.orderInfo.amount,
             description: `${this.orderInfo.serviceType} - ${this.expertInfo.name}`,
-            payType: 'APP' // 微信小程序支付类型
+            payType: 'NATIVE' // 微信小程序支付类型
           }
           
           console.log('微信支付订单数据:', paymentData)

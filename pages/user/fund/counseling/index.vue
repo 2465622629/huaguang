@@ -69,12 +69,16 @@
             </view>
             
             <view class="counselor-tags">
-              <template v-for="(tag, tagIndex) in item.specialties">
-                <view class="specialty-tag" :key="'tag-' + tagIndex">
+              <view 
+                v-for="(tag, tagIndex) in item.specialties" 
+                :key="'tag-' + tagIndex"
+                class="tag-wrapper"
+              >
+                <view class="specialty-tag">
                   <text> {{ tag }} </text>
                 </view>
-                <text v-if="tagIndex < item.specialties.length - 1" class="tag-separator" :key="'sep-' + tagIndex"> | </text>
-              </template>
+                <text v-if="tagIndex < item.specialties.length - 1" class="tag-separator"> | </text>
+              </view>
             </view>
             
             <view class="counselor-stats">
@@ -95,7 +99,7 @@
             <view class="counselor-price-action">
               <view class="price-info">
                 <text class="price-value">¥{{ item.price }}</text>
-                <text class="price-unit">/30分钟</text>
+                <text class="price-unit">/{{ item.durationMinutes || 30 }}分钟</text>
               </view>
               <view class="consult-btn" @click.stop="consultCounselor(item)">
                 <text>立即咨询</text>
@@ -294,8 +298,8 @@ export default {
         const res = await getPsychologistList(params)
         console.log('res',res);
         
-        if (res && res.records) {
-          const responseData = res
+        if (res && res.data && res.data.records) {
+          const responseData = res.data
           
           // 映射API数据到前端字段
           const mappedData = responseData.records.map(item => this.mapCounselorData(item))
@@ -398,19 +402,22 @@ export default {
       })
     },
     
-    // 映射API数据到前端字段
+    // 映射API数据到前端字段  
     mapCounselorData(apiData) {
+      // {{ AURA-X: Modify - 适配新API响应结构字段映射. Source: 用户提供的接口响应示例 }}
       return {
-        id: apiData.id || apiData.psychologistId,
-        name: apiData.name || apiData.psychologistName,
-        serviceType: apiData.serviceType || apiData.consultationType || '语音/视频',
-        age: apiData.age || 30,
-        certificates: apiData.certificates || apiData.qualification || '心理咨询师',
-        specialties: apiData.specialties || apiData.expertiseAreas || [],
-        consultationCount: apiData.consultationCount || apiData.totalConsultations || 0,
-        returnClientCount: apiData.returnClientCount || apiData.returningClients || 0,
-        motto: apiData.motto || apiData.personalStatement || '专业倾听，用心陪伴',
-        price: apiData.price || apiData.consultationFee || 99.9
+        id: apiData.id,
+        name: apiData.name,
+        serviceType: apiData.isOnline ? (apiData.statusDescription || '在线服务') : '离线',
+        age: apiData.age,
+        certificates: apiData.qualificationDescription || '心理咨询师',
+        specialties: apiData.specialties || apiData.professionalFields || [],
+        consultationCount: apiData.consultationCount || 0,
+        returnClientCount: 0, // API响应中暂无此字段，设为0
+        motto: apiData.slogan || '专业倾听，用心陪伴',
+        price: apiData.price || 0,
+        durationMinutes: apiData.durationMinutes || 30,
+        isOnline: apiData.isOnline || false
       }
     },
     
@@ -701,6 +708,11 @@ export default {
       align-items: center;
       flex-wrap: wrap;
       margin-bottom: 3rpx;
+      
+      .tag-wrapper {
+        display: flex;
+        align-items: center;
+      }
       
       .specialty-tag {
         display: inline-block;
