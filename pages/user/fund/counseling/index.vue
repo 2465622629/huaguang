@@ -392,14 +392,15 @@ export default {
     
     // 咨询操作
     consultCounselor(counselor) {
-      // 跳转到咨询前测试页面
+      // 跳转到咨询前测试页面，并传递导师ID
+      const url = `/pages/user/fund/counseling/test?expertId=${counselor.id}`;
       uni.navigateTo({
-        url: '/pages/user/fund/counseling/test',
+        url: url,
         success: (res) => {
-          // 传递咨询师信息到测试页面
+          // 为了兼容，仍然可以传递完整信息
           res.eventChannel.emit('counselorData', { counselor })
         }
-      })
+      });
     },
     
     // 映射API数据到前端字段  

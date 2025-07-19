@@ -20,9 +20,9 @@ export const getChatSessions = (params) => {
 /**
  * 创建或获取聊天会话
  * @param {Object} data 会话数据
- * @param {number} data.targetId 目标用户ID
- * @param {string} data.targetType 目标类型（lawyer/psychologist/enterprise）
- * @param {string} [data.serviceType] 服务类型
+ * @param {number} data.otherUserId 对方用户ID
+ * @param {string} data.type 会话类型
+ * @param {number} [data.consultationOrderId] 咨询订单ID（咨询会话时需要）
  * @returns {Promise} 会话信息
  */
 export const createChatSession = (data) => {
@@ -80,7 +80,6 @@ export const sendMessage = (data) => {
  * 标记消息为已读
  * @param {Object} data 标记数据
  * @param {number} data.conversationId 会话ID
- * @param {Array} [data.messageIds] 消息ID列表
  * @returns {Promise} 标记结果
  */
 export const markMessagesAsRead = (data) => {
@@ -105,7 +104,7 @@ export const uploadChatFile = (file, fileType) => {
  * @returns {Promise} 发送结果
  */
 export const sendEnterpriseResume = (params) => {
-  return post('/chat/send-resume', {}, params)
+  return post('/chat/send-resume', null, params)
 }
 
 /**
@@ -116,7 +115,7 @@ export const sendEnterpriseResume = (params) => {
  * @returns {Promise} 发送结果
  */
 export const sendPsychTestResult = (params) => {
-  return post('/chat/send-test-result', {}, params)
+  return post('/chat/send-test-result', null, params)
 }
 
 /**

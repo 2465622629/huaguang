@@ -132,7 +132,8 @@ export default {
       config,
       currentQuestionIndex: 0,
       answers: [],
-      counselor: null, // 咨询师信息
+      counselorInfo: null,
+      expertId: null, // 咨询师信息
       
       // API数据 - {{ AURA-X: Modify - 使用固定testId为1 }}
       testId: 1, // 心理测试ID
@@ -330,13 +331,13 @@ export default {
       this.testId = parseInt(options.testId) || 1
     }
     
-    // 获取上一页面传递的咨询师数据
+    this.expertId = options.expertId || null;
+
+    // 接收从列表页传递过来的咨询师信息
     const eventChannel = this.getOpenerEventChannel()
-    if (eventChannel) {
-      eventChannel.on('counselorData', (data) => {
-        this.counselor = data.counselor
-      })
-    }
+    eventChannel.on('counselorData', (data) => {
+      this.counselorInfo = data.counselor
+    })
     
     // 初始化测试
     await this.initializeTest()
@@ -1138,8 +1139,19 @@ export default {
         showCancel: false,
         confirmText: '继续咨询',
         success: () => {
+          let url = `/pages/user/index/chat/index?testResultId=${testResult.id}`;
+          if (this.expertId) {
+            url += `&expertId=${this.expertId}`;
+          }
+          
           uni.redirectTo({
-            url: `/pages/user/index/chat/index?testResultId=${testResult.id}&targetId=${this.counselor ? this.counselor.id : ''}&targetType=psychologist`
+            url: url,
+            success: (navRes) => {
+              // 通过eventChannel传递复杂的咨询师对象
+              if (this.counselorInfo) {
+                navRes.eventChannel.emit('counselorData', { counselor: this.counselorInfo })
+              }
+            }
           })
         }
       })
@@ -1154,7 +1166,7 @@ export default {
 
     // 导航到咨询页面
     navigateToConsultation(testResult) {
-      if (!this.counselor) {
+      if (!this.counselorInfo) {
         // 如果没有咨询师信息，跳转到咨询师选择页面
         uni.navigateTo({
           url: '/pages/user/fund/counseling/index',
@@ -1175,7 +1187,7 @@ export default {
         success: (res) => {
           // 传递测试结果和咨询师信息到聊天页面
           res.eventChannel.emit('counselData', {
-            counselor: this.counselor,
+            counselor: this.counselorInfo,
             testResult: testResult,
             answers: this.answers,
             testDuration: this.testDuration

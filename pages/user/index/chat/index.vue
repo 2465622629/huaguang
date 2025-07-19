@@ -24,12 +24,17 @@
     </view>
     
     <!-- 聊天内容区域 -->
-    <scroll-view 
+        <scroll-view 
       class="chat-content" 
       scroll-y="true" 
       :scroll-top="scrollTop"
       :style="{ height: chatHeight }"
+      @scrolltoupper="handleScrollToUpper"
     >
+      <!-- 加载更多 -->
+      <view v-if="loadingMessages" class="loading-more">
+        <text class="loading-text">正在加载更多消息...</text>
+      </view>
       <!-- 加载状态 -->
       <view v-if="loading" class="loading-container">
         <text class="loading-text">加载中...</text>
@@ -75,14 +80,15 @@
           v-model="inputMessage"
           @confirm="sendMessage"
         />
-        <view class="add-button" @click="showMoreOptions">
+        <button v-if="inputMessage.trim()" class="send-button" @click="sendMessage">发送</button>
+        <view v-else class="add-button" @click="showMoreOptions">
           <uv-icon name="plus-circle" color="#888888" size="54"></uv-icon>
         </view>
       </view>
     </view>
     
     <!-- 快捷操作栏 -->
-    <view class="quick-actions">
+    <view class="quick-actions" v-if="showQuickActions">
       <view class="action-item" @click="sendTestResult">
         <view class="action-icon" >
           <uv-icon :name="config.staticBaseUrl + '/icons/send_test.png'" color="#FFFFFF" size="64"></uv-icon>
@@ -102,6 +108,7 @@
 <script>
 import config from '@/config/index.js'
 import { getTestResult } from '@/api/modules/psychological-tests.js'
+import { getChatMessages, sendMessage as apiSendMessage } from '@/api/modules/chat.js'
 
 export default {
   name: 'ChatPage',
@@ -127,7 +134,7 @@ export default {
       remainingTime: 30 * 60, // 30分钟，单位秒
       countdownInterval: null,
       fullTestResult: null,
-      loading: false,
+      loading: true,
       loadingMessages: false,
       sendingMessage: false,
       currentPage: 1,
@@ -136,7 +143,9 @@ export default {
       cacheKey: '',
       cacheExpiry: 5 * 60 * 1000,
       retryCount: 0,
-      maxRetries: 3
+      maxRetries: 3,
+      showQuickActions: false,
+      expertId: null
     }
   },
   onLoad(options) {
@@ -151,8 +160,12 @@ export default {
     this.targetId = options.targetId || options.expertId || ''
 
     if (options.testResultId) {
-      this.testResultId = options.testResultId
-      this.handleTestResult(this.testResultId)
+      this.testResultId = options.testResultId || null;
+      this.expertId = options.expertId || null;
+      // 先加载历史消息，再处理测试结果的显示
+      this.initChatData().then(() => {
+        this.handleTestResult(this.testResultId)
+      })
     } else {
       this.initChatData()
     }
@@ -275,35 +288,125 @@ export default {
     },
 
     calculateChatHeight() {
-      const systemInfo = uni.getSystemInfoSync()
-      const statusBarHeight = systemInfo.statusBarHeight || 0
-      const navBarHeight = 60
-      const inputAreaHeight = 50
-      const quickActionsHeight = 80
-      
-      this.chatHeight = `${systemInfo.windowHeight - statusBarHeight - navBarHeight - inputAreaHeight - quickActionsHeight}px`
+      const systemInfo = uni.getSystemInfoSync();
+      const statusBarHeight = systemInfo.statusBarHeight || 0;
+      const navBarHeight = 60; 
+      const inputAreaHeight = 50; 
+      const quickActionsHeight = this.showQuickActions ? 80 : 0;
+
+      this.chatHeight = `${systemInfo.windowHeight - statusBarHeight - navBarHeight - inputAreaHeight - quickActionsHeight}px`;
     },
     
     async initChatData() {
+      this.loading = true
+      await this.loadMessages(true)
+      this.loading = false
+    },
+
+    async loadMessages(isInitialLoad = false) {
+      if (this.loadingMessages || !this.hasMoreMessages) return
+
+      this.loadingMessages = true
       try {
-        this.loading = true
-        console.log('初始化聊天数据')
+        const res = await getChatMessages(this.sessionId, {
+          targetId: this.expertId || this.targetId,
+          page: this.currentPage,
+          size: this.pageSize
+        })
+
+        if (res.code === 200 && res.data) {
+          const newMessages = res.data.records.map(m => ({
+            id: m.id,
+            senderType: m.senderType === 'user' ? 'user' : 'expert',
+            type: m.messageType,
+            content: m.content
+          }))
+
+          this.messages = [...newMessages.reverse(), ...this.messages]
+          this.hasMoreMessages = res.data.pages > this.currentPage
+          if (this.hasMoreMessages) {
+            this.currentPage++
+          }
+
+          if (isInitialLoad) {
+            this.$nextTick(() => {
+              this.scrollTop = 999999
+            })
+          }
+        }
       } catch (error) {
-        console.error('初始化聊天数据失败:', error)
+        console.error('加载消息失败:', error)
       } finally {
-        this.loading = false
+        this.loadingMessages = false
       }
     },
 
-    sendMessage() {
-      if (this.inputMessage.trim()) {
-        console.log('发送消息:', this.inputMessage)
-        this.inputMessage = ''
+    handleScrollToUpper() {
+      this.loadMessages()
+    },
+
+    async sendMessage() {
+      const content = this.inputMessage.trim()
+      if (!content || this.sendingMessage) return
+
+      this.sendingMessage = true
+      const tempMessageId = 'temp-' + Date.now()
+
+      // 立即显示在界面上
+      this.messages.push({
+        id: tempMessageId,
+        senderType: 'user',
+        type: 'text',
+        content: content
+      })
+      this.inputMessage = ''
+      this.$nextTick(() => {
+        this.scrollTop = 999999
+      })
+
+      try {
+        const res = await apiSendMessage({
+          conversationId: this.sessionId,
+          targetId: this.expertId || this.targetId,
+          messageType: 'text',
+          content: content
+        })
+
+        if (res.code === 200 && res.data) {
+          // 用服务器返回的真实消息替换临时消息
+          const index = this.messages.findIndex(m => m.id === tempMessageId)
+          if (index !== -1) {
+            this.$set(this.messages, index, {
+              id: res.data.id,
+              senderType: 'user',
+              type: 'text',
+              content: res.data.content
+            })
+          }
+        } else {
+          // 发送失败处理
+          const index = this.messages.findIndex(m => m.id === tempMessageId)
+          if (index !== -1) {
+            this.messages[index].content = '消息发送失败，请重试'
+            // 可以增加一个重试按钮
+          }
+        }
+      } catch (error) {
+        console.error('发送消息失败:', error)
+        const index = this.messages.findIndex(m => m.id === tempMessageId)
+        if (index !== -1) {
+          this.messages[index].content = '网络错误，发送失败'
+        }
+      } finally {
+        this.sendingMessage = false
       }
     },
     
     showMoreOptions() {
-      console.log('显示更多选项')
+      this.showQuickActions = !this.showQuickActions;
+      this.$nextTick(() => {
+        this.calculateChatHeight();
+      });
     },
 
     sendTestResult() {
@@ -489,43 +592,48 @@ export default {
   background-color: #FFFFFF;
   padding: 10px 15px;
   border-top: 1px solid #EEEEEE;
-  
+
   .input-container {
-    position: relative;
     display: flex;
     align-items: center;
-    
+
     .message-input {
       flex: 1;
       height: 36px;
       background-color: rgb(255, 246, 246);
       border-radius: 18px;
-      padding: 0 15px 0 15px;
-      padding-right: 45px;
+      padding: 0 15px;
       font-size: 14px;
       border: none;
-      
+
       &::placeholder {
         color: #BDBDBD;
       }
     }
-    
+
+    .send-button {
+      flex-shrink: 0;
+      margin-left: 10px;
+      padding: 0 15px;
+      height: 36px;
+      line-height: 36px;
+      background-color: #FF8FA3;
+      color: white;
+      border: none;
+      border-radius: 18px;
+      font-size: 14px;
+      // uni-app button 样式重置
+      &::after {
+        border: none;
+      }
+    }
+
     .add-button {
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 28px;
-      height: 28px;
+      flex-shrink: 0;
+      margin-left: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
-      background-color: transparent;
-      
-      &:active {
-        background-color: rgba(0, 0, 0, 0.05);
-      }
     }
   }
 }
