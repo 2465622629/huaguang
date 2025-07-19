@@ -39,8 +39,15 @@
           <text class="progress-text">{{ currentQuestionIndex + 1 }} / {{ questions.length }}</text>
         </view>
         
-        <!-- 问题文本 -->
+        <!-- 问题文本 - {{ AURA-X: Modify - 添加分组标题显示 }} -->
         <view class="question-section">
+          <!-- 显示当前分组标题 -->
+          <view v-if="currentSectionHeader" class="section-header">
+            <text class="section-title">{{ currentSectionHeader.title }}</text>
+            <text v-if="currentSectionHeader.description" class="section-description">{{ currentSectionHeader.description }}</text>
+          </view>
+          
+          <!-- 问题文本 -->
           <view v-for="(line, index) in currentQuestion.question.split('\n')" :key="index" class="question-line">
             <text class="question-text">{{ line }}</text>
           </view>
@@ -115,8 +122,8 @@
 
 <script>
 import config from '@/config/index.js'
-// 使用心理师模块的API
-import { getPsychTestDetail, submitPsychTestAnswers, getPsychTests } from '@/api/modules/psychologist.js'
+// {{ AURA-X: Modify - 使用心理测试模块的API }}
+import { getTestDetail, submitTest } from '@/api/modules/psychological-tests.js'
 
 export default {
   name: 'PsychologicalTestPage',
@@ -127,11 +134,12 @@ export default {
       answers: [],
       counselor: null, // 咨询师信息
       
-      // API数据
-      testId: 'default_psychological_test', // 默认测试ID
+      // API数据 - {{ AURA-X: Modify - 使用固定testId为1 }}
+      testId: 1, // 心理测试ID
       testSession: null, // 测试会话信息
       testDetail: null,
-      questions: [],
+      questions: [], // 过滤后的实际答题问题（不包含section_header）
+      allQuestions: [], // 原始问题列表（包含section_header）
       
       // 企业级状态管理
       isLoading: false,
@@ -316,10 +324,10 @@ export default {
       ]
     }
   },
-  async onLoad(options) {
-    // 获取传递的测试ID
+      async onLoad(options) {
+    // {{ AURA-X: Modify - 支持传递testId但默认使用1 }}
     if (options.testId) {
-      this.testId = options.testId
+      this.testId = parseInt(options.testId) || 1
     }
     
     // 获取上一页面传递的咨询师数据
@@ -343,13 +351,46 @@ export default {
     isLastQuestion() {
       return this.currentQuestionIndex === this.questions.length - 1
     },
-    // {{ AURA-X: Add - 检查当前题目是否已回答，用于控制导航按钮显示 }}
+    // {{ AURA-X: Modify - 增强答题状态检查，支持更多题型 }}
     hasAnsweredCurrentQuestion() {
-      const answer = this.answers[this.currentQuestionIndex]
-      if (this.currentQuestion && this.currentQuestion.type === 'multiple_choice') {
-        return Array.isArray(answer) && answer.length > 0
+      if (!this.currentQuestion || this.currentQuestionIndex < 0) {
+        return false
       }
-      return answer !== null && answer !== undefined
+      
+      const answer = this.answers[this.currentQuestionIndex]
+      const questionType = this.currentQuestion.type
+      
+      switch (questionType) {
+        case 'multiple_choice':
+          return Array.isArray(answer) && answer.length > 0
+        case 'text_input':
+          return typeof answer === 'string' && answer.trim().length > 0
+        case 'scale':
+          return typeof answer === 'number' && answer > 0
+        case 'single_choice':
+        case 'yes_no':
+        default:
+          return answer !== null && answer !== undefined && answer !== ''
+      }
+    },
+    // {{ AURA-X: Add - 获取当前题目对应的分组标题 }}
+    currentSectionHeader() {
+      if (!this.currentQuestion || !this.allQuestions.length) return null
+      
+      const currentQuestionId = this.currentQuestion.id
+      
+      // 在原始问题列表中找到当前问题的位置
+      const currentIndex = this.allQuestions.findIndex(q => q.id === currentQuestionId)
+      if (currentIndex === -1) return null
+      
+      // 往前查找最近的section_header
+      for (let i = currentIndex - 1; i >= 0; i--) {
+        if (this.allQuestions[i].type === 'section_header') {
+          return this.allQuestions[i]
+        }
+      }
+      
+      return null
     }
   },
   methods: {
@@ -371,7 +412,7 @@ export default {
       await this.loadTestQuestions()
     },
 
-    // 加载测试问题 - 企业级API集成
+    // 加载测试问题 - {{ AURA-X: Modify - 使用新的API和数据结构 }}
     async loadTestQuestions() {
       this.isLoadingQuestions = true
       this.errorState.hasError = false
@@ -381,19 +422,20 @@ export default {
         
         // 使用智能重试机制获取测试详情
         const response = await this.callApiWithRetry(async () => {
-          return await getPsychTestDetail(this.testId)
+          return await getTestDetail(this.testId)
         })
 
         if (response && response.data) {
           this.testDetail = response.data
+          this.allQuestions = response.data.questions || []
           
-          // 格式化问题数据
-          this.questions = this.formatQuestions(response.data.questions || [])
+          // 过滤掉section_header类型的题目，只保留需要回答的题目
+          this.questions = this.filterAnswerableQuestions(this.allQuestions)
           
           // 初始化答案数组
           this.answers = new Array(this.questions.length).fill(null)
           
-          console.log('心理测试问题加载成功:', this.questions.length, '个问题')
+          console.log('心理测试问题加载成功:', this.allQuestions.length, '个原始问题,', this.questions.length, '个答题问题')
           
           // 缓存测试数据
           this.setCachedTestData(response.data)
@@ -410,16 +452,18 @@ export default {
         if (cachedData && cachedData.questions) {
           console.log('使用缓存的测试数据')
           this.testDetail = cachedData
-          this.questions = this.formatQuestions(cachedData.questions)
+          this.allQuestions = cachedData.questions
+          this.questions = this.filterAnswerableQuestions(this.allQuestions)
           this.answers = new Array(this.questions.length).fill(null)
         } else {
           console.log('使用默认问题作为降级方案')
           // 使用默认问题作为最终降级方案
           this.questions = this.defaultQuestions
+          this.allQuestions = this.defaultQuestions
           this.answers = new Array(this.questions.length).fill(null)
           this.testDetail = {
             id: this.testId,
-            title: '心理健康评估',
+            name: '心理健康评估',
             description: '了解您的心理状态',
             questions: this.defaultQuestions
           }
@@ -438,7 +482,44 @@ export default {
       }
     },
 
-    // 格式化问题数据
+    // {{ AURA-X: Add - 过滤可回答的问题，排除section_header }}
+    filterAnswerableQuestions(allQuestions) {
+      if (!Array.isArray(allQuestions)) {
+        console.warn('filterAnswerableQuestions: 输入不是数组')
+        return []
+      }
+      
+      return allQuestions.filter(q => {
+        // 过滤掉空对象和section_header类型
+        return q && typeof q === 'object' && q.type !== 'section_header'
+      }).map((q, index) => {
+        // 数据验证和默认值设置
+        const question = {
+          id: q.id || `q_${index + 1}`,
+          question: q.question || q.title || `问题 ${index + 1}`,
+          options: this.formatOptions(q.options || []),
+          type: this.validateQuestionType(q.type) || 'single_choice',
+          required: q.required !== false,
+          category: q.category || 'general',
+          originalIndex: allQuestions.indexOf(q)
+        }
+        
+        // 验证选项是否有效
+        if (question.options.length === 0) {
+          console.warn(`问题 ${question.id} 没有有效选项`)
+          // 提供默认选项
+          question.options = [
+            { value: 'yes', text: '是', score: 1 },
+            { value: 'no', text: '否', score: 0 }
+          ]
+          question.type = 'yes_no'
+        }
+        
+        return question
+      })
+    },
+
+    // 格式化问题数据（保留原方法作为兼容）
     formatQuestions(apiQuestions) {
       return apiQuestions.map((q, index) => ({
         id: q.id || `q_${index + 1}`,
@@ -450,12 +531,47 @@ export default {
       }))
     },
 
-    // 格式化选项数据
+    // {{ AURA-X: Add - 验证问题类型的有效性 }}
+    validateQuestionType(type) {
+      const validTypes = ['single_choice', 'multiple_choice', 'yes_no', 'text_input', 'scale']
+      return validTypes.includes(type) ? type : null
+    },
+
+    // 格式化选项数据 - {{ AURA-X: Modify - 支持新的选项格式并增强验证 }}
     formatOptions(apiOptions) {
-      return apiOptions.map((opt, index) => ({
-        value: opt.value || (index + 1),
-        text: opt.text || opt.label || opt
-      }))
+      if (!Array.isArray(apiOptions)) {
+        console.warn('formatOptions: 选项不是数组格式')
+        return []
+      }
+      
+      return apiOptions.filter(opt => opt != null).map((opt, index) => {
+        // 处理不同格式的选项数据
+        if (typeof opt === 'string') {
+          return {
+            value: index + 1,
+            text: opt,
+            score: 0,
+            hasInput: false
+          }
+        }
+        
+        if (typeof opt === 'object') {
+          return {
+            value: opt.value || opt.id || (index + 1),
+            text: opt.text || opt.label || opt.title || `选项 ${index + 1}`,
+            score: typeof opt.score === 'number' ? opt.score : 0,
+            hasInput: Boolean(opt.has_input || opt.hasInput)
+          }
+        }
+        
+        // 默认选项格式
+        return {
+          value: index + 1,
+          text: `选项 ${index + 1}`,
+          score: 0,
+          hasInput: false
+        }
+      })
     },
 
     // 智能缓存系统
@@ -555,44 +671,73 @@ export default {
       this.clearTestProgress()
     },
 
-    // 答题逻辑 - 修复Vue响应式更新问题 {{ AURA-X: Modify - 使用Vue.set确保响应式更新 }}
+    // 答题逻辑 - {{ AURA-X: Modify - 增强验证和错误处理 }}
     selectAnswer(optionValue) {
       const currentQ = this.currentQuestion
-      console.log('选择答案:', optionValue, '题目类型:', currentQ.type)
       
-      if (currentQ.type === 'multiple_choice') {
-        // 多选题处理 - 使用响应式方法
-        let answerArray = this.answers[this.currentQuestionIndex]
-        if (!Array.isArray(answerArray)) {
-          answerArray = []
-        }
-        
-        const index = answerArray.indexOf(optionValue)
-        
-        if (index > -1) {
-          answerArray.splice(index, 1) // 取消选择
-          console.log('取消选择:', optionValue, '当前答案:', answerArray)
-        } else {
-          answerArray.push(optionValue) // 添加选择
-          console.log('添加选择:', optionValue, '当前答案:', answerArray)
-        }
-        
-        // 使用Vue.set确保响应式更新
-        this.$set(this.answers, this.currentQuestionIndex, [...answerArray])
-      } else {
-        // 单选题处理
-        this.$set(this.answers, this.currentQuestionIndex, optionValue)
-        console.log('单选答案:', optionValue)
+      // 基础验证
+      if (!currentQ) {
+        console.error('selectAnswer: 当前问题不存在')
+        return
       }
       
-      // 实时保存进度
-      this.saveTestProgress()
+      if (optionValue == null) {
+        console.error('selectAnswer: 选项值无效')
+        return
+      }
       
-      // 单选题自动前进到下一题
-      if (currentQ.type === 'single_choice' && !this.isLastQuestion) {
-        setTimeout(() => {
-          this.currentQuestionIndex++
-        }, 300) // 短暂延迟提供视觉反馈
+      // 验证选项是否有效
+      const validOption = currentQ.options.find(opt => opt.value === optionValue)
+      if (!validOption) {
+        console.error('selectAnswer: 选项值不在有效范围内', optionValue)
+        return
+      }
+      
+      console.log('选择答案:', optionValue, '题目类型:', currentQ.type)
+      
+      try {
+        if (currentQ.type === 'multiple_choice') {
+          // 多选题处理 - 使用响应式方法
+          let answerArray = this.answers[this.currentQuestionIndex]
+          if (!Array.isArray(answerArray)) {
+            answerArray = []
+          }
+          
+          const index = answerArray.indexOf(optionValue)
+          
+          if (index > -1) {
+            answerArray.splice(index, 1) // 取消选择
+            console.log('取消选择:', optionValue, '当前答案:', answerArray)
+          } else {
+            answerArray.push(optionValue) // 添加选择
+            console.log('添加选择:', optionValue, '当前答案:', answerArray)
+          }
+          
+          // 使用Vue.set确保响应式更新
+          this.$set(this.answers, this.currentQuestionIndex, [...answerArray])
+        } else {
+          // 单选题处理 (包括 yes_no 类型)
+          this.$set(this.answers, this.currentQuestionIndex, optionValue)
+          console.log('单选答案:', optionValue)
+        }
+        
+        // 实时保存进度
+        this.saveTestProgress()
+        
+        // 单选题和yes_no题自动前进到下一题
+        if ((currentQ.type === 'single_choice' || currentQ.type === 'yes_no') && !this.isLastQuestion) {
+          setTimeout(() => {
+            this.currentQuestionIndex++
+          }, 300) // 短暂延迟提供视觉反馈
+        }
+        
+      } catch (error) {
+        console.error('selectAnswer: 答题处理失败', error)
+        uni.showToast({
+          title: '答题失败，请重试',
+          icon: 'none',
+          duration: 1500
+        })
       }
     },
 
@@ -749,18 +894,11 @@ export default {
           mask: true
         })
 
-        // 构建提交数据
+        // 构建提交数据 - {{ AURA-X: Modify - 按照API文档格式 }}
         const submitData = {
           testId: this.testId,
           answers: this.formatAnswersForSubmission(),
-          duration: this.testDuration,
-          metadata: {
-            questionsCount: this.questions.length,
-            completionRate: this.calculateCompletionRate(),
-            deviceInfo: this.getDeviceInfo(),
-            testVersion: this.testDetail?.version || '1.0',
-            timestamp: new Date().toISOString()
-          }
+          timeSpentSeconds: this.testDuration
         }
 
         let testResult = null
@@ -768,9 +906,9 @@ export default {
         try {
           console.log('提交心理测试结果:', submitData)
           
-          // 使用心理师模块API提交测试结果
+          // 使用心理测试模块API提交
           const response = await this.callApiWithRetry(async () => {
-            return await submitPsychTestAnswers(submitData)
+            return await submitTest(submitData)
           })
           
           testResult = response.data || response
@@ -823,24 +961,59 @@ export default {
       }
     },
 
-    // 格式化答案数据用于提交
+    // 格式化答案数据用于提交 - {{ AURA-X: Modify - 按照API文档要求格式化 }}
     formatAnswersForSubmission() {
-      return this.questions.map((question, index) => {
+      const answersMap = {}
+      
+      this.questions.forEach((question, index) => {
         const answer = this.answers[index]
-        return {
-          questionId: question.id,
-          answer: answer,
-          type: question.type,
-          timestamp: Date.now()
+        
+        // 跳过未回答的题目
+        if (answer === null || answer === undefined) {
+          return
         }
-      }).filter(item => item.answer !== null && item.answer !== undefined)
+        
+        // 将答案映射到题目ID，格式：{ "questionId": "answer" }
+        answersMap[question.id.toString()] = answer
+      })
+      
+      return answersMap
     },
 
-    // 计算完成率
+    // {{ AURA-X: Add - 获取答案对应的文本内容 }}
+    getAnswerText(question, answer) {
+      if (!question || !question.options) return ''
+      
+      if (question.type === 'multiple_choice' && Array.isArray(answer)) {
+        return answer.map(value => {
+          const option = question.options.find(opt => opt.value === value)
+          return option ? option.text : value
+        }).join(', ')
+      } else {
+        const option = question.options.find(opt => opt.value === answer)
+        return option ? option.text : String(answer || '')
+      }
+    },
+
+    // 计算完成率 - {{ AURA-X: Modify - 更精确的完成率计算 }}
     calculateCompletionRate() {
-      const answeredCount = this.answers.filter(answer => 
-        answer !== null && answer !== undefined
-      ).length
+      if (this.questions.length === 0) return 0
+      
+      const answeredCount = this.answers.filter((answer, index) => {
+        const question = this.questions[index]
+        if (!question) return false
+        
+        // 根据题型判断是否已回答
+        switch (question.type) {
+          case 'multiple_choice':
+            return Array.isArray(answer) && answer.length > 0
+          case 'text_input':
+            return typeof answer === 'string' && answer.trim().length > 0
+          default:
+            return answer !== null && answer !== undefined && answer !== ''
+        }
+      }).length
+      
       return Math.round((answeredCount / this.questions.length) * 100)
     },
 
@@ -932,19 +1105,32 @@ export default {
       }
 
       return {
-        summary,
-        level,
+        // 兼容API格式的字段
+        resultDescription: summary,
+        resultLevel: level,
         score: Math.round(normalizedScore),
+        scorePercentage: Math.round(normalizedScore),
         recommendations,
-        completionRate: this.calculateCompletionRate(),
+        timeSpentSeconds: this.testDuration,
+        timeSpentFormatted: this.formatDuration(this.testDuration),
+        // 本地计算标识
         isLocalCalculation: true,
-        calculationMethod: 'simplified_average'
+        calculationMethod: 'simplified_average',
+        completionRate: this.calculateCompletionRate()
       }
     },
 
-    // 显示测试结果
+    // 显示测试结果 - {{ AURA-X: Modify - 适配新的API响应格式 }}
     showTestResult(testResult) {
-      const resultText = `${testResult.summary}\n\n评分: ${testResult.score}${testResult.isLocalCalculation ? ' (离线计算)' : ''}\n完成率: ${testResult.completionRate || this.calculateCompletionRate()}%`
+      let resultText = ''
+      
+      if (testResult.isLocalCalculation) {
+        // 本地计算结果格式
+        resultText = `${testResult.summary}\n\n评分: ${testResult.score} (离线计算)\n完成率: ${testResult.completionRate || this.calculateCompletionRate()}%`
+      } else {
+        // API返回的结果格式
+        resultText = `${testResult.resultDescription || '测试完成'}\n\n等级: ${testResult.resultLevel || '未知'}\n评分: ${testResult.score || 0}分${testResult.scorePercentage ? ` (${testResult.scorePercentage}%)` : ''}\n用时: ${testResult.timeSpentFormatted || this.formatDuration(this.testDuration)}`
+      }
       
       uni.showModal({
         title: '测试完成',
@@ -955,6 +1141,13 @@ export default {
           this.navigateToConsultation(testResult)
         }
       })
+    },
+
+    // {{ AURA-X: Add - 格式化时长显示 }}
+    formatDuration(seconds) {
+      const minutes = Math.floor(seconds / 60)
+      const remainingSeconds = seconds % 60
+      return `${minutes}分${remainingSeconds}秒`
     },
 
     // 导航到咨询页面
@@ -1175,7 +1368,7 @@ export default {
       }
     }
     
-    // 问题文本
+    // 问题文本 - {{ AURA-X: Modify - 添加分组标题样式 }}
     .question-section {
       flex: 1;
       display: flex;
@@ -1183,6 +1376,28 @@ export default {
       justify-content: center;
       text-align: center;
       margin-bottom: 60rpx;
+      
+      .section-header {
+        margin-bottom: 30rpx;
+        padding: 20rpx;
+        background-color: rgba(200, 100, 122, 0.1);
+        border-radius: 20rpx;
+        
+        .section-title {
+          display: block;
+          font-size: 38rpx;
+          color: #C8647A;
+          font-weight: bold;
+          margin-bottom: 10rpx;
+        }
+        
+        .section-description {
+          display: block;
+          font-size: 28rpx;
+          color: #DDA0AF;
+          line-height: 1.4;
+        }
+      }
       
       .question-text {
         display: block;
