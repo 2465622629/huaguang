@@ -324,7 +324,7 @@ export default {
       ]
     }
   },
-      async onLoad(options) {
+  async onLoad(options) {
     // {{ AURA-X: Modify - 支持传递testId但默认使用1 }}
     if (options.testId) {
       this.testId = parseInt(options.testId) || 1
@@ -362,7 +362,7 @@ export default {
       
       switch (questionType) {
         case 'multiple_choice':
-          return Array.isArray(answer) && answer.length > 0
+        return Array.isArray(answer) && answer.length > 0
         case 'text_input':
           return typeof answer === 'string' && answer.trim().length > 0
         case 'scale':
@@ -696,39 +696,39 @@ export default {
       console.log('选择答案:', optionValue, '题目类型:', currentQ.type)
       
       try {
-        if (currentQ.type === 'multiple_choice') {
-          // 多选题处理 - 使用响应式方法
-          let answerArray = this.answers[this.currentQuestionIndex]
-          if (!Array.isArray(answerArray)) {
-            answerArray = []
-          }
-          
-          const index = answerArray.indexOf(optionValue)
-          
-          if (index > -1) {
-            answerArray.splice(index, 1) // 取消选择
-            console.log('取消选择:', optionValue, '当前答案:', answerArray)
-          } else {
-            answerArray.push(optionValue) // 添加选择
-            console.log('添加选择:', optionValue, '当前答案:', answerArray)
-          }
-          
-          // 使用Vue.set确保响应式更新
-          this.$set(this.answers, this.currentQuestionIndex, [...answerArray])
-        } else {
-          // 单选题处理 (包括 yes_no 类型)
-          this.$set(this.answers, this.currentQuestionIndex, optionValue)
-          console.log('单选答案:', optionValue)
+      if (currentQ.type === 'multiple_choice') {
+        // 多选题处理 - 使用响应式方法
+        let answerArray = this.answers[this.currentQuestionIndex]
+        if (!Array.isArray(answerArray)) {
+          answerArray = []
         }
         
-        // 实时保存进度
-        this.saveTestProgress()
+        const index = answerArray.indexOf(optionValue)
         
+        if (index > -1) {
+          answerArray.splice(index, 1) // 取消选择
+          console.log('取消选择:', optionValue, '当前答案:', answerArray)
+        } else {
+          answerArray.push(optionValue) // 添加选择
+          console.log('添加选择:', optionValue, '当前答案:', answerArray)
+        }
+        
+        // 使用Vue.set确保响应式更新
+        this.$set(this.answers, this.currentQuestionIndex, [...answerArray])
+      } else {
+          // 单选题处理 (包括 yes_no 类型)
+        this.$set(this.answers, this.currentQuestionIndex, optionValue)
+        console.log('单选答案:', optionValue)
+      }
+      
+      // 实时保存进度
+      this.saveTestProgress()
+      
         // 单选题和yes_no题自动前进到下一题
         if ((currentQ.type === 'single_choice' || currentQ.type === 'yes_no') && !this.isLastQuestion) {
-          setTimeout(() => {
-            this.currentQuestionIndex++
-          }, 300) // 短暂延迟提供视觉反馈
+        setTimeout(() => {
+          this.currentQuestionIndex++
+        }, 300) // 短暂延迟提供视觉反馈
         }
         
       } catch (error) {
@@ -1138,7 +1138,9 @@ export default {
         showCancel: false,
         confirmText: '继续咨询',
         success: () => {
-          this.navigateToConsultation(testResult)
+          uni.redirectTo({
+            url: `/pages/user/index/chat/index?testResultId=${testResult.id}&targetId=${this.counselor ? this.counselor.id : ''}&targetType=psychologist`
+          })
         }
       })
     },

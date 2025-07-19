@@ -101,6 +101,7 @@
 
 <script>
 import config from '@/config/index.js'
+import { getTestResult } from '@/api/modules/psychological-tests.js'
 
 export default {
   name: 'ChatPage',
@@ -118,9 +119,14 @@ export default {
       sessionInfo: {
         expertName: '林默',
         expertDesc: '专业心理咨询师',
-        sessionDuration: '19:58',
+        sessionDuration: '30:00', // 默认显示
         sessionStatus: 'active'
       },
+      testResultId: null,
+      timer: null,
+      remainingTime: 30 * 60, // 30分钟，单位秒
+      countdownInterval: null,
+      fullTestResult: null,
       loading: false,
       loadingMessages: false,
       sendingMessage: false,
@@ -143,10 +149,15 @@ export default {
     this.sessionId = options.sessionId || options.conversationId || ''
     this.targetType = options.targetType || options.type || 'psychologist'
     this.targetId = options.targetId || options.expertId || ''
+
+    if (options.testResultId) {
+      this.testResultId = options.testResultId
+      this.handleTestResult(this.testResultId)
+    } else {
+      this.initChatData()
+    }
     
     this.cacheKey = `chat_${this.sessionId}_${this.targetType}`
-    
-    this.initChatData()
   },
   computed: {
     themeColors() {
@@ -199,6 +210,70 @@ export default {
       uni.navigateBack()
     },
     
+    // 启动计时器
+    startTimer() {
+      if (this.countdownInterval) return // 防止重复启动
+
+      this.countdownInterval = setInterval(() => {
+        if (this.remainingTime > 0) {
+          this.remainingTime--
+          const minutes = Math.floor(this.remainingTime / 60).toString().padStart(2, '0')
+          const seconds = (this.remainingTime % 60).toString().padStart(2, '0')
+          this.sessionInfo.sessionDuration = `${minutes}:${seconds}`
+        } else {
+          clearInterval(this.countdownInterval)
+          this.sessionInfo.sessionDuration = '00:00'
+          uni.showToast({
+            title: '咨询时间已结束',
+            icon: 'none'
+          })
+        }
+      }, 1000)
+    },
+
+    async handleTestResult(resultId) {
+      this.loading = true
+      try {
+        const res = await getTestResult(resultId)
+        if (res.code === 200 && res.data) {
+          const result = res.data
+          this.fullTestResult = result // 保存完整结果
+          const welcomeMessage = {
+            id: 'system-welcome-' + Date.now(),
+            senderType: 'expert',
+            type: 'text',
+            content: '您好，我们已经收到了您的测试结果，现在可以开始本次咨询了。'
+          }
+          const resultMessageContent = `测试结果概要：
+- **测试名称**: ${result.testName}
+- **综合评估**: ${result.resultLevel} (${result.resultDescription})`
+
+          const resultMessage = {
+            id: 'system-result-' + Date.now(),
+            senderType: 'expert',
+            type: 'text',
+            content: resultMessageContent
+          }
+
+          this.messages.push(welcomeMessage, resultMessage)
+          this.startTimer()
+        } else {
+          uni.showToast({
+            title: res.message || '获取测试结果失败',
+            icon: 'none'
+          })
+        }
+      } catch (error) {
+        console.error('获取测试结果失败:', error)
+        uni.showToast({
+          title: '网络错误，请稍后重试',
+          icon: 'none'
+        })
+      } finally {
+        this.loading = false
+      }
+    },
+
     calculateChatHeight() {
       const systemInfo = uni.getSystemInfoSync()
       const statusBarHeight = systemInfo.statusBarHeight || 0
@@ -232,11 +307,40 @@ export default {
     },
 
     sendTestResult() {
-      console.log('发送测试结果')
+      if (!this.fullTestResult) {
+        uni.showToast({
+          title: '当前没有可发送的测试结果',
+          icon: 'none'
+        })
+        return
+      }
+
+      const result = this.fullTestResult
+      const messageContent = `我完成了 “${result.testName}”，这是我的结果概要：\n- **综合评估**: ${result.resultLevel}\n- **详细描述**: ${result.resultDescription}`
+
+      const userResultMessage = {
+        id: 'user-result-' + Date.now(),
+        senderType: 'user',
+        type: 'text',
+        content: messageContent
+      }
+
+      this.messages.push(userResultMessage)
+
+      // 滚动到底部以显示新消息
+      this.$nextTick(() => {
+        this.scrollTop = 999999
+      })
     },
 
     openAlbum() {
       console.log('打开相册')
+    }
+  },
+  beforeDestroy() {
+    // 页面销毁前清除计时器
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval)
     }
   }
 }
