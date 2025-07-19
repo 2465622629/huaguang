@@ -27,7 +27,7 @@
               <input class="item-input" v-model="formData.applicantName" placeholder="姓名" />
             </view>
             <view class="form-item half" @click="openBirthDatePicker">
-              <input class="item-input" v-model="formData.birthDate" placeholder="出生日期" disabled
+              <input class="item-input" v-model="displayBirthDate" placeholder="出生日期" disabled
                 style="pointer-events: none;" />
               <uv-datetime-picker ref="birthDatePicker" v-model="formData.birthDate" mode="date"
                 @confirm="handleBirthDateChange">
@@ -38,7 +38,7 @@
           <!-- 第二行：性别、学历文凭 -->
           <view class="form-row">
             <view class="form-item half" @click="openGenderPicker">
-              <input class="item-input" v-model="genderOptions[formData.gender]" placeholder="性别" disabled
+              <input class="item-input" v-model="displayGender" placeholder="性别" disabled
                 style="pointer-events: none;" />
               <uv-picker ref="genderPicker" :columns="[genderOptions]" @confirm="handleGenderChange">
               </uv-picker>
@@ -160,8 +160,7 @@
 <script>
 import request from '@/utils/request.js'
 import { uploadFile } from '@/utils/file.js'
-import config from '@/config/index.js'
-import { staticBaseUrl } from '@/config/index.js'
+import config, { API_CONFIG, staticBaseUrl } from '@/config/index.js'
 
 export default {
   name: 'FundApplyPage',
@@ -171,7 +170,7 @@ export default {
       formData: {
         applicantName: '',
         birthDate: '',
-        gender: '',
+        gender: null, // 使用null表示未选择
         education: '',
         address: '',
         property: '',
@@ -190,6 +189,21 @@ export default {
           images: []
         }
       ]
+    }
+  },
+  computed: {
+    displayBirthDate() {
+      if (!this.formData.birthDate) {
+        return '';
+      }
+      const date = new Date(this.formData.birthDate);
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+         displayGender() {
+       return this.formData.gender !== null ? this.genderOptions[this.formData.gender] : '';
     }
   },
   methods: {
@@ -213,7 +227,10 @@ export default {
       this.formData.birthDate = e.value
     },
     handleGenderChange(e) {
-      this.formData.gender = e.value[0]
+      // uv-picker返回的e.indexs是选中项的索引数组
+      console.log('性别选择事件:', e)
+      this.formData.gender = e.indexs[0]
+      console.log('设置性别为:', this.formData.gender, '显示文本:', this.genderOptions[this.formData.gender])
     },
     addDebtItem() {
       this.debtList.push({
@@ -260,12 +277,32 @@ export default {
         
         const fileRes = await uploadFile(uploadParams)
         
-        // 上传成功，更新状态
+        // 调试上传响应数据结构
+        console.log('上传响应数据:', fileRes)
+        
+        // 根据实际响应结构处理数据
+        let fileUrl, fileId
+        if (fileRes.data && fileRes.data.fileUrl) {
+          // 如果data下有fileUrl
+          fileUrl = fileRes.data.fileUrl
+          fileId = fileRes.data.fileName || fileRes.data.fileId
+        } else if (fileRes.fileUrl) {
+          // 如果直接在根级有fileUrl
+          fileUrl = fileRes.fileUrl
+          fileId = fileRes.fileName || fileRes.fileId
+        } else {
+          throw new Error('响应数据格式不正确')
+        }
+        
+        // 拼接完整的图片URL
+        const fullImageUrl = `${API_CONFIG.BASE_URL}${fileUrl}`
+        console.log(`图片地址：${fullImageUrl}`)
+        
         this.debtList[index].images = [{
           status: 'success',
           message: '',
-          url: fileRes.fileUrl,
-          id: fileRes.fileId
+          url: fullImageUrl,
+          id: fileId
         }]
         
         uni.showToast({
@@ -317,6 +354,18 @@ export default {
       console.log('图片加载成功:', this.debtList[index].images[0])
     },
     
+    // 格式化日期用于提交
+    formatDateForSubmit(dateValue) {
+      if (!dateValue) return ''
+      
+      const date = new Date(dateValue)
+      const year = date.getFullYear()
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const day = date.getDate().toString().padStart(2, '0')
+      
+      return `${year}-${month}-${day}`
+    },
+    
     async handleSubmit() {
       // 表单验证
       if (!this.formData.applicantName) {
@@ -333,7 +382,7 @@ export default {
         })
         return
       }
-      if (this.formData.gender === '') {
+      if (this.formData.gender === null || this.formData.gender === '') {
         uni.showToast({
           title: '请选择性别',
           icon: 'none'
@@ -388,7 +437,7 @@ export default {
         return {
           platformName: item.platform,
           debtAmount: Number(item.amount),
-          debtImageFileId: item.images[0].id // 假设上传成功后返回的图片对象中包含id字段
+          debtImageFileId: item.images[0].id // 使用上传后返回的文件ID
         }
       })
 
@@ -397,32 +446,38 @@ export default {
       }
 
       try {
-        // 使用青年帮扶基金API提交申请
+        // 格式化日期用于调试
+        const formattedDate = this.formatDateForSubmit(this.formData.birthDate)
+        console.log('原始日期:', this.formData.birthDate, '格式化后:', formattedDate)
+        
+        // 使用申请记录模块API提交青年帮扶基金申请
         const submitData = {
           applicationType: 'general', // 通用帮扶申请
-          basicInfo: {
-            applicantName: this.formData.applicantName,
-            birthDate: this.formData.birthDate,
-            gender: this.formData.gender === '男' ? 'male' : 'female',
+          userInfo: {
+            name: this.formData.applicantName,
+            birthDate: formattedDate,
+            gender: this.formData.gender === 0 ? 'male' : 'female',
             education: this.formData.education,
             address: this.formData.address,
-            property: this.formData.property || '',
+            assets: this.formData.property || '',
             parentContact: this.formData.parentContact
           },
-          financialInfo: {
-            debts: debts.map(debt => ({
+          debtInfoList: debts.map(debt => ({
               bankPlatform: debt.platformName,
-              loanAmount: debt.debtAmount,
-              proofDocuments: [debt.debtImageFileId]
-            }))
-          },
-          supportingDocuments: debts.map(debt => debt.debtImageFileId)
+            debtAmount: debt.debtAmount,
+            debtScreenshot: debt.debtImageFileId
+          })),
+          basicDocuments: debts.map(debt => debt.debtImageFileId),
+          specialDocuments: [],
+          applicationDescription: '青年帮扶基金申请'
         }
 
-        // 导入青年帮扶基金API
-        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
+        console.log('提交数据:', submitData)
+
+        // 导入申请记录API
+        const applicationRecordApi = (await import('@/api/modules/application-record.js')).default
         
-        const res = await youthAssistanceApi.submitAssistanceApplication(submitData)
+        const res = await applicationRecordApi.submitYouthAssistanceApplication(submitData)
         
         if (res && res.success !== false) {
           uni.showToast({
