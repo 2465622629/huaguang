@@ -13,7 +13,10 @@
         
         <!-- 专家信息和计时器 -->
         <view class="lawyer-info">
-          <text class="lawyer-name">{{ sessionInfo.expertName }}</text>
+          <text class="lawyer-name">
+            {{ sessionInfo.expertName }}
+            <text v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</text>
+          </text>
           <text class="lawyer-desc">{{ sessionInfo.expertDesc }}</text>
           <view class="timer-container">
             <uv-icon :name="config.staticBaseUrl + '/icons/shalou.png'" color="#FFFFFF" size="32"></uv-icon>
@@ -51,6 +54,7 @@
               <view class="avatar"></view>
               <view class="message-bubble received-bubble">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
+                <image v-else-if="message.type === 'image'" :src="message.content" mode="aspectFit" class="message-image" />
               </view>
             </template>
             
@@ -58,10 +62,21 @@
             <template v-else>
               <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
+                <image v-else-if="message.type === 'image'" :src="message.content" mode="aspectFit" class="message-image" />
               </view>
               <view class="avatar"></view>
             </template>
           </view>
+          <!-- 消息状态显示 -->
+           <view v-if="message.senderType === 'user' && message.status" class="message-status">
+             <text v-if="message.status === 'sending'" class="status-sending">发送中...</text>
+             <text v-else-if="message.status === 'sent'" class="status-sent">已发送</text>
+             <view v-else-if="message.status === 'failed'" class="status-failed-container">
+               <text class="status-failed">发送失败</text>
+               <text class="retry-btn" @tap="retryMessage(message)">重试</text>
+             </view>
+             <text v-else-if="message.status === 'read'" class="status-read">已读</text>
+           </view>
         </view>
         
         <!-- 空状态 -->
@@ -108,7 +123,22 @@
 <script>
 import config from '@/config/index.js'
 import { getTestResult } from '@/api/modules/psychological-tests.js'
-import { getChatMessages, sendMessage as apiSendMessage } from '@/api/modules/chat.js'
+import {
+  getChatMessages,
+  sendMessage as apiSendMessage,
+  createChatSession,
+  getChatSessions,
+  getChatSessionDetail,
+  markMessagesAsRead,
+  getSessionUnreadCount,
+  uploadChatFile,
+  sendPsychTestResult,
+  sendEnterpriseResume,
+  getPsychChatPageData,
+  getLawyerChatPageData,
+  getEnterpriseChatPageData,
+  getChatPageData
+} from '@/api/modules/chat.js'
 
 export default {
   name: 'ChatPage',
@@ -145,24 +175,49 @@ export default {
       retryCount: 0,
       maxRetries: 3,
       showQuickActions: false,
-      expertId: null
+      expertId: null,
+      // 新增状态变量
+      unreadCount: 0,
+      sessionDetail: null,
+      uploadingFile: false,
+      pageData: null,
+      unreadTimer: null,
+      consultationOrderId: null,
+      sessionList: []
     }
   },
-  onLoad(options) {
+  async onLoad(options) {
     console.log('聊天页面加载参数:', options)
     
     if (options.theme) {
       this.themeType = options.theme
     }
     
-    this.sessionId = options.sessionId || options.conversationId || ''
     this.targetType = options.targetType || options.type || 'psychologist'
     this.targetId = options.targetId || options.expertId || ''
+    this.consultationOrderId = options.consultationOrderId || options.orderId || null
+    
+    // 处理会话ID：如果没有传入sessionId，则需要创建或获取会话
+    if (options.sessionId || options.conversationId) {
+      this.sessionId = options.sessionId || options.conversationId
+    } else if (this.targetId) {
+      // 没有sessionId但有targetId，需要创建或获取会话
+      await this.createOrGetSession()
+    } else {
+      uni.showToast({
+        title: '缺少必要参数',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateBack()
+      }, 1500)
+      return
+    }
 
     if (options.testResultId) {
       this.testResultId = options.testResultId || null;
       this.expertId = options.expertId || null;
-      // 先加载历史消息，再处理测试结果的显示
+      // 先加载页面数据和历史消息，再处理测试结果的显示
       this.initChatData().then(() => {
         this.handleTestResult(this.testResultId)
       })
@@ -171,6 +226,10 @@ export default {
     }
     
     this.cacheKey = `chat_${this.sessionId}_${this.targetType}`
+    
+    // 加载页面数据和会话详情
+    this.loadPageData()
+    this.loadSessionDetail()
   },
   computed: {
     themeColors() {
@@ -268,7 +327,7 @@ export default {
             content: resultMessageContent
           }
 
-          this.messages.push(welcomeMessage, resultMessage)
+          this.messages.unshift(welcomeMessage, resultMessage)
           this.startTimer()
         } else {
           uni.showToast({
@@ -301,9 +360,235 @@ export default {
       this.loading = true
       await this.loadMessages(true)
       this.loading = false
+      // 标记消息为已读
+      this.markAsRead()
+      this.startUnreadCheck() // 启动未读消息检查
     },
 
-    async loadMessages(isInitialLoad = false) {
+    // 创建或获取会话
+    async createOrGetSession() {
+      try {
+        uni.showLoading({
+          title: '初始化会话...'
+        })
+        
+        const sessionData = {
+          otherUserId: this.targetId,
+          type: 'consultation' // 默认为咨询类型
+        }
+        
+        // 如果有咨询订单ID，添加到请求中
+        if (this.consultationOrderId) {
+          sessionData.consultationOrderId = this.consultationOrderId
+        }
+        
+        const res = await createChatSession(sessionData)
+        
+        if (res.code === 200 && res.data) {
+          this.sessionId = res.data.id || res.data.conversationId
+          
+          // 如果返回了参与者信息，更新专家数据
+          if (res.data.participantInfos && res.data.participantInfos.length > 0) {
+            const expertInfo = res.data.participantInfos.find(p => p.userType !== 'user')
+            if (expertInfo) {
+              this.expertName = expertInfo.realName || expertInfo.nickname
+              this.expertId = expertInfo.userId
+            }
+          }
+          
+          console.log('会话创建成功:', this.sessionId)
+          
+          // 创建会话后获取会话列表
+          await this.loadChatSessions()
+        } else {
+          throw new Error(res.message || '创建会话失败')
+        }
+      } catch (error) {
+        console.error('创建/获取会话失败:', error)
+        uni.showToast({
+          title: error.message || '会话初始化失败',
+          icon: 'none'
+        })
+        
+        setTimeout(() => {
+          uni.navigateBack()
+        }, 1500)
+      } finally {
+        uni.hideLoading()
+      }
+    },
+
+    // 加载会话列表
+    async loadChatSessions() {
+      try {
+        const params = {
+          messageType: 'all'
+        }
+        
+        const res = await getChatSessions(params)
+        
+        if (res.code === 200 && res.data) {
+          console.log('会话列表加载成功:', res.data)
+          
+          // 可以将会话列表存储到data中，供其他功能使用
+          this.sessionList = res.data.conversations || res.data
+          
+          // 如果当前会话在列表中，可以更新相关信息
+          if (this.sessionId && this.sessionList) {
+            const currentSession = this.sessionList.find(s => s.id == this.sessionId)
+            if (currentSession) {
+              // 更新未读消息数量等信息
+              this.unreadCount = currentSession.unreadCount || 0
+            }
+          }
+        } else {
+          console.warn('获取会话列表失败:', res.message)
+        }
+      } catch (error) {
+        console.error('加载会话列表失败:', error)
+      }
+    },
+
+    // 加载页面数据
+    async loadPageData(retryCount = 0) {
+      try {
+        let pageDataApi = null
+        
+        // 根据咨询类型选择对应的API
+        switch (this.targetType) {
+          case 'psychologist':
+            pageDataApi = getPsychChatPageData
+            break
+          case 'lawyer':
+            pageDataApi = getLawyerChatPageData
+            break
+          case 'enterprise':
+            pageDataApi = getEnterpriseChatPageData
+            break
+          default:
+            pageDataApi = getChatPageData
+        }
+        
+        const res = await pageDataApi(this.sessionId)
+        if (res.code === 200 && res.data) {
+          this.pageData = res.data
+          // 更新专家信息
+          if (res.data.expertInfo) {
+            this.sessionInfo.expertName = res.data.expertInfo.name || this.sessionInfo.expertName
+            this.sessionInfo.expertDesc = res.data.expertInfo.title || this.sessionInfo.expertDesc
+          }
+        } else if (res.code === 401 || res.code === 403) {
+          // 认证失败，跳转到登录页
+          uni.showToast({
+            title: '请先登录',
+            icon: 'none'
+          })
+          uni.navigateTo({
+            url: '/pages/login/index'
+          })
+        }
+      } catch (error) {
+        console.error('加载页面数据失败:', error)
+        
+        // 网络错误重试机制
+        if (retryCount < 2 && (error.code === 'NETWORK_ERROR' || !error.code)) {
+          setTimeout(() => {
+            this.loadPageData(retryCount + 1)
+          }, 1000 * (retryCount + 1))
+        } else {
+          uni.showToast({
+            title: '加载失败，请检查网络',
+            icon: 'none'
+          })
+        }
+      }
+    },
+
+    // 加载会话详情
+    async loadSessionDetail(retryCount = 0) {
+      try {
+        const res = await getChatSessionDetail(this.sessionId)
+        if (res.code === 200 && res.data) {
+          this.sessionDetail = res.data
+          // 更新会话信息
+          if (res.data.expertName) {
+            this.sessionInfo.expertName = res.data.expertName
+          }
+          if (res.data.expertDesc) {
+            this.sessionInfo.expertDesc = res.data.expertDesc
+          }
+        } else if (res.code === 401 || res.code === 403) {
+          // 认证失败，跳转到登录页
+          uni.showToast({
+            title: '请先登录',
+            icon: 'none'
+          })
+          uni.navigateTo({
+            url: '/pages/login/index'
+          })
+        }
+      } catch (error) {
+        console.error('加载会话详情失败:', error)
+        
+        // 网络错误重试机制
+        if (retryCount < 2 && (error.code === 'NETWORK_ERROR' || !error.code)) {
+          setTimeout(() => {
+            this.loadSessionDetail(retryCount + 1)
+          }, 1000 * (retryCount + 1))
+        } else {
+          uni.showToast({
+            title: '加载会话详情失败',
+            icon: 'none'
+          })
+        }
+      }
+    },
+
+    // 标记消息为已读
+    async markAsRead() {
+      try {
+        await markMessagesAsRead({
+          conversationId: this.sessionId
+        })
+        this.unreadCount = 0
+      } catch (error) {
+        console.error('标记已读失败:', error)
+      }
+    },
+
+    // 获取未读消息数量
+    async getUnreadCount() {
+      try {
+        const res = await getSessionUnreadCount(this.sessionId)
+        if (res.code === 200) {
+          this.unreadCount = res.data || 0
+        }
+      } catch (error) {
+        console.error('获取未读数量失败:', error)
+      }
+    },
+
+    // 开始定时检查未读消息
+    startUnreadCheck() {
+      if (this.unreadTimer) {
+        clearInterval(this.unreadTimer)
+      }
+      
+      // 每30秒检查一次未读消息
+      this.unreadTimer = setInterval(() => {
+        this.getUnreadCount()
+      }, 30000)
+    },
+
+    // 停止定时检查未读消息
+    stopUnreadCheck() {
+      if (this.unreadTimer) {
+        clearInterval(this.unreadTimer)
+        this.unreadTimer = null
+      }
+    },
+
+    async loadMessages(isInitialLoad = false, retryCount = 0) {
       if (this.loadingMessages || !this.hasMoreMessages) return
 
       this.loadingMessages = true
@@ -317,12 +602,24 @@ export default {
         if (res.code === 200 && res.data) {
           const newMessages = res.data.records.map(m => ({
             id: m.id,
-            senderType: m.senderType === 'user' ? 'user' : 'expert',
+            senderType: m.senderInfo?.userType === 'user' ? 'user' : 'expert', // 根据senderInfo.userType判断
             type: m.messageType,
-            content: m.content
+            content: m.content,
+            createdAt: m.createdAt // 保存创建时间用于排序
           }))
 
-          this.messages = [...newMessages.reverse(), ...this.messages]
+          // 根据createdAt字段对消息进行时间排序（升序，旧消息在前）
+          newMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+
+          // 根据是否是初始加载来决定消息合并方式
+          if (isInitialLoad) {
+            // 初始加载时，直接使用排序后的消息
+            this.messages = newMessages
+          } else {
+            // 上拉加载更多历史消息时，将新消息放在现有消息前面，然后对整个列表重新排序
+            const allMessages = [...newMessages, ...this.messages]
+            this.messages = allMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+          }
           this.hasMoreMessages = res.data.pages > this.currentPage
           if (this.hasMoreMessages) {
             this.currentPage++
@@ -333,9 +630,30 @@ export default {
               this.scrollTop = 999999
             })
           }
+        } else if (res.code === 401 || res.code === 403) {
+          // 认证失败，跳转到登录页
+          uni.showToast({
+            title: '请先登录',
+            icon: 'none'
+          })
+          uni.navigateTo({
+            url: '/pages/login/index'
+          })
         }
       } catch (error) {
         console.error('加载消息失败:', error)
+        
+        // 网络错误重试机制
+        if (retryCount < 2 && (error.code === 'NETWORK_ERROR' || !error.code)) {
+          setTimeout(() => {
+            this.loadMessages(isInitialLoad, retryCount + 1)
+          }, 1000 * (retryCount + 1))
+        } else {
+          uni.showToast({
+            title: '加载消息失败，请检查网络',
+            icon: 'none'
+          })
+        }
       } finally {
         this.loadingMessages = false
       }
@@ -345,7 +663,7 @@ export default {
       this.loadMessages()
     },
 
-    async sendMessage() {
+    async sendMessage(retryCount = 0) {
       const content = this.inputMessage.trim()
       if (!content || this.sendingMessage) return
 
@@ -357,7 +675,8 @@ export default {
         id: tempMessageId,
         senderType: 'user',
         type: 'text',
-        content: content
+        content: content,
+        status: 'sending'
       })
       this.inputMessage = ''
       this.$nextTick(() => {
@@ -380,14 +699,24 @@ export default {
               id: res.data.id,
               senderType: 'user',
               type: 'text',
-              content: res.data.content
+              content: res.data.content,
+              status: 'sent'
             })
           }
+        } else if (res.code === 401 || res.code === 403) {
+          // 认证失败，跳转到登录页
+          uni.showToast({
+            title: '请先登录',
+            icon: 'none'
+          })
+          uni.navigateTo({
+            url: '/pages/login/index'
+          })
         } else {
           // 发送失败处理
           const index = this.messages.findIndex(m => m.id === tempMessageId)
           if (index !== -1) {
-            this.messages[index].content = '消息发送失败，请重试'
+            this.messages[index].status = 'failed'
             // 可以增加一个重试按钮
           }
         }
@@ -395,7 +724,23 @@ export default {
         console.error('发送消息失败:', error)
         const index = this.messages.findIndex(m => m.id === tempMessageId)
         if (index !== -1) {
-          this.messages[index].content = '网络错误，发送失败'
+          // 网络错误重试机制
+          if (retryCount < 2 && (error.code === 'NETWORK_ERROR' || !error.code)) {
+            this.messages[index].content = '正在重试发送...'
+            setTimeout(() => {
+              // 移除临时消息，重新发送
+              const retryIndex = this.messages.findIndex(m => m.id === tempMessageId)
+              if (retryIndex !== -1) {
+                this.messages.splice(retryIndex, 1)
+              }
+              this.inputMessage = content
+              this.sendingMessage = false
+              this.sendMessage(retryCount + 1)
+            }, 1000 * (retryCount + 1))
+            return
+          } else {
+            this.messages[index].status = 'failed'
+          }
         }
       } finally {
         this.sendingMessage = false
@@ -409,8 +754,8 @@ export default {
       });
     },
 
-    sendTestResult() {
-      if (!this.fullTestResult) {
+    async sendTestResult() {
+      if (!this.fullTestResult || !this.testResultId) {
         uni.showToast({
           title: '当前没有可发送的测试结果',
           icon: 'none'
@@ -418,32 +763,229 @@ export default {
         return
       }
 
-      const result = this.fullTestResult
-      const messageContent = `我完成了 “${result.testName}”，这是我的结果概要：\n- **综合评估**: ${result.resultLevel}\n- **详细描述**: ${result.resultDescription}`
+      try {
+        // 使用API发送测试结果
+        const res = await sendPsychTestResult({
+          conversationId: this.sessionId,
+          testResultId: this.testResultId
+        })
 
-      const userResultMessage = {
-        id: 'user-result-' + Date.now(),
-        senderType: 'user',
-        type: 'text',
-        content: messageContent
+        if (res.code === 200) {
+          uni.showToast({
+            title: '测试结果已发送',
+            icon: 'success'
+          })
+          
+          // 重新加载消息列表以显示发送的结果
+          await this.loadMessages(true)
+          
+          this.$nextTick(() => {
+            this.scrollTop = 999999
+          })
+        } else {
+          throw new Error(res.message || '发送失败')
+        }
+      } catch (error) {
+        console.error('发送测试结果失败:', error)
+        
+        // 降级到本地显示
+        const result = this.fullTestResult
+        const messageContent = `我完成了 "${result.testName}"，这是我的结果概要：\n- **综合评估**: ${result.resultLevel}\n- **详细描述**: ${result.resultDescription}`
+
+        const userResultMessage = {
+          id: 'user-result-' + Date.now(),
+          senderType: 'user',
+          type: 'text',
+          content: messageContent
+        }
+
+        this.messages.push(userResultMessage)
+
+        this.$nextTick(() => {
+          this.scrollTop = 999999
+        })
+        
+        uni.showToast({
+          title: '网络错误，已本地显示',
+          icon: 'none'
+        })
       }
-
-      this.messages.push(userResultMessage)
-
-      // 滚动到底部以显示新消息
-      this.$nextTick(() => {
-        this.scrollTop = 999999
-      })
     },
 
     openAlbum() {
-      console.log('打开相册')
-    }
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['original', 'compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          const tempFilePath = res.tempFilePaths[0]
+          this.uploadImage(tempFilePath)
+        },
+        fail: (error) => {
+          console.error('选择图片失败:', error)
+          uni.showToast({
+            title: '选择图片失败',
+            icon: 'none'
+          })
+        }
+      })
+    },
+
+    // 上传图片
+    async uploadImage(filePath) {
+      if (this.uploadingFile) return
+      
+      this.uploadingFile = true
+      uni.showLoading({
+        title: '上传中...'
+      })
+
+      try {
+        // 创建文件对象
+        const file = {
+          path: filePath,
+          name: 'image_' + Date.now() + '.jpg'
+        }
+
+        const res = await uploadChatFile(file, 'image')
+        
+        if (res.code === 200 && res.data) {
+          // 发送图片消息
+          await this.sendImageMessage(res.data.fileUrl, res.data.fileName)
+          
+          uni.showToast({
+            title: '图片发送成功',
+            icon: 'success'
+          })
+        } else {
+          throw new Error(res.message || '上传失败')
+        }
+      } catch (error) {
+        console.error('上传图片失败:', error)
+        uni.showToast({
+          title: '上传失败，请重试',
+          icon: 'none'
+        })
+      } finally {
+        this.uploadingFile = false
+        uni.hideLoading()
+      }
+    },
+
+    // 发送图片消息
+    async sendImageMessage(fileUrl, fileName) {
+      try {
+        const res = await apiSendMessage({
+          conversationId: this.sessionId,
+          targetId: this.expertId || this.targetId,
+          messageType: 'image',
+          fileUrl: fileUrl,
+          fileName: fileName
+        })
+
+        if (res.code === 200 && res.data) {
+          // 添加到消息列表
+          this.messages.push({
+            id: res.data.id,
+            senderType: 'user',
+            type: 'image',
+            content: fileUrl,
+            fileName: fileName,
+            status: 'sent'
+          })
+
+          this.$nextTick(() => {
+            this.scrollTop = 999999
+          })
+        }
+      } catch (error) {
+        console.error('发送图片消息失败:', error)
+        throw error
+      }
+    },
+
+    // 发送简历（企业咨询场景）
+    async sendResume(resumeFileId) {
+      try {
+        const res = await sendEnterpriseResume({
+          conversationId: this.sessionId,
+          resumeFileId: resumeFileId
+        })
+
+        if (res.code === 200) {
+          uni.showToast({
+            title: '简历已发送',
+            icon: 'success'
+          })
+          
+          // 重新加载消息列表
+          await this.loadMessages(true)
+          
+          this.$nextTick(() => {
+            this.scrollTop = 999999
+          })
+        } else {
+          throw new Error(res.message || '发送失败')
+        }
+      } catch (error) {
+        console.error('发送简历失败:', error)
+        uni.showToast({
+           title: '发送简历失败',
+           icon: 'none'
+         })
+       }
+     },
+
+     // 重试发送消息
+     async retryMessage(message) {
+       if (message.type === 'text') {
+         // 移除失败的消息
+         const index = this.messages.findIndex(m => m.id === message.id)
+         if (index !== -1) {
+           this.messages.splice(index, 1)
+         }
+         
+         // 重新发送
+         this.inputMessage = message.content
+         await this.sendMessage()
+       } else if (message.type === 'image') {
+         // 图片重试逻辑
+         uni.showToast({
+           title: '请重新选择图片发送',
+           icon: 'none'
+         })
+         
+         // 移除失败的消息
+         const index = this.messages.findIndex(m => m.id === message.id)
+         if (index !== -1) {
+           this.messages.splice(index, 1)
+         }
+       }
+     }
   },
   beforeDestroy() {
     // 页面销毁前清除计时器
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval)
+    }
+    if (this.unreadTimer) {
+      clearInterval(this.unreadTimer)
+    }
+  },
+
+  onShow() {
+    // 页面显示时标记消息为已读
+    if (this.sessionId) {
+      this.markAsRead()
+      this.getUnreadCount()
+    }
+  },
+
+  onHide() {
+    // 页面隐藏时停止未读消息检查
+    if (this.unreadTimer) {
+      clearInterval(this.unreadTimer)
+      this.unreadTimer = null
     }
   }
 }
@@ -493,6 +1035,19 @@ export default {
       font-size: 16px;
       font-weight: bold;
       margin-bottom: 2px;
+      position: relative;
+    }
+    
+    .unread-badge {
+      background-color: #ff4757;
+      color: white;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 8px;
+      min-width: 18px;
+      text-align: center;
+      display: inline-block;
     }
     
     .lawyer-desc {
@@ -518,6 +1073,7 @@ export default {
 .chat-content {
   flex: 1;
   background-color: rgb(255, 248, 248);
+  padding-top: 30rpx;
 }
 
 .message-item {
@@ -545,6 +1101,7 @@ export default {
   &.sent {
     justify-content: flex-end;
     padding-right: 15px;
+    align-items: flex-end; // 头像对齐到底部
     
     .avatar {
       width: 40px;
@@ -553,6 +1110,7 @@ export default {
       background-color: #D9D9D9;
       margin-left: 8px;
       flex-shrink: 0;
+      align-self: flex-end; // 确保头像在底部
     }
     
     .message-bubble {
@@ -698,4 +1256,50 @@ export default {
 .message-wrapper {
   margin-bottom: 10px;
 }
-</style> 
+
+.message-status {
+  text-align: right;
+  padding: 2px 15px 0 0;
+  
+  .status-sending {
+    color: #999999;
+    font-size: 12px;
+  }
+  
+  .status-sent {
+    color: #999999;
+    font-size: 12px;
+  }
+  
+  .status-failed-container {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+   }
+   
+   .status-failed {
+     color: #ff4757;
+     font-size: 12px;
+   }
+   
+   .retry-btn {
+     color: #007aff;
+     font-size: 12px;
+     padding: 2px 6px;
+     border: 1px solid #007aff;
+     border-radius: 4px;
+     background-color: transparent;
+   }
+  
+  .status-read {
+    color: #2ed573;
+    font-size: 12px;
+  }
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+}
+</style>

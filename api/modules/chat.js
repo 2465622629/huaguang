@@ -6,12 +6,11 @@
 import { get, post, put, del, upload } from '../request.js'
 
 /**
- * 获取聊天会话列表
- * @param {Object} params 查询参数
- * @param {string} params.type 会话类型（必需）
- * @param {number} params.page 页码（必需）
- * @param {number} params.size 每页数量（必需）
- * @returns {Promise} 会话列表
+ * 获取会话列表
+ * @param {object} params - 查询参数
+ * @param {('all'|'private'|'consultation')} params.type - 会话类型：all-全部, private-私聊, consultation-咨询
+ * @param {number} params.page - 页码
+ * @param {number} params.size - 每页数量
  */
 export const getChatSessions = (params) => {
   return get('/chat/conversations', params)
@@ -21,7 +20,7 @@ export const getChatSessions = (params) => {
  * 创建或获取聊天会话
  * @param {Object} data 会话数据
  * @param {number} data.otherUserId 对方用户ID
- * @param {string} data.type 会话类型
+ * @param {string} data.type 会话类型, 支持 'all', 'private', 'consultation'
  * @param {number} [data.consultationOrderId] 咨询订单ID（咨询会话时需要）
  * @returns {Promise} 会话信息
  */
@@ -38,6 +37,8 @@ export const getChatSessionDetail = (conversationId) => {
   return get(`/chat/conversations/${conversationId}`)
 }
 
+
+
 /**
  * 删除聊天会话
  * @param {number} conversationId 会话ID
@@ -51,13 +52,21 @@ export const deleteChatSession = (conversationId) => {
  * 获取聊天消息列表
  * @param {number} conversationId 会话ID
  * @param {Object} params 查询参数
- * @param {string} params.messageType 消息类型（必需）
- * @param {number} params.page 页码（必需）
- * @param {number} params.size 每页数量（必需）
+ * @param {number} [params.page=1] 页码
+ * @param {number} [params.size=20] 每页数量
+ * @param {string} [params.messageType] 消息类型过滤（可选）
+ * @param {number} [params.targetId] 目标用户ID（可选）
  * @returns {Promise} 消息列表
  */
-export const getChatMessages = (conversationId, params) => {
-  return get(`/chat/conversations/${conversationId}/messages`, params)
+export const getChatMessages = (conversationId, params = {}) => {
+  // 设置默认参数
+  const defaultParams = {
+    page: 1,
+    size: 20,
+    ...params
+  }
+  
+  return get(`/chat/conversations/${conversationId}/messages`, defaultParams)
 }
 
 /**
