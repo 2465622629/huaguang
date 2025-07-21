@@ -29,6 +29,7 @@
     <!-- 聊天内容区域 -->
         <scroll-view 
       class="chat-content" 
+      :class="{ 'with-quick-actions': showQuickActions }"
       scroll-y="true" 
       :scroll-top="scrollTop"
       :style="{ height: chatHeight }"
@@ -54,7 +55,10 @@
               <view class="avatar"></view>
               <view class="message-bubble received-bubble">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image'" :src="message.content" mode="aspectFit" class="message-image" />
+                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" />
+                <view v-else-if="message.type === 'file'" class="file-message">
+                  <text class="file-name">{{ message.fileName || '文件' }}</text>
+                </view>
               </view>
             </template>
             
@@ -62,7 +66,10 @@
             <template v-else>
               <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image'" :src="message.content" mode="aspectFit" class="message-image" />
+                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" />
+                <view v-else-if="message.type === 'file'" class="file-message">
+                  <text class="file-name">{{ message.fileName || '文件' }}</text>
+                </view>
               </view>
               <view class="avatar"></view>
             </template>
@@ -104,12 +111,12 @@
     
     <!-- 快捷操作栏 -->
     <view class="quick-actions" v-if="showQuickActions">
-      <view class="action-item" @click="sendTestResult">
+      <!-- <view class="action-item" @click="sendTestResult">
         <view class="action-icon" >
           <uv-icon :name="config.staticBaseUrl + '/icons/send_test.png'" color="#FFFFFF" size="64"></uv-icon>
         </view>
         <text class="action-label">发送测试结果</text>
-      </view>
+      </view> -->
       <view class="action-item" @click="openAlbum">
         <view class="action-icon" >
           <uv-icon :name="config.staticBaseUrl + '/icons/photo.png'" color="#FFFFFF" size="64"></uv-icon>
@@ -276,6 +283,12 @@ export default {
   },
   mounted() {
     this.calculateChatHeight()
+    // 监听屏幕方向变化
+    uni.onWindowResize(() => {
+      this.$nextTick(() => {
+        this.calculateChatHeight()
+      })
+    })
   },
   methods: {
     goBack() {
@@ -349,11 +362,19 @@ export default {
     calculateChatHeight() {
       const systemInfo = uni.getSystemInfoSync();
       const statusBarHeight = systemInfo.statusBarHeight || 0;
-      const navBarHeight = 60; 
-      const inputAreaHeight = 50; 
-      const quickActionsHeight = this.showQuickActions ? 80 : 0;
-
-      this.chatHeight = `${systemInfo.windowHeight - statusBarHeight - navBarHeight - inputAreaHeight - quickActionsHeight}px`;
+      const safeAreaInsets = systemInfo.safeAreaInsets || {};
+      const safeAreaBottom = safeAreaInsets.bottom || 0;
+      
+      // 动态计算导航栏高度（适配不同设备）
+      const navBarHeight = statusBarHeight + 90; // 状态栏 + 导航内容高度 + padding
+      const inputAreaHeight = 66; // 输入区域高度（包含padding和border）
+      const quickActionsHeight = this.showQuickActions ? 116 : 0; // 快捷操作区域高度（包含padding）
+      
+      // 计算可用高度，考虑安全区域和额外边距
+      const extraMargin = 10; // 额外边距确保内容不被遮挡
+      const availableHeight = systemInfo.windowHeight - navBarHeight - inputAreaHeight - quickActionsHeight - safeAreaBottom - extraMargin;
+      
+      this.chatHeight = `${Math.max(availableHeight, 200)}px`; // 最小高度200px
     },
     
     async initChatData() {
@@ -430,11 +451,12 @@ export default {
         if (res.code === 200 && res.data) {
           console.log('会话列表加载成功:', res.data)
           
-          // 可以将会话列表存储到data中，供其他功能使用
-          this.sessionList = res.data.conversations || res.data
+          // 确保sessionList始终是数组类型
+          const sessionData = res.data.conversations || res.data
+          this.sessionList = Array.isArray(sessionData) ? sessionData : []
           
           // 如果当前会话在列表中，可以更新相关信息
-          if (this.sessionId && this.sessionList) {
+          if (this.sessionId && this.sessionList.length > 0) {
             const currentSession = this.sessionList.find(s => s.id == this.sessionId)
             if (currentSession) {
               // 更新未读消息数量等信息
@@ -443,9 +465,13 @@ export default {
           }
         } else {
           console.warn('获取会话列表失败:', res.message)
+          // 确保sessionList在失败时也是数组
+          this.sessionList = []
         }
       } catch (error) {
         console.error('加载会话列表失败:', error)
+        // 确保sessionList在异常时也是数组
+        this.sessionList = []
       }
     },
 
@@ -600,13 +626,28 @@ export default {
         })
 
         if (res.code === 200 && res.data) {
-          const newMessages = res.data.records.map(m => ({
-            id: m.id,
-            senderType: m.senderInfo?.userType === 'user' ? 'user' : 'expert', // 根据senderInfo.userType判断
-            type: m.messageType,
-            content: m.content,
-            createdAt: m.createdAt // 保存创建时间用于排序
-          }))
+          const newMessages = res.data.records.map(m => {
+            // 处理消息类型和内容
+            let messageType = m.messageType
+            let messageContent = m.content
+            let fileUrl = m.fileUrl
+            
+            // 如果是文件类型，保持原始类型，设置fileUrl
+            if (m.messageType === 'file' && m.fileUrl) {
+              messageContent = m.fileUrl // 设置内容为文件URL
+              fileUrl = m.fileUrl
+            }
+            
+            return {
+              id: m.id,
+              senderType: m.senderInfo?.userType === 'user' ? 'user' : 'expert', // 根据senderInfo.userType判断
+              type: messageType,
+              content: messageContent,
+              fileUrl: fileUrl,
+              fileName: m.fileName,
+              createdAt: m.createdAt // 保存创建时间用于排序
+            }
+          })
 
           // 根据createdAt字段对消息进行时间排序（升序，旧消息在前）
           newMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
@@ -749,6 +790,7 @@ export default {
     
     showMoreOptions() {
       this.showQuickActions = !this.showQuickActions;
+      // 重新计算聊天区域高度
       this.$nextTick(() => {
         this.calculateChatHeight();
       });
@@ -836,34 +878,103 @@ export default {
       if (this.uploadingFile) return
       
       this.uploadingFile = true
+      const tempMessageId = 'temp-image-' + Date.now()
+      
+      // 添加临时消息显示上传状态
+      this.messages.push({
+        id: tempMessageId,
+        senderType: 'user',
+        type: 'image',
+        content: filePath, // 临时使用本地路径
+        status: 'sending'
+      })
+      
+      this.$nextTick(() => {
+        this.scrollTop = 999999
+      })
+      
       uni.showLoading({
         title: '上传中...'
       })
 
       try {
+        // 获取文件信息
+        const fileInfo = await new Promise((resolve, reject) => {
+          uni.getFileInfo({
+            filePath: filePath,
+            success: resolve,
+            fail: reject
+          })
+        })
+        
+        // 检查文件大小（限制为5MB）
+        if (fileInfo.size > 5 * 1024 * 1024) {
+          throw new Error('图片大小不能超过5MB')
+        }
+        
         // 创建文件对象
         const file = {
           path: filePath,
-          name: 'image_' + Date.now() + '.jpg'
+          name: 'image_' + Date.now() + '.jpg',
+          size: fileInfo.size
         }
 
         const res = await uploadChatFile(file, 'image')
         
         if (res.code === 200 && res.data) {
-          // 发送图片消息
-          await this.sendImageMessage(res.data.fileUrl, res.data.fileName)
-          
-          uni.showToast({
-            title: '图片发送成功',
-            icon: 'success'
-          })
+          try {
+            // 发送图片消息
+            await this.sendImageMessage(res.data.fileUrl, res.data.fileName)
+            
+            // 发送成功后移除临时消息
+            const tempIndex = this.messages.findIndex(m => m.id === tempMessageId)
+            if (tempIndex !== -1) {
+              this.messages.splice(tempIndex, 1)
+            }
+            
+            uni.showToast({
+              title: '图片发送成功',
+              icon: 'success'
+            })
+          } catch (sendError) {
+            console.error('发送图片消息失败:', sendError)
+            
+            // 发送失败，更新临时消息状态
+            const tempIndex = this.messages.findIndex(m => m.id === tempMessageId)
+            if (tempIndex !== -1) {
+              this.messages[tempIndex].status = 'failed'
+            }
+            
+            uni.showToast({
+              title: '发送失败，请重试',
+              icon: 'none'
+            })
+            return // 提前返回，避免执行后续的成功逻辑
+          }
         } else {
           throw new Error(res.message || '上传失败')
         }
       } catch (error) {
         console.error('上传图片失败:', error)
+        
+        // 更新临时消息状态为失败
+        const tempIndex = this.messages.findIndex(m => m.id === tempMessageId)
+        if (tempIndex !== -1) {
+          this.messages[tempIndex].status = 'failed'
+        }
+        
+        let errorMessage = '上传失败，请重试'
+        
+        if (error.message.includes('大小')) {
+          errorMessage = error.message
+        } else if (error.message.includes('网络')) {
+          errorMessage = '网络错误，请检查网络连接'
+        } else if (error.message.includes('格式')) {
+          errorMessage = '不支持的图片格式'
+        }
+        
         uni.showToast({
-          title: '上传失败，请重试',
+          title: errorMessage,
           icon: 'none'
         })
       } finally {
@@ -875,28 +986,26 @@ export default {
     // 发送图片消息
     async sendImageMessage(fileUrl, fileName) {
       try {
+        // 拼接完整的图片地址
+        const fullImageUrl = config.API_CONFIG.BASE_URL + fileUrl
+        console.log(`图片消息参数${fullImageUrl}`)
+        console.log(`会话id${this.sessionId}`)
+        
         const res = await apiSendMessage({
           conversationId: this.sessionId,
-          targetId: this.expertId || this.targetId,
-          messageType: 'image',
-          fileUrl: fileUrl,
-          fileName: fileName
+          messageType: 'file',
+          fileUrl: fullImageUrl
         })
 
         if (res.code === 200 && res.data) {
-          // 添加到消息列表
-          this.messages.push({
-            id: res.data.id,
-            senderType: 'user',
-            type: 'image',
-            content: fileUrl,
-            fileName: fileName,
-            status: 'sent'
-          })
-
+          // 刷新消息列表以获取最新消息
+          await this.loadMessages(true)
+          
           this.$nextTick(() => {
             this.scrollTop = 999999
           })
+        } else {
+          throw new Error(res.message || '发送失败')
         }
       } catch (error) {
         console.error('发送图片消息失败:', error)
@@ -961,6 +1070,14 @@ export default {
            this.messages.splice(index, 1)
          }
        }
+     },
+
+     // 判断文件是否为图片类型
+     isImageFile(fileUrl) {
+       if (!fileUrl) return false
+       const fileExtension = fileUrl.toLowerCase().split('.').pop()
+       const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
+       return imageExtensions.includes(fileExtension)
      }
   },
   beforeDestroy() {
@@ -992,12 +1109,20 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+/* 安全区域适配 */
+@supports (bottom: env(safe-area-inset-bottom)) {
+  .chat-page {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
 .chat-page {
   width: 100%;
   height: 100vh;
   background-color: #F7F7F8;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 .status-bar {
@@ -1074,6 +1199,15 @@ export default {
   flex: 1;
   background-color: rgb(255, 248, 248);
   padding-top: 30rpx;
+  padding-bottom: 20rpx;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  transition: padding-bottom 0.3s ease;
+  
+  &.with-quick-actions {
+    padding-bottom: 40rpx;
+  }
 }
 
 .message-item {
@@ -1128,6 +1262,26 @@ export default {
     line-height: 1.4;
   }
   
+  .message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    display: block;
+  }
+  
+  .file-message {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    
+    .file-name {
+      font-size: 14px;
+      color: #666666;
+    }
+  }
+  
   &.received-bubble {
     background-color: #FFFFFF;
     border-bottom-left-radius: 4px;
@@ -1150,6 +1304,9 @@ export default {
   background-color: #FFFFFF;
   padding: 10px 15px;
   border-top: 1px solid #EEEEEE;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
 
   .input-container {
     display: flex;
@@ -1199,8 +1356,13 @@ export default {
 .quick-actions {
   background-color: #FFFFFF;
   padding: 20px 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
   display: flex;
   justify-content: space-around;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  border-top: 1px solid #EEEEEE;
   
   .action-item {
     display: flex;

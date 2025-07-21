@@ -57,7 +57,7 @@ export const businessConfig = {
 
 // 错误码配置
 export const errorCodes = {
-  SUCCESS: 0,
+  SUCCESS: 200, // 修改为200，与服务器返回的成功状态码保持一致
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,

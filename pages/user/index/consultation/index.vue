@@ -207,12 +207,15 @@ export default {
       console.log('咨询专家:', expert)
       
       if (expert.type === 'lawyer') {
+        // 使用userId字段而不是id字段
+        const lawyerId = expert.userId || expert.id
         uni.navigateTo({
-          url: `/pages/user/index/lawyer-detail/index?lawyerId=${expert.id}`
+          url: `/pages/user/index/lawyer-detail/index?lawyerId=${lawyerId}`
         })
       } else if (expert.type === 'psychologist') {
+        const psychologistId = expert.userId || expert.id
         uni.navigateTo({
-          url: `/pages/psychologist/consultation/consultation?psychologistId=${expert.id}`
+          url: `/pages/psychologist/consultation/consultation?psychologistId=${psychologistId}`
         })
       }
     },
@@ -360,6 +363,7 @@ export default {
     formatLawyerData(lawyers) {
       return lawyers.map(lawyer => ({
         id: lawyer.id,
+        userId: lawyer.userId, // 保存userId字段用于咨询跳转
         type: 'lawyer',
         name: lawyer.name || '未知律师',
         specialty: lawyer.specialties ? lawyer.specialties.join('、') : '专业领域',
@@ -532,7 +536,7 @@ export default {
 <style lang="scss" scoped>
 .lawyer-consultation-page {
   background-size: cover;
-  background-position: unset;
+  background-position: 50% 0%;
   background-repeat: no-repeat;
   min-height: 100vh;
   position: relative;

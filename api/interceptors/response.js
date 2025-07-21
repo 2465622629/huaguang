@@ -17,9 +17,9 @@ const responseInterceptor = (response) => {
   // HTTP状态码检查
   if (statusCode === 200) {
     
-    // 检查业务状态码 (支持200和0两种成功状态码)
-    if (data.code === errorCodes.SUCCESS || data.code === 200) {
-      console.log('✅ 业务状态码检查通过，返回data.data')
+    // 检查业务状态码
+    if (data.code === errorCodes.SUCCESS) {
+      console.log('✅ 业务状态码检查通过，返回data')
       return data
     } else {
       console.log('❌ 业务状态码检查失败，进入错误处理')
@@ -55,7 +55,8 @@ const uploadResponseInterceptor = (response) => {
     try {
       const result = typeof data === 'string' ? JSON.parse(data) : data
       if (result.code === errorCodes.SUCCESS) {
-        return result.data
+        // 返回完整的result对象，保持与普通请求一致的数据结构
+        return result
       } else {
         handleBusinessError(result)
         return Promise.reject({

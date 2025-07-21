@@ -97,12 +97,21 @@ export const markMessagesAsRead = (data) => {
 
 /**
  * 上传聊天文件
- * @param {File} file 文件对象
+ * @param {File|Object} file 文件对象或文件路径对象
  * @param {string} fileType 文件类型（image/file/audio）
  * @returns {Promise} 上传结果
  */
 export const uploadChatFile = (file, fileType) => {
-  return upload(`/chat/upload?fileType=${encodeURIComponent(fileType)}`, file, 'file')
+  // 处理文件路径或文件对象
+  const filePath = file.path || file
+  const fileName = file.name || 'file'
+  
+  return upload(`/chat/upload?fileType=${encodeURIComponent(fileType)}`, filePath, {
+    name: 'file',
+    formData: {
+      fileName: fileName
+    }
+  })
 }
 
 /**
@@ -124,7 +133,8 @@ export const sendEnterpriseResume = (params) => {
  * @returns {Promise} 发送结果
  */
 export const sendPsychTestResult = (params) => {
-  return post('/chat/send-test-result', null, params)
+  const { conversationId, testResultId } = params
+  return post(`/chat/send-test-result?conversationId=${conversationId}&testResultId=${testResultId}`)
 }
 
 /**
