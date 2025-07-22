@@ -32,9 +32,13 @@
             <view class="upload-hint">请确保照片清晰完整</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in idCardFiles" :key="file.id" class="uploaded-file">
-              <text class="file-name">{{ file.name }}</text>
-              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            <view v-for="file in idCardFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+              <image :src="file.path" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">{{ file.name }}</text>
+                <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+              </view>
+              <view class="preview-icon">👁️</view>
             </view>
             <view class="upload-more" @click.stop="handleIdCardUpload">
               <text class="upload-more-text">继续上传</text>
@@ -50,9 +54,13 @@
             <view class="upload-hint">如离职证明、社保停缴记录等</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in unemploymentProofFiles" :key="file.id" class="uploaded-file">
-              <text class="file-name">{{ file.name }}</text>
-              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            <view v-for="file in unemploymentProofFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+              <image :src="file.path" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">{{ file.name }}</text>
+                <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+              </view>
+              <view class="preview-icon">👁️</view>
             </view>
             <view class="upload-more" @click.stop="handleUnemploymentProofUpload">
               <text class="upload-more-text">继续上传</text>
@@ -61,28 +69,7 @@
         </view>
       </view>
 
-      <!-- 失业原因说明卡片 -->
-      <view class="content-card">
-        <view class="card-section-title">失业原因说明 <text class="required-mark">*</text></view>
-        
-        <view class="unemployment-reason-input-area">
-          <textarea
-            class="unemployment-reason-input"
-            :value="unemploymentReason"
-            @input="handleUnemploymentReasonInput"
-            placeholder="请详细描述您的失业原因和当前困难情况，以便我们更好地为您提供帮助（10-500字符）"
-            :maxlength="500"
-            auto-height
-            :show-confirm-bar="false"
-          />
-          <view class="char-count">
-            <text class="current-count" :class="{ 'over-limit': unemploymentReason.length > 500 }">
-              {{ unemploymentReason.length }}
-            </text>
-            <text class="max-count">/500</text>
-          </view>
-        </view>
-      </view>
+
 
       <!-- 个人简历卡片 -->
       <view class="content-card">
@@ -96,9 +83,13 @@
             <view class="upload-hint">支持图片格式，有助于为您匹配合适工作</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in resumeFiles" :key="file.id" class="uploaded-file">
-              <text class="file-name">{{ file.name }}</text>
-              <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+            <view v-for="file in resumeFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+              <image :src="file.path" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">{{ file.name }}</text>
+                <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+              </view>
+              <view class="preview-icon">👁️</view>
             </view>
             <view class="upload-more" @click.stop="handleResumeUpload">
               <text class="upload-more-text">重新上传</text>
@@ -129,7 +120,7 @@ export default {
     return {
       config: config,
       backgroundImage: staticBaseUrl + '/apply-bg.png',
-      unemploymentReason: '',
+
       idCardFiles: [],
       unemploymentProofFiles: [],
       resumeFiles: [],
@@ -179,7 +170,6 @@ export default {
     saveFormCache() {
       try {
         const cacheData = {
-          unemploymentReason: this.unemploymentReason,
           timestamp: Date.now()
         }
         uni.setStorageSync(this.cacheKey, JSON.stringify(cacheData))
@@ -195,14 +185,7 @@ export default {
           const cacheData = JSON.parse(cacheStr)
           const isExpired = Date.now() - cacheData.timestamp > this.cacheExpiry
           
-          if (!isExpired && cacheData.unemploymentReason) {
-            this.unemploymentReason = cacheData.unemploymentReason
-            uni.showToast({
-              title: '已恢复上次填写内容',
-              icon: 'success',
-              duration: 2000
-            })
-          }
+          // 缓存已加载但无需恢复内容
         }
       } catch (error) {
         console.warn('表单缓存加载失败:', error)
@@ -268,11 +251,19 @@ export default {
       }
     },
 
-    // 失业原因输入处理
-    handleUnemploymentReasonInput(e) {
-      this.unemploymentReason = e.detail.value
-      // 实时保存缓存
-      this.saveFormCache()
+    // 图片预览功能
+    previewImage(imagePath) {
+      uni.previewImage({
+        current: imagePath,
+        urls: [imagePath],
+        fail: (error) => {
+          console.error('图片预览失败:', error)
+          uni.showToast({
+            title: '图片预览失败',
+            icon: 'none'
+          })
+        }
+      })
     },
 
     // 指数退避重试机制
@@ -361,30 +352,7 @@ export default {
         return false
       }
 
-      // 验证失业原因描述
-      if (!this.unemploymentReason.trim()) {
-        uni.showToast({
-          title: '请描述失业原因',
-          icon: 'none'
-        })
-        return false
-      }
 
-      if (this.unemploymentReason.trim().length < 10) {
-        uni.showToast({
-          title: '失业原因描述至少10个字符',
-          icon: 'none'
-        })
-        return false
-      }
-
-      if (this.unemploymentReason.trim().length > 500) {
-        uni.showToast({
-          title: '失业原因描述不能超过500个字符',
-          icon: 'none'
-        })
-        return false
-      }
 
       return true
     },
@@ -408,7 +376,6 @@ export default {
 
         // 构建提交数据
         const submitData = {
-          unemploymentReason: this.unemploymentReason.trim(),
           idCardFiles: this.idCardFiles.map(file => ({
             name: file.name,
             path: file.path,
@@ -627,27 +594,59 @@ export default {
         .uploaded-files {
           .uploaded-file {
             display: flex;
-            justify-content: space-between;
             align-items: center;
             padding: 20rpx;
             background-color: #FFFFFF;
             border-radius: 16rpx;
             margin-bottom: 16rpx;
             border: 2rpx solid #E8F4FD;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
 
-            .file-name {
-              color: #333333;
-              font-size: 26rpx;
-              flex: 1;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
+            &:hover {
+              border-color: #347ff1;
+              box-shadow: 0 4rpx 12rpx rgba(52, 127, 241, 0.15);
             }
 
-            .file-size {
-              color: #888888;
-              font-size: 22rpx;
+            .file-preview {
+              width: 80rpx;
+              height: 80rpx;
+              border-radius: 12rpx;
+              margin-right: 20rpx;
+              border: 1rpx solid #E8F4FD;
+            }
+
+            .file-info {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+
+              .file-name {
+                color: #333333;
+                font-size: 26rpx;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                margin-bottom: 8rpx;
+              }
+
+              .file-size {
+                color: #888888;
+                font-size: 22rpx;
+              }
+            }
+
+            .preview-icon {
+              color: #347ff1;
+              font-size: 32rpx;
               margin-left: 20rpx;
+              opacity: 0.7;
+              transition: opacity 0.3s ease;
+            }
+
+            &:hover .preview-icon {
+              opacity: 1;
             }
           }
 
@@ -668,50 +667,7 @@ export default {
         }
       }
 
-      .unemployment-reason-input-area {
-        position: relative;
 
-        .unemployment-reason-input {
-          width: 100%;
-          min-height: 200rpx;
-          padding: 30rpx;
-          background-color: #F8F9FA;
-          border-radius: 24rpx;
-          border: 2rpx solid #E9ECEF;
-          font-size: 28rpx;
-          color: #333333;
-          line-height: 1.6;
-          box-sizing: border-box;
-          transition: border-color 0.3s ease;
-
-          &:focus {
-            border-color: #347ff1;
-            background-color: #FFFFFF;
-          }
-        }
-
-        .char-count {
-          display: flex;
-          justify-content: flex-end;
-          align-items: center;
-          margin-top: 16rpx;
-          padding-right: 20rpx;
-
-          .current-count {
-            font-size: 24rpx;
-            color: #666666;
-
-            &.over-limit {
-              color: #FF4757;
-            }
-          }
-
-          .max-count {
-            font-size: 24rpx;
-            color: #999999;
-          }
-        }
-      }
 
       .required-mark {
         color: #FF4757;

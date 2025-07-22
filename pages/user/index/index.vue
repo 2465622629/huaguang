@@ -124,7 +124,7 @@
 <script>
 import UserTabbar from '@/components/tabbar/user-tabbar/user-tabbar.vue'
 import config from '@/config/index.js'
-import { getHomePageData, getHotLawyers, getHotJobs, getBanners } from '@/api/modules/home.js'
+import { getHomePageData, getHotLawyers, getHotJobs } from '@/api/modules/home.js'
 
 export default {
   components: {
@@ -198,12 +198,14 @@ export default {
     async loadHomeData() {
       try {
         // 并行加载多个接口数据
-        const [homeData, banners, hotLawyers, hotJobs] = await Promise.allSettled([
+        const [homeData, hotLawyers, hotJobs] = await Promise.allSettled([
           this.getHomePageData(),
-          this.getBanners(),
           this.getHotLawyers(),
           this.getHotJobs()
         ])
+        
+        // 使用随机图片作为轮播图数据源
+        this.getRandomImages()
         
         console.log('主页数据加载完成')
       } catch (error) {
@@ -234,26 +236,7 @@ export default {
       }
     },
     
-    // 获取轮播图
-    async getBanners() {
-      try {
-        const response = await getBanners({
-          position: 'home_banner',
-          active: true
-        })
-        console.log('轮播图数据：', response)
-        
-        if (response && response.data && response.data.length > 0) {
-          this.swiperList = response.data.map(banner => banner.imageUrl || banner.image)
-        } else {
-          // 如果没有轮播图数据，使用随机图片
-          this.getRandomImages()
-        }
-      } catch (error) {
-        console.error('获取轮播图失败：', error)
-        this.getRandomImages()
-      }
-    },
+
     
     // 获取热门律师
     async getHotLawyers() {

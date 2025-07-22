@@ -3,7 +3,7 @@
  * @description 包含青年帮扶基金相关的所有接口，如信用修复、帮扶申请、帮扶记录等。
  */
 
-import request from '../request.js';
+import request, { get, post, put, del, patch, upload } from '../request.js';
 
 const youthAssistanceApi = {
   /**
@@ -16,7 +16,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 信用修复申请列表
    */
   getCreditRepairApplications(params) {
-    return request.get('/youth-assistance/credit/repair', { params });
+    return get('/youth-assistance/credit/repair', params);
   },
 
   /**
@@ -32,7 +32,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitCreditRepairApplication(data) {
-    return request.post('/youth-assistance/credit/repair', data);
+    return post('/youth-assistance/credit/repair', data);
   },
 
   /**
@@ -45,7 +45,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 帮扶申请列表
    */
   getAssistanceApplications(params) {
-    return request.get('/youth-assistance/applications', { params });
+    return get('/youth-assistance/applications', params);
   },
 
   /**
@@ -58,7 +58,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitAssistanceApplication(data) {
-    return request.post('/youth-assistance/applications', data);
+    return post('/youth-assistance/applications', data);
   },
 
   /**
@@ -67,7 +67,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitUnemploymentAssistance(data) {
-    return request.post('/youth-assistance/applications/unemployment', data);
+    return post('/youth-assistance/applications/unemployment', data);
   },
 
   /**
@@ -76,7 +76,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitPsychologicalSupport(data) {
-    return request.post('/youth-assistance/applications/psychological-support', data);
+    return post('/youth-assistance/applications/psychological-support', data);
   },
 
   /**
@@ -85,7 +85,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitLegalAid(data) {
-    return request.post('/youth-assistance/applications/legal-aid', data);
+    return post('/youth-assistance/applications/legal-aid', data);
   },
 
   /**
@@ -94,7 +94,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请结果
    */
   submitDebtRelief(data) {
-    return request.post('/youth-assistance/applications/debt-relief', data);
+    return post('/youth-assistance/applications/debt-relief', data);
   },
 
   /**
@@ -107,7 +107,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 帮扶记录列表
    */
   getAssistanceRecords(params) {
-    return request.get('/youth-assistance/records', { params });
+    return get('/youth-assistance/records', params);
   },
 
   /**
@@ -115,7 +115,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 主页数据，包括统计信息、服务模块和最近案例
    */
   getHomePage() {
-    return request.get('/youth-assistance/home');
+    return get('/youth-assistance/home');
   },
 
   /**
@@ -124,7 +124,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请详细信息
    */
   getCreditRepairApplicationDetail(applicationId) {
-    return request.get(`/youth-assistance/credit/repair/${applicationId}`);
+    return get(`/youth-assistance/credit/repair/${applicationId}`);
   },
 
   /**
@@ -132,7 +132,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 信用记录信息
    */
   getCreditRecord() {
-    return request.get('/youth-assistance/credit/record');
+    return get('/youth-assistance/credit/record');
   },
 
   /**
@@ -141,7 +141,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 申请详细信息
    */
   getAssistanceApplicationDetail(applicationId) {
-    return request.get(`/youth-assistance/applications/${applicationId}`);
+    return get(`/youth-assistance/applications/${applicationId}`);
   },
 
   /**
@@ -152,7 +152,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 心理测试列表
    */
   getPsychologicalTests(params = {}) {
-    return request.get('/youth-assistance/psychological-tests', { params });
+    return get('/youth-assistance/psychological-tests', params);
   },
 
   /**
@@ -161,7 +161,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 测试详情，包含问题列表
    */
   getPsychologicalTestDetail(testId) {
-    return request.get(`/youth-assistance/psychological-tests/${testId}`);
+    return get(`/youth-assistance/psychological-tests/${testId}`);
   },
 
   /**
@@ -174,7 +174,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 测试结果分析
    */
   submitPsychologicalTestResult(data) {
-    return request.post('/youth-assistance/psychological-tests/submit', data);
+    return post('/youth-assistance/psychological-tests/submit', data);
   },
 
   /**
@@ -185,7 +185,7 @@ const youthAssistanceApi = {
    * @returns {Promise<object>} - 测试历史记录
    */
   getPsychologicalTestHistory(params = {}) {
-    return request.get('/youth-assistance/psychological-tests/history', { params });
+    return get('/youth-assistance/psychological-tests/history', params);
   },
 };
 

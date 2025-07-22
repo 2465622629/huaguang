@@ -36,32 +36,23 @@
             class="record-item"
             @click="viewApplicationDetail(application)"
           >
-            <!-- 记录头部 -->
-            <view class="record-header">
-              <view class="record-info">
-                <text class="job-title">{{ application.jobTitle }}</text>
-                <text class="company-name">{{ application.companyName }}</text>
-              </view>
-              <view class="record-status" :class="getStatusClass(application.status)">
-                <text class="status-text">{{ getStatusText(application.status) }}</text>
-              </view>
-            </view>
-            
-            <!-- 记录内容 -->
+            <!-- 主要信息区域 -->
             <view class="record-content">
-              <view class="job-info">
-                <text class="salary-range">{{ formatSalary(application.salaryMin, application.salaryMax) }}</text>
-                <text class="job-location">{{ application.location }}</text>
+              <view class="content-header">
+                <text class="job-title">{{ application.jobTitle }}</text>
+                <text class="job-salary">{{ formatSalary(application.salaryMin, application.salaryMax) }}</text>
               </view>
-              <view class="record-meta">
-                <text class="apply-time">投递时间：{{ formatTime(application.createdAt) }}</text>
-              </view>
+              <text class="company-name">{{ application.companyName }}</text>
+              <text class="apply-time">{{ formatTime(application.createdAt) }}</text>
             </view>
             
-            <!-- 操作按钮 -->
+            <!-- 底部按钮区域 -->
             <view class="record-actions">
-              <view class="action-btn" @click.stop="viewApplicationDetail(application)">
-                <text class="action-text">查看详情</text>
+              <view class="action-button primary" @click.stop="enterCommunication(application)">
+                <text class="action-text">进入沟通</text>
+              </view>
+              <view class="action-button secondary" @click.stop="endConversation(application)">
+                <text class="action-text">结束对话</text>
               </view>
             </view>
           </view>
@@ -205,34 +196,40 @@ export default {
       }
     },
 
-    // 获取状态样式类
-    getStatusClass(status) {
-      switch (status) {
-        case 'hired':
-          return 'status-success'
-        case 'pending':
-          return 'status-pending'
-        case 'reviewing':
-          return 'status-reviewing'
-        case 'interviewed':
-          return 'status-interviewed'
-        case 'rejected':
-          return 'status-error'
-        default:
-          return 'status-default'
+    // 进入沟通
+    enterCommunication(application) {
+      console.log('进入沟通:', application)
+      
+      // 跳转到聊天页面，传递企业相关信息
+      if (application.companyName) {
+        uni.navigateTo({
+          url: `/pages/user/index/chat/index?consultationType=enterprise&companyName=${encodeURIComponent(application.companyName)}&jobTitle=${encodeURIComponent(application.jobTitle || '')}`
+        })
+      } else {
+        uni.showToast({
+          title: '企业信息不完整',
+          icon: 'none'
+        })
       }
     },
 
-    // 获取状态文本
-    getStatusText(status) {
-      const statusMap = {
-        'pending': '待查看',
-        'reviewing': '审核中',
-        'interviewed': '已面试',
-        'hired': '已录用',
-        'rejected': '已拒绝'
-      }
-      return statusMap[status] || '未知状态'
+    // 结束对话
+    endConversation(application) {
+      console.log('结束对话:', application)
+      
+      uni.showModal({
+        title: '确认结束对话',
+        content: '确定要结束与该企业的对话吗？',
+        success: (res) => {
+          if (res.confirm) {
+            // 这里可以调用API结束对话
+            uni.showToast({
+              title: '对话已结束',
+              icon: 'success'
+            })
+          }
+        }
+      })
     },
 
     // 格式化薪资范围
@@ -249,34 +246,13 @@ export default {
       if (!timestamp) return ''
       
       const date = new Date(timestamp)
-      const now = new Date()
-      const diff = now - date
+      const year = date.getFullYear()
+      const month = date.getMonth() + 1
+      const day = date.getDate()
+      const hour = date.getHours().toString().padStart(2, '0')
+      const minute = date.getMinutes().toString().padStart(2, '0')
       
-      // 今天
-      if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
-        return date.toLocaleTimeString('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      }
-      
-      // 昨天
-      const yesterday = new Date(now)
-      yesterday.setDate(yesterday.getDate() - 1)
-      if (date.getDate() === yesterday.getDate()) {
-        return '昨天 ' + date.toLocaleTimeString('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      }
-      
-      // 其他日期
-      return date.toLocaleDateString('zh-CN', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      return `${year}年${month}月${day}日 ${hour}:${minute}`
     },
 
     // 刷新数据
@@ -395,137 +371,111 @@ export default {
 
 .record-item {
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 24rpx;
-  margin-bottom: 30rpx;
-  padding: 32rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+  border-radius: 16rpx;
+  margin-bottom: 24rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10rpx);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  border: 1rpx solid rgba(0, 0, 0, 0.05);
 }
 
-.record-header {
+.record-item:active {
+  transform: scale(0.98);
+  box-shadow: 0 1rpx 8rpx rgba(0, 0, 0, 0.12);
+}
+
+.record-content {
+  flex: 1;
+  margin-bottom: 20rpx;
+}
+
+.content-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24rpx;
-}
-
-.record-info {
-  flex: 1;
-  margin-right: 24rpx;
+  align-items: center;
+  margin-bottom: 8rpx;
 }
 
 .job-title {
   font-size: 32rpx;
   font-weight: 600;
   color: #333;
-  display: block;
-  margin-bottom: 8rpx;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-}
-
-.company-name {
-  font-size: 28rpx;
-  color: #666;
-  display: block;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-}
-
-.record-status {
-  padding: 8rpx 24rpx;
-  border-radius: 24rpx;
-  font-size: 24rpx;
+  line-height: 1.3;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  margin-right: 16rpx;
 }
 
-.status-pending {
-  background: #FFF3E0;
-  color: #F57C00;
-}
-
-.status-reviewing {
-  background: #E3F2FD;
-  color: #1976D2;
-}
-
-.status-interviewed {
-  background: #F3E5F5;
-  color: #7B1FA2;
-}
-
-.status-success {
-  background: #E8F5E8;
-  color: #2E7D32;
-}
-
-.status-error {
-  background: #FFEBEE;
-  color: #C62828;
-}
-
-.status-default {
-  background: #F5F5F5;
-  color: #757575;
-}
-
-.status-text {
-  font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-}
-
-.record-content {
-  margin-bottom: 24rpx;
-}
-
-.job-info {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  margin-bottom: 16rpx;
-}
-
-.salary-range {
+.job-salary {
   font-size: 28rpx;
   color: #FF6B35;
   font-weight: 600;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  flex-shrink: 0;
 }
 
-.job-location {
+.company-name {
   font-size: 28rpx;
-  color: #666;
+  color: #3D3D3D;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-}
-
-.record-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: block;
+  margin-bottom: 8rpx;
 }
 
 .apply-time {
-  font-size: 24rpx;
+  font-size: 26rpx;
   color: #999;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  display: block;
 }
 
 .record-actions {
   display: flex;
-  justify-content: flex-end;
-  padding-top: 24rpx;
-  border-top: 1rpx solid #F0F0F0;
+  gap: 20rpx;
+  margin-top: 16rpx;
 }
 
-.action-btn {
-  padding: 12rpx 32rpx;
-  background: #007AFF;
-  border-radius: 32rpx;
+.action-button {
+  flex: 1;
+  padding: 16rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.action-button.primary {
+  background: #e8f0ff;
+  color: #467BFF;
+  border: none;
+}
+
+.action-button.primary:active {
+  background: #d4e7ff;
+  transform: scale(0.98);
+}
+
+.action-button.secondary {
+  background: #eeeeee;
+  color: #999;
+  border: none;
+}
+
+.action-button.secondary:active {
+  background: #e0e0e0;
+  transform: scale(0.98);
 }
 
 .action-text {
-  color: #FFFFFF;
-  font-size: 24rpx;
   font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  line-height: 1.2;
 }
 
 /* 空状态 */

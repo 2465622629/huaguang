@@ -44,29 +44,29 @@
         <text class="loading-text">加载中...</text>
       </view>
       
-      <!-- 消息列表 -->
-      <template v-else>
-        <!-- 消息项 -->
-        <view v-for="(message, index) in messages" :key="message.id" class="message-wrapper">
+              <!-- 消息列表 -->
+        <template v-else>
+          <!-- 消息项 -->
+          <view v-for="(message, index) in filteredMessages" :key="message.id" class="message-wrapper">
           <!-- 消息内容 -->
           <view class="message-item" :class="message.senderType === 'user' ? 'sent' : 'received'">
             <!-- 接收的消息 -->
             <template v-if="message.senderType !== 'user'">
               <view class="avatar"></view>
-              <view class="message-bubble received-bubble">
-                <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
-                <view v-else-if="message.type === 'file'" class="file-message">
-                  <text class="file-name">{{ message.fileName || '文件' }}</text>
+                              <view class="message-bubble received-bubble">
+                  <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
+                  <image v-else-if="(message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))) && isValidImageUrl(message.fileUrl || message.content)" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
+                  <view v-else-if="message.type === 'file'" class="file-message">
+                    <text class="file-name">{{ message.fileName || '文件' }}</text>
+                  </view>
                 </view>
-              </view>
             </template>
             
             <!-- 发送的消息 -->
             <template v-else>
               <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
+                <image v-else-if="(message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))) && isValidImageUrl(message.fileUrl || message.content)" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
                 <view v-else-if="message.type === 'file'" class="file-message">
                   <text class="file-name">{{ message.fileName || '文件' }}</text>
                 </view>
@@ -87,7 +87,7 @@
         </view>
         
         <!-- 空状态 -->
-        <view v-if="!loading && messages.length === 0" class="empty-container">
+        <view v-if="!loading && filteredMessages.length === 0" class="empty-container">
           <text class="empty-text">暂无消息，开始聊天吧</text>
         </view>
       </template>
@@ -239,6 +239,32 @@ export default {
     this.loadSessionDetail()
   },
   computed: {
+    // 过滤后的消息列表（排除无效图片URL的消息）
+    filteredMessages() {
+      return this.messages.filter(message => {
+        // 如果是文本消息，直接显示
+        if (message.type === 'text') {
+          return true
+        }
+        
+        // 如果是图片或文件消息，检查URL是否有效
+        if (message.type === 'image' || message.type === 'file') {
+          const fileUrl = message.fileUrl || message.content
+          
+          // 如果是图片类型的文件，必须有有效的URL才显示
+          if (this.isImageFile(fileUrl)) {
+            return this.isValidImageUrl(fileUrl)
+          }
+          
+          // 非图片类型的文件消息正常显示
+          return true
+        }
+        
+        // 其他类型消息正常显示
+        return true
+      })
+    },
+    
     themeColors() {
       const themes = {
         blue: {
@@ -632,10 +658,19 @@ export default {
             let messageContent = m.content
             let fileUrl = m.fileUrl
             
+            // 统一处理fileUrl的拼接
+            if (fileUrl) {
+              // 如果fileUrl不是完整的URL（不包含http://或https://），则拼接BASE_URL
+              if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+                fileUrl = config.API_CONFIG.BASE_URL + '/uploads/' + fileUrl.replace(/^\/+/, '') // 去除开头的斜杠后再拼接
+                console.log('fileUrl',fileUrl);
+                
+              }
+            }
+            
             // 如果是文件类型，保持原始类型，设置fileUrl
-            if (m.messageType === 'file' && m.fileUrl) {
-              messageContent = m.fileUrl // 设置内容为文件URL
-              fileUrl = m.fileUrl
+            if (m.messageType === 'file' && fileUrl) {
+              messageContent = fileUrl // 设置内容为完整的文件URL
             }
             
             return {
@@ -1060,7 +1095,7 @@ export default {
        }
      },
 
-     // 判断文件是否为图片类型
+           // 判断文件是否为图片类型
      isImageFile(fileUrl) {
        if (!fileUrl) return false
        const fileExtension = fileUrl.toLowerCase().split('.').pop()
@@ -1068,31 +1103,37 @@ export default {
        return imageExtensions.includes(fileExtension)
      },
 
-     // 预览图片
-     previewImage(imageUrl) {
-       if (!imageUrl) return
-       
-       // 获取聊天中所有的图片URL
-       const allImageUrls = this.messages
-         .filter(msg => (msg.type === 'image' || (msg.type === 'file' && this.isImageFile(msg.fileUrl || msg.content))))
-         .map(msg => msg.fileUrl || msg.content)
-         .filter(url => url) // 过滤空值
-       
-       uni.previewImage({
-         urls: allImageUrls.length > 0 ? allImageUrls : [imageUrl], // 图片URL数组
-         current: imageUrl, // 当前显示的图片
-         success: () => {
-           console.log('图片预览成功')
-         },
-         fail: (error) => {
-           console.error('图片预览失败:', error)
-           uni.showToast({
-             title: '图片预览失败',
-             icon: 'none'
-           })
-         }
-       })
+     // 判断URL是否有效（包含协议）
+     isValidImageUrl(fileUrl) {
+       if (!fileUrl) return false
+       return fileUrl.toLowerCase().startsWith('http://') || fileUrl.toLowerCase().startsWith('https://')
      },
+
+           // 预览图片
+      previewImage(imageUrl) {
+        if (!imageUrl || !this.isValidImageUrl(imageUrl)) return
+        
+        // 获取聊天中所有有效的图片URL
+        const allImageUrls = this.messages
+          .filter(msg => (msg.type === 'image' || (msg.type === 'file' && this.isImageFile(msg.fileUrl || msg.content))))
+          .map(msg => msg.fileUrl || msg.content)
+          .filter(url => url && this.isValidImageUrl(url)) // 过滤空值和无效URL
+        
+        uni.previewImage({
+          urls: allImageUrls.length > 0 ? allImageUrls : [imageUrl], // 图片URL数组
+          current: imageUrl, // 当前显示的图片
+          success: () => {
+            console.log('图片预览成功')
+          },
+          fail: (error) => {
+            console.error('图片预览失败:', error)
+            uni.showToast({
+              title: '图片预览失败',
+              icon: 'none'
+            })
+          }
+        })
+      },
 
      // 刷新消息列表
      async refreshMessages() {
