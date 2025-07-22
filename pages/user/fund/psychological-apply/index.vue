@@ -26,8 +26,19 @@
         
         <!-- 文件上传区域 - 身份证 -->
         <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">上传身份证正反面照片</view>
+          <view v-if="idCardFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">上传身份证正反面照片</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="(file, index) in idCardFiles" :key="index" class="uploaded-file" @click.stop="previewImage(file)">
+              <image :src="file" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">身份证_{{ index + 1 }}.jpg</text>
+                <text class="file-size">{{ (Math.random() * 500 + 100).toFixed(1) }}KB</text>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
       
@@ -60,8 +71,19 @@
         
         <!-- 文件上传区域 - 问诊资料 -->
         <view class="file-upload-area" @click="handleMedicalRecordUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">心理咨询记录或相关证明材料</view>
+          <view v-if="medicalRecords.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">心理咨询记录或相关证明材料</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="(file, index) in medicalRecords" :key="index" class="uploaded-file" @click.stop="previewImage(file)">
+              <image :src="file" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">医疗记录_{{ index + 1 }}.jpg</text>
+                <text class="file-size">{{ (Math.random() * 500 + 100).toFixed(1) }}KB</text>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
       
@@ -75,13 +97,7 @@
         <text class="submit-text">{{ isSubmitting ? '提交中...' : '提 交 审 核' }}</text>
       </view>
       
-      <!-- 错误提示区域 -->
-      <view v-if="errorState.hasError" class="error-container">
-        <view class="error-message">{{ errorState.errorMessage }}</view>
-        <view v-if="errorState.canRetry" class="retry-button" @click="retrySubmit">
-          重试
-        </view>
-      </view>
+
     </view>
     
     <!-- iOS Home Indicator -->
@@ -112,21 +128,7 @@ export default {
       cacheKey: 'psychological_support_form_cache',
       cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
       
-      // 重试机制配置
-      retryConfig: {
-        maxRetries: 3,
-        baseDelay: 1000,
-        maxDelay: 8000,
-        backoffFactor: 2
-      },
-      
-      // 错误处理状态
-      errorState: {
-        hasError: false,
-        errorType: '',
-        errorMessage: '',
-        canRetry: false
-      }
+
     }
   },
   mounted() {
@@ -229,6 +231,23 @@ export default {
     },
 
     /**
+     * 图片预览
+     */
+    previewImage(imagePath) {
+      uni.previewImage({
+        current: imagePath,
+        urls: [imagePath],
+        fail: (error) => {
+          console.error('图片预览失败:', error)
+          uni.showToast({
+            title: '图片预览失败',
+            icon: 'none'
+          })
+        }
+      })
+    },
+
+    /**
      * 智能缓存管理 - 保存表单数据
      */
     saveCachedFormData() {
@@ -272,45 +291,30 @@ export default {
     },
 
     /**
-     * 清理错误状态
-     */
-    clearErrorState() {
-      this.errorState = {
-        hasError: false,
-        errorType: '',
-        errorMessage: '',
-        canRetry: false
-      }
-    },
-
-    /**
-     * 设置错误状态
-     */
-    setErrorState(type, message, canRetry = false) {
-      this.errorState = {
-        hasError: true,
-        errorType: type,
-        errorMessage: message,
-        canRetry
-      }
-    },
-
-    /**
      * 表单验证
      */
     validateForm() {
       if (!this.psychologicalDistress.trim()) {
-        this.setErrorState('validation', '请详细描述您的心理困扰情况')
+        uni.showToast({
+          title: '请详细描述您的心理困扰情况',
+          icon: 'none'
+        })
         return false
       }
 
       if (this.psychologicalDistress.trim().length < 20) {
-        this.setErrorState('validation', '心理困扰描述至少需要20个字符，请详细说明')
+        uni.showToast({
+          title: '心理困扰描述至少需要20个字符，请详细说明',
+          icon: 'none'
+        })
         return false
       }
 
       if (this.idCardFiles.length === 0) {
-        this.setErrorState('validation', '请上传身份证正反面照片')
+        uni.showToast({
+          title: '请上传身份证正反面照片',
+          icon: 'none'
+        })
         return false
       }
 
@@ -318,43 +322,10 @@ export default {
     },
 
     /**
-     * 指数退避重试机制
-     */
-    async executeWithRetry(apiCall, retryCount = 0) {
-      try {
-        return await apiCall()
-      } catch (error) {
-        if (retryCount < this.retryConfig.maxRetries) {
-          // 计算延迟时间：基础延迟 * 退避因子^重试次数 + 随机抖动
-          const baseDelay = this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, retryCount)
-          const jitter = Math.random() * 0.3 * baseDelay // 30%随机抖动
-          const delay = Math.min(baseDelay + jitter, this.retryConfig.maxDelay)
-          
-          console.log(`API调用失败，${delay}ms后进行第${retryCount + 1}次重试:`, error.message)
-          
-          await new Promise(resolve => setTimeout(resolve, delay))
-          return this.executeWithRetry(apiCall, retryCount + 1)
-        }
-        throw error
-      }
-    },
-
-    /**
-     * 重试提交
-     */
-    async retrySubmit() {
-      this.clearErrorState()
-      await this.handleSubmit()
-    },
-
-    /**
      * 处理提交申请
      */
     async handleSubmit() {
       if (this.isSubmitting) return
-
-      // 清理之前的错误状态
-      this.clearErrorState()
 
       // 表单验证
       if (!this.validateForm()) {
@@ -364,31 +335,30 @@ export default {
       this.isSubmitting = true
 
       try {
-        // 构建提交数据
+        // 构建提交数据 - 参考失业申请页面格式
         const submitData = {
-          applicationType: 'psychological_support',
-          basicInfo: {
-            psychologicalDistress: this.psychologicalDistress.trim(),
-            applicationDate: new Date().toISOString(),
-            hasMedicalRecords: this.medicalRecords.length > 0
-          },
-          supportingDocuments: {
-            idCardFiles: this.idCardFiles,
-            medicalRecords: this.medicalRecords
-          },
-          metadata: {
-            deviceInfo: uni.getSystemInfoSync(),
-            submitTime: Date.now(),
-            formVersion: '1.0.0'
+          idCardFiles: this.idCardFiles.map(file => ({
+            name: `身份证_${Date.now()}.jpg`,
+            path: file,
+            size: Math.floor(Math.random() * 1000000) + 100000
+          })),
+          medicalRecords: this.medicalRecords.map(file => ({
+            name: `医疗记录_${Date.now()}.jpg`,
+            path: file,
+            size: Math.floor(Math.random() * 1000000) + 100000
+          })),
+          psychologicalDistress: this.psychologicalDistress.trim(),
+          applicationTime: new Date().toISOString(),
+          deviceInfo: {
+            platform: uni.getSystemInfoSync().platform,
+            version: uni.getSystemInfoSync().version
           }
         }
 
         console.log('提交心理支持申请数据:', submitData)
 
-        // 使用指数退避重试机制调用API
-        const result = await this.executeWithRetry(async () => {
-          return await youthAssistanceApi.submitPsychologicalSupport(submitData)
-        })
+        // 调用API提交申请
+        const result = await youthAssistanceApi.submitPsychologicalSupport(submitData)
 
         console.log('心理支持申请提交成功:', result)
 
@@ -402,49 +372,39 @@ export default {
           duration: 2000
         })
 
-        // 延迟返回上一页
+        // 延迟跳转到帮扶类型页面
         setTimeout(() => {
-          this.goBack()
+          uni.navigateTo({
+            url: '/pages/user/fund/help-types/index'
+          })
         }, 2000)
 
       } catch (error) {
         console.error('心理支持申请提交失败:', error)
         
-        // 错误分类和处理
+        // 错误分类和处理 - 直接弹出提示
         let errorMessage = '申请提交失败，请稍后重试'
-        let canRetry = true
 
         if (error.code === 'NETWORK_ERROR') {
           errorMessage = '网络连接失败，请检查网络后重试'
         } else if (error.code === 'VALIDATION_ERROR') {
           errorMessage = error.message || '提交数据验证失败'
-          canRetry = false
         } else if (error.code === 'SERVER_ERROR') {
           errorMessage = '服务器繁忙，请稍后重试'
         } else if (error.code === 'TIMEOUT') {
           errorMessage = '请求超时，请重试'
         } else if (error.status === 401) {
           errorMessage = '登录已过期，请重新登录'
-          canRetry = false
         } else if (error.status === 403) {
           errorMessage = '没有权限执行此操作'
-          canRetry = false
         } else if (error.status >= 500) {
           errorMessage = '服务器错误，请稍后重试'
         }
 
-        this.setErrorState('submit', errorMessage, canRetry)
-
-        // 用户行为跟踪
-        console.log('用户操作记录:', {
-          action: 'psychological_support_submit_failed',
-          error: error.message,
-          timestamp: Date.now(),
-          formData: {
-            psychologicalDistressLength: this.psychologicalDistress.length,
-            hasIdCard: this.idCardFiles.length > 0,
-            hasMedicalRecords: this.medicalRecords.length > 0
-          }
+        uni.showToast({
+          title: errorMessage,
+          icon: 'none',
+          duration: 3000
         })
 
       } finally {
@@ -544,19 +504,74 @@ export default {
         justify-content: center;
         min-height: 160rpx;
         
-        .upload-icon {
-          color: #C0C0C0;
-          font-size: 120rpx;
-          font-weight: normal;
-          line-height: 1;
-          margin-bottom: 15rpx;
+        .upload-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          
+          .upload-icon {
+            color: #C0C0C0;
+            font-size: 120rpx;
+            font-weight: normal;
+            line-height: 1;
+            margin-bottom: 15rpx;
+          }
+          
+          .upload-text {
+            color: #888888;
+            font-size: 28rpx;
+            font-weight: normal;
+            text-align: center;
+          }
         }
         
-        .upload-text {
-          color: #888888;
-          font-size: 28rpx;
-          font-weight: normal;
-          text-align: center;
+        .uploaded-files {
+          .uploaded-file {
+            display: flex;
+            align-items: center;
+            padding: 20rpx;
+            background-color: #FFFFFF;
+            border-radius: 16rpx;
+            margin-bottom: 16rpx;
+            border: 2rpx solid #E8F4FD;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+
+            &:hover {
+              border-color: #347ff1;
+              box-shadow: 0 4rpx 12rpx rgba(52, 127, 241, 0.15);
+            }
+
+            .file-preview {
+              width: 80rpx;
+              height: 80rpx;
+              border-radius: 12rpx;
+              margin-right: 20rpx;
+              border: 1rpx solid #E8F4FD;
+            }
+
+            .file-info {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+
+              .file-name {
+                color: #333333;
+                font-size: 26rpx;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                margin-bottom: 8rpx;
+              }
+
+              .file-size {
+                color: #888888;
+                font-size: 22rpx;
+              }
+            }
+          }
         }
       }
       
@@ -612,38 +627,7 @@ export default {
       }
     }
     
-    .error-container {
-      background-color: #FFF2F0;
-      border: 2rpx solid #FFCCC7;
-      border-radius: 24rpx;
-      padding: 24rpx;
-      margin: 20rpx auto 0 auto;
-      width: 90%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      
-      .error-message {
-        color: #FF4D4F;
-        font-size: 28rpx;
-        text-align: center;
-        margin-bottom: 16rpx;
-        line-height: 1.4;
-      }
-      
-      .retry-button {
-        background-color: #FF4D4F;
-        color: #FFFFFF;
-        padding: 12rpx 32rpx;
-        border-radius: 20rpx;
-        font-size: 26rpx;
-        font-weight: bold;
-        
-        &:active {
-          opacity: 0.8;
-        }
-      }
-    }
+
   }
   
   .home-indicator {

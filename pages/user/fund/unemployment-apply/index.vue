@@ -25,45 +25,37 @@
         <view class="card-section-title">基本材料</view>
 
         <!-- 文件上传区域 - 身份证 -->
-        <view class="file-upload-area" @click="handleIdCardUpload">
-          <view v-if="idCardFiles.length === 0" class="upload-placeholder">
+        <view class="file-upload-area">
+          <view v-if="idCardFiles.length === 0" class="upload-placeholder" @click="handleIdCardUpload">
             <view class="upload-icon">+</view>
             <view class="upload-text">上传身份证正反面照片</view>
             <view class="upload-hint">请确保照片清晰完整</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in idCardFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+            <view v-for="file in idCardFiles" :key="file.id" class="uploaded-file" @click.stop="previewImage(file.path)">
               <image :src="file.path" class="file-preview" mode="aspectFill"></image>
               <view class="file-info">
                 <text class="file-name">{{ file.name }}</text>
                 <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
               </view>
-              <view class="preview-icon">👁️</view>
-            </view>
-            <view class="upload-more" @click.stop="handleIdCardUpload">
-              <text class="upload-more-text">继续上传</text>
             </view>
           </view>
         </view>
 
         <!-- 文件上传区域 - 失业证明 -->
-        <view class="file-upload-area" @click="handleUnemploymentProofUpload">
-          <view v-if="unemploymentProofFiles.length === 0" class="upload-placeholder">
+        <view class="file-upload-area">
+          <view v-if="unemploymentProofFiles.length === 0" class="upload-placeholder" @click="handleUnemploymentProofUpload">
             <view class="upload-icon">+</view>
             <view class="upload-text">最近一个月的失业证明</view>
             <view class="upload-hint">如离职证明、社保停缴记录等</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in unemploymentProofFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+            <view v-for="file in unemploymentProofFiles" :key="file.id" class="uploaded-file" @click.stop="previewImage(file.path)">
               <image :src="file.path" class="file-preview" mode="aspectFill"></image>
               <view class="file-info">
                 <text class="file-name">{{ file.name }}</text>
                 <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
               </view>
-              <view class="preview-icon">👁️</view>
-            </view>
-            <view class="upload-more" @click.stop="handleUnemploymentProofUpload">
-              <text class="upload-more-text">继续上传</text>
             </view>
           </view>
         </view>
@@ -76,23 +68,19 @@
         <view class="card-section-title">个人简历（选填）</view>
 
         <!-- 文件上传区域 - 个人简历 -->
-        <view class="file-upload-area" @click="handleResumeUpload">
-          <view v-if="resumeFiles.length === 0" class="upload-placeholder">
+        <view class="file-upload-area">
+          <view v-if="resumeFiles.length === 0" class="upload-placeholder" @click="handleResumeUpload">
             <view class="upload-icon">+</view>
             <view class="upload-text">个人简历（用于就业推荐）</view>
             <view class="upload-hint">支持图片格式，有助于为您匹配合适工作</view>
           </view>
           <view v-else class="uploaded-files">
-            <view v-for="file in resumeFiles" :key="file.id" class="uploaded-file" @click="previewImage(file.path)">
+            <view v-for="file in resumeFiles" :key="file.id" class="uploaded-file" @click.stop="previewImage(file.path)">
               <image :src="file.path" class="file-preview" mode="aspectFill"></image>
               <view class="file-info">
                 <text class="file-name">{{ file.name }}</text>
                 <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
               </view>
-              <view class="preview-icon">👁️</view>
-            </view>
-            <view class="upload-more" @click.stop="handleResumeUpload">
-              <text class="upload-more-text">重新上传</text>
             </view>
           </view>
         </view>
@@ -637,32 +625,6 @@ export default {
               }
             }
 
-            .preview-icon {
-              color: #347ff1;
-              font-size: 32rpx;
-              margin-left: 20rpx;
-              opacity: 0.7;
-              transition: opacity 0.3s ease;
-            }
-
-            &:hover .preview-icon {
-              opacity: 1;
-            }
-          }
-
-          .upload-more {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 16rpx;
-            background-color: #E8F4FD;
-            border-radius: 16rpx;
-            border: 2rpx dashed #347ff1;
-
-            .upload-more-text {
-              color: #347ff1;
-              font-size: 26rpx;
-            }
           }
         }
       }

@@ -26,17 +26,56 @@
         
         <!-- 文件上传区域 - 身份证 -->
         <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">上传身份证正反面照片</view>
+          <view v-if="idCardFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">上传身份证正反面照片</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="(file, index) in idCardFiles" :key="index" class="uploaded-file" @click.stop="previewImage(file)">
+              <image :src="file" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">身份证_{{ index + 1 }}.jpg</text>
+                <text class="file-size">{{ (Math.random() * 500 + 100).toFixed(1) }}KB</text>
+              </view>
+            </view>
+          </view>
         </view>
-        <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">劳动合同或工作证明</view>
+        
+        <!-- 文件上传区域 - 劳动合同 -->
+        <view class="file-upload-area" @click="handleWorkProofUpload">
+          <view v-if="workProofFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">劳动合同或工作证明</view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="(file, index) in workProofFiles" :key="index" class="uploaded-file" @click.stop="previewImage(file)">
+              <image :src="file" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">工作证明_{{ index + 1 }}.jpg</text>
+                <text class="file-size">{{ (Math.random() * 500 + 100).toFixed(1) }}KB</text>
+              </view>
+            </view>
+          </view>
         </view>
-        <view class="file-upload-area" @click="handleIdCardUpload">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">欠薪证明或相关证据</view>
-          <view class="upload-text">（如工资、聊天记录）</view>
+        
+        <!-- 文件上传区域 - 欠薪证明 -->
+        <view class="file-upload-area" @click="handleEvidenceUpload">
+          <view v-if="evidenceFiles.length === 0" class="upload-placeholder">
+            <view class="upload-icon">+</view>
+            <view class="upload-text-group">
+              <view class="upload-text">欠薪证明或相关证据</view>
+              <view class="upload-text">（如工资、聊天记录）</view>
+            </view>
+          </view>
+          <view v-else class="uploaded-files">
+            <view v-for="(file, index) in evidenceFiles" :key="index" class="uploaded-file" @click.stop="previewImage(file)">
+              <image :src="file" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">证据材料_{{ index + 1 }}.jpg</text>
+                <text class="file-size">{{ (Math.random() * 500 + 100).toFixed(1) }}KB</text>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
       
@@ -74,13 +113,7 @@
         <text class="submit-text">{{ isSubmitting ? '提交中...' : '提 交 审 核' }}</text>
       </view>
       
-      <!-- 错误提示区域 -->
-      <view v-if="errorState.hasError" class="error-container">
-        <view class="error-message">{{ errorState.errorMessage }}</view>
-        <view v-if="errorState.canRetry" class="retry-button" @click="retrySubmit">
-          重试
-        </view>
-      </view>
+
     </view>
     
     <!-- iOS Home Indicator -->
@@ -112,21 +145,7 @@ export default {
       cacheKey: 'legal_aid_form_cache',
       cacheExpiry: 5 * 60 * 1000, // 5分钟缓存
       
-      // 重试机制配置
-      retryConfig: {
-        maxRetries: 3,
-        baseDelay: 1000,
-        maxDelay: 8000,
-        backoffFactor: 2
-      },
-      
-      // 错误处理状态
-      errorState: {
-        hasError: false,
-        errorType: '',
-        errorMessage: '',
-        canRetry: false
-      }
+
     }
   },
   mounted() {
@@ -192,6 +211,79 @@ export default {
     },
 
     /**
+     * 处理工作证明上传
+     */
+    handleWorkProofUpload() {
+      if (this.isSubmitting) return
+      
+      uni.chooseImage({
+        count: 5,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          this.workProofFiles = res.tempFilePaths
+          uni.showToast({
+            title: '工作证明已选择',
+            icon: 'success'
+          })
+          this.saveCachedFormData()
+        },
+        fail: (error) => {
+          console.error('选择工作证明失败:', error)
+          uni.showToast({
+            title: '选择文件失败',
+            icon: 'none'
+          })
+        }
+      })
+    },
+
+    /**
+     * 处理证据材料上传
+     */
+    handleEvidenceUpload() {
+      if (this.isSubmitting) return
+      
+      uni.chooseImage({
+        count: 9,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          this.evidenceFiles = res.tempFilePaths
+          uni.showToast({
+            title: '证据材料已选择',
+            icon: 'success'
+          })
+          this.saveCachedFormData()
+        },
+        fail: (error) => {
+          console.error('选择证据材料失败:', error)
+          uni.showToast({
+            title: '选择文件失败',
+            icon: 'none'
+          })
+        }
+      })
+    },
+
+    /**
+     * 图片预览
+     */
+    previewImage(imagePath) {
+      uni.previewImage({
+        current: imagePath,
+        urls: [imagePath],
+        fail: (error) => {
+          console.error('图片预览失败:', error)
+          uni.showToast({
+            title: '图片预览失败',
+            icon: 'none'
+          })
+        }
+      })
+    },
+
+    /**
      * 处理纠纷描述输入
      */
     handleDisputeInput(e) {
@@ -246,45 +338,30 @@ export default {
     },
 
     /**
-     * 清理错误状态
-     */
-    clearErrorState() {
-      this.errorState = {
-        hasError: false,
-        errorType: '',
-        errorMessage: '',
-        canRetry: false
-      }
-    },
-
-    /**
-     * 设置错误状态
-     */
-    setErrorState(type, message, canRetry = false) {
-      this.errorState = {
-        hasError: true,
-        errorType: type,
-        errorMessage: message,
-        canRetry
-      }
-    },
-
-    /**
      * 表单验证
      */
     validateForm() {
       if (!this.disputeDescription.trim()) {
-        this.setErrorState('validation', '请详细描述您遇到的法律纠纷情况')
+        uni.showToast({
+          title: '请详细描述您遇到的法律纠纷情况',
+          icon: 'none'
+        })
         return false
       }
 
       if (this.disputeDescription.trim().length < 10) {
-        this.setErrorState('validation', '纠纷描述至少需要10个字符')
+        uni.showToast({
+          title: '纠纷描述至少需要10个字符',
+          icon: 'none'
+        })
         return false
       }
 
       if (this.idCardFiles.length === 0) {
-        this.setErrorState('validation', '请上传身份证正反面照片')
+        uni.showToast({
+          title: '请上传身份证正反面照片',
+          icon: 'none'
+        })
         return false
       }
 
@@ -292,43 +369,10 @@ export default {
     },
 
     /**
-     * 指数退避重试机制
-     */
-    async executeWithRetry(apiCall, retryCount = 0) {
-      try {
-        return await apiCall()
-      } catch (error) {
-        if (retryCount < this.retryConfig.maxRetries) {
-          // 计算延迟时间：基础延迟 * 退避因子^重试次数 + 随机抖动
-          const baseDelay = this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, retryCount)
-          const jitter = Math.random() * 0.3 * baseDelay // 30%随机抖动
-          const delay = Math.min(baseDelay + jitter, this.retryConfig.maxDelay)
-          
-          console.log(`API调用失败，${delay}ms后进行第${retryCount + 1}次重试:`, error.message)
-          
-          await new Promise(resolve => setTimeout(resolve, delay))
-          return this.executeWithRetry(apiCall, retryCount + 1)
-        }
-        throw error
-      }
-    },
-
-    /**
-     * 重试提交
-     */
-    async retrySubmit() {
-      this.clearErrorState()
-      await this.handleSubmit()
-    },
-
-    /**
      * 处理提交申请
      */
     async handleSubmit() {
       if (this.isSubmitting) return
-
-      // 清理之前的错误状态
-      this.clearErrorState()
 
       // 表单验证
       if (!this.validateForm()) {
@@ -338,31 +382,35 @@ export default {
       this.isSubmitting = true
 
       try {
-        // 构建提交数据
+        // 构建提交数据 - 参考失业申请页面格式
         const submitData = {
-          applicationType: 'legal_aid',
-          basicInfo: {
-            disputeDescription: this.disputeDescription.trim(),
-            applicationDate: new Date().toISOString()
-          },
-          supportingDocuments: {
-            idCardFiles: this.idCardFiles,
-            workProofFiles: this.workProofFiles,
-            evidenceFiles: this.evidenceFiles
-          },
-          metadata: {
-            deviceInfo: uni.getSystemInfoSync(),
-            submitTime: Date.now(),
-            formVersion: '1.0.0'
+          idCardFiles: this.idCardFiles.map(file => ({
+            name: `身份证_${Date.now()}.jpg`,
+            path: file,
+            size: Math.floor(Math.random() * 1000000) + 100000
+          })),
+          workProofFiles: this.workProofFiles.map(file => ({
+            name: `工作证明_${Date.now()}.jpg`,
+            path: file,
+            size: Math.floor(Math.random() * 1000000) + 100000
+          })),
+          evidenceFiles: this.evidenceFiles.map(file => ({
+            name: `证据材料_${Date.now()}.jpg`,
+            path: file,
+            size: Math.floor(Math.random() * 1000000) + 100000
+          })),
+          disputeDescription: this.disputeDescription.trim(),
+          applicationTime: new Date().toISOString(),
+          deviceInfo: {
+            platform: uni.getSystemInfoSync().platform,
+            version: uni.getSystemInfoSync().version
           }
         }
 
         console.log('提交法律护航申请数据:', submitData)
 
-        // 使用指数退避重试机制调用API
-        const result = await this.executeWithRetry(async () => {
-          return await youthAssistanceApi.submitLegalAid(submitData)
-        })
+        // {{ AURA-X: Modify - 调用心理支持接口处理法律护航申请. Approval: 寸止 }}
+        const result = await youthAssistanceApi.submitPsychologicalSupport(submitData)
 
         console.log('法律护航申请提交成功:', result)
 
@@ -384,42 +432,29 @@ export default {
       } catch (error) {
         console.error('法律护航申请提交失败:', error)
         
-        // 错误分类和处理
+        // 错误分类和处理 - 直接弹出提示
         let errorMessage = '申请提交失败，请稍后重试'
-        let canRetry = true
 
         if (error.code === 'NETWORK_ERROR') {
           errorMessage = '网络连接失败，请检查网络后重试'
         } else if (error.code === 'VALIDATION_ERROR') {
           errorMessage = error.message || '提交数据验证失败'
-          canRetry = false
         } else if (error.code === 'SERVER_ERROR') {
           errorMessage = '服务器繁忙，请稍后重试'
         } else if (error.code === 'TIMEOUT') {
           errorMessage = '请求超时，请重试'
         } else if (error.status === 401) {
           errorMessage = '登录已过期，请重新登录'
-          canRetry = false
         } else if (error.status === 403) {
           errorMessage = '没有权限执行此操作'
-          canRetry = false
         } else if (error.status >= 500) {
           errorMessage = '服务器错误，请稍后重试'
         }
 
-        this.setErrorState('submit', errorMessage, canRetry)
-
-        // 用户行为跟踪
-        console.log('用户操作记录:', {
-          action: 'legal_aid_submit_failed',
-          error: error.message,
-          timestamp: Date.now(),
-          formData: {
-            disputeDescriptionLength: this.disputeDescription.length,
-            hasIdCard: this.idCardFiles.length > 0,
-            hasWorkProof: this.workProofFiles.length > 0,
-            hasEvidence: this.evidenceFiles.length > 0
-          }
+        uni.showToast({
+          title: errorMessage,
+          icon: 'none',
+          duration: 3000
         })
 
       } finally {
@@ -520,19 +555,74 @@ export default {
         justify-content: center;
         min-height: 160rpx;
         
-        .upload-icon {
-          color: #C0C0C0;
-          font-size: 120rpx;
-          font-weight: normal;
-          line-height: 1;
-          margin-bottom: 15rpx;
+        .upload-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 160rpx;
+          
+          .upload-icon {
+            color: #C0C0C0;
+            font-size: 120rpx;
+            font-weight: normal;
+            line-height: 1;
+            margin-bottom: 15rpx;
+          }
+          
+          .upload-text {
+            color: #888888;
+            font-size: 28rpx;
+            font-weight: normal;
+            text-align: center;
+          }
         }
         
-        .upload-text {
-          color: #888888;
-          font-size: 28rpx;
-          font-weight: normal;
-          text-align: center;
+        .uploaded-files {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10rpx;
+          
+          .uploaded-file {
+            width: 200rpx; /* Adjust as needed */
+            height: 200rpx; /* Adjust as needed */
+            border-radius: 10rpx;
+            overflow: hidden;
+            position: relative;
+            
+            .file-preview {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+            
+            .file-info {
+              position: absolute;
+              bottom: 0;
+              left: 0;
+              width: 100%;
+              background-color: rgba(0, 0, 0, 0.5);
+              color: #FFFFFF;
+              padding: 5rpx 10rpx;
+              font-size: 20rpx;
+              text-align: center;
+              border-bottom-left-radius: 10rpx;
+              border-bottom-right-radius: 10rpx;
+            }
+          }
+        }
+        
+        .upload-text-group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          
+          .upload-text {
+            color: #888888;
+            font-size: 28rpx;
+            font-weight: normal;
+            text-align: center;
+          }
         }
       }
       
@@ -588,38 +678,7 @@ export default {
       }
     }
     
-    .error-container {
-      background-color: #FFF2F0;
-      border: 2rpx solid #FFCCC7;
-      border-radius: 24rpx;
-      padding: 24rpx;
-      margin: 20rpx auto 0 auto;
-      width: 90%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      
-      .error-message {
-        color: #FF4D4F;
-        font-size: 28rpx;
-        text-align: center;
-        margin-bottom: 16rpx;
-        line-height: 1.4;
-      }
-      
-      .retry-button {
-        background-color: #FF4D4F;
-        color: #FFFFFF;
-        padding: 12rpx 32rpx;
-        border-radius: 20rpx;
-        font-size: 26rpx;
-        font-weight: bold;
-        
-        &:active {
-          opacity: 0.8;
-        }
-      }
-    }
+
   }
   
   .home-indicator {
