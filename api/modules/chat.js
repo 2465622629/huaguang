@@ -99,14 +99,15 @@ export const markMessagesAsRead = (data) => {
  * 上传聊天文件
  * @param {File|Object} file 文件对象或文件路径对象
  * @param {string} fileType 文件类型（image/file/audio）
+ * @param {number} conversationId 会话ID
  * @returns {Promise} 上传结果
  */
-export const uploadChatFile = (file, fileType) => {
+export const uploadChatFile = (file, fileType, conversationId) => {
   // 处理文件路径或文件对象
   const filePath = file.path || file
   const fileName = file.name || 'file'
   
-  return upload(`/chat/upload?fileType=${encodeURIComponent(fileType)}`, filePath, {
+  return upload(`/chat/upload?fileType=${encodeURIComponent(fileType)}&conversationId=${conversationId}`, filePath, {
     name: 'file',
     formData: {
       fileName: fileName

@@ -55,7 +55,7 @@
               <view class="avatar"></view>
               <view class="message-bubble received-bubble">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" />
+                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
                 <view v-else-if="message.type === 'file'" class="file-message">
                   <text class="file-name">{{ message.fileName || '文件' }}</text>
                 </view>
@@ -66,7 +66,7 @@
             <template v-else>
               <view class="message-bubble sent-bubble" :style="{ backgroundColor: themeColors.bubbleColor }">
                 <text v-if="message.type === 'text'" class="message-text">{{ message.content }}</text>
-                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" />
+                <image v-else-if="message.type === 'image' || (message.type === 'file' && isImageFile(message.fileUrl || message.content))" :src="message.fileUrl || message.content" mode="aspectFit" class="message-image" @click="previewImage(message.fileUrl || message.content)" />
                 <view v-else-if="message.type === 'file'" class="file-message">
                   <text class="file-name">{{ message.fileName || '文件' }}</text>
                 </view>
@@ -733,17 +733,14 @@ export default {
         })
 
         if (res.code === 200 && res.data) {
-          // 用服务器返回的真实消息替换临时消息
+          // 移除临时消息
           const index = this.messages.findIndex(m => m.id === tempMessageId)
           if (index !== -1) {
-            this.$set(this.messages, index, {
-              id: res.data.id,
-              senderType: 'user',
-              type: 'text',
-              content: res.data.content,
-              status: 'sent'
-            })
+            this.messages.splice(index, 1)
           }
+          
+          // 刷新消息列表，获取最新消息
+          await this.refreshMessages()
         } else if (res.code === 401 || res.code === 403) {
           // 认证失败，跳转到登录页
           uni.showToast({
@@ -819,11 +816,7 @@ export default {
           })
           
           // 重新加载消息列表以显示发送的结果
-          await this.loadMessages(true)
-          
-          this.$nextTick(() => {
-            this.scrollTop = 999999
-          })
+          await this.refreshMessages()
         } else {
           throw new Error(res.message || '发送失败')
         }
@@ -919,7 +912,7 @@ export default {
           size: fileInfo.size
         }
 
-        const res = await uploadChatFile(file, 'image')
+        const res = await uploadChatFile(file, 'image', this.sessionId)
         
         if (res.code === 200 && res.data) {
           try {
@@ -931,6 +924,9 @@ export default {
             if (tempIndex !== -1) {
               this.messages.splice(tempIndex, 1)
             }
+            
+            // 刷新消息列表，获取最新消息
+            await this.refreshMessages()
             
             uni.showToast({
               title: '图片发送成功',
@@ -999,11 +995,7 @@ export default {
 
         if (res.code === 200 && res.data) {
           // 刷新消息列表以获取最新消息
-          await this.loadMessages(true)
-          
-          this.$nextTick(() => {
-            this.scrollTop = 999999
-          })
+          await this.refreshMessages()
         } else {
           throw new Error(res.message || '发送失败')
         }
@@ -1028,11 +1020,7 @@ export default {
           })
           
           // 重新加载消息列表
-          await this.loadMessages(true)
-          
-          this.$nextTick(() => {
-            this.scrollTop = 999999
-          })
+          await this.refreshMessages()
         } else {
           throw new Error(res.message || '发送失败')
         }
@@ -1078,6 +1066,51 @@ export default {
        const fileExtension = fileUrl.toLowerCase().split('.').pop()
        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
        return imageExtensions.includes(fileExtension)
+     },
+
+     // 预览图片
+     previewImage(imageUrl) {
+       if (!imageUrl) return
+       
+       // 获取聊天中所有的图片URL
+       const allImageUrls = this.messages
+         .filter(msg => (msg.type === 'image' || (msg.type === 'file' && this.isImageFile(msg.fileUrl || msg.content))))
+         .map(msg => msg.fileUrl || msg.content)
+         .filter(url => url) // 过滤空值
+       
+       uni.previewImage({
+         urls: allImageUrls.length > 0 ? allImageUrls : [imageUrl], // 图片URL数组
+         current: imageUrl, // 当前显示的图片
+         success: () => {
+           console.log('图片预览成功')
+         },
+         fail: (error) => {
+           console.error('图片预览失败:', error)
+           uni.showToast({
+             title: '图片预览失败',
+             icon: 'none'
+           })
+         }
+       })
+     },
+
+     // 刷新消息列表
+     async refreshMessages() {
+       try {
+         // 重置分页参数
+         this.currentPage = 1
+         this.hasMoreMessages = true
+         
+         // 重新加载消息
+         await this.loadMessages(true)
+         
+         // 滚动到底部
+         this.$nextTick(() => {
+           this.scrollTop = 999999
+         })
+       } catch (error) {
+         console.error('刷新消息列表失败:', error)
+       }
      }
   },
   beforeDestroy() {
@@ -1263,10 +1296,22 @@ export default {
   }
   
   .message-image {
-    max-width: 200px;
-    max-height: 200px;
+    max-width: 120px;
+    max-height: 120px;
+    min-width: 80px;
+    min-height: 80px;
     border-radius: 8px;
     display: block;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      opacity: 0.8;
+    }
+    
+    &:active {
+      transform: scale(0.95);
+    }
   }
   
   .file-message {
@@ -1460,8 +1505,20 @@ export default {
 }
 
 .message-image {
-  max-width: 200px;
-  max-height: 200px;
+  max-width: 120px;
+  max-height: 120px;
+  min-width: 80px;
+  min-height: 80px;
   border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
 }
 </style>
