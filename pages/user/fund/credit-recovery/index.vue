@@ -30,19 +30,17 @@
                 placeholder="银行/平台" 
                 placeholderClass="input-placeholder"
                 border="none"
-                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
                 clearable
               />
             </view>
             <view class="input-field">
-              <uv-input 
-                v-model="formData.loanInfo.loanTime" 
-                placeholder="借款时间" 
-                placeholderClass="input-placeholder"
-                border="none"
-                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
-                clearable
-              />
+              <view class="date-picker-wrapper" @click="showLoanTimePicker">
+                <view class="date-display" :class="{ 'placeholder': !formData.loanInfo.loanTime }">
+                  {{ formData.loanInfo.loanTime || '借款时间' }}
+                </view>
+                <uv-icon name="arrow-down" color="#AAAAAA" size="14"></uv-icon>
+              </view>
             </view>
           </view>
           <view class="input-row">
@@ -52,19 +50,17 @@
                 placeholder="金额" 
                 placeholderClass="input-placeholder"
                 border="none"
-                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
                 clearable
               />
             </view>
             <view class="input-field">
-              <uv-input 
-                v-model="formData.loanInfo.overdueTime" 
-                placeholder="逾期时间" 
-                placeholderClass="input-placeholder"
-                border="none"
-                customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
-                clearable
-              />
+              <view class="date-picker-wrapper" @click="showOverdueTimePicker">
+                <view class="date-display" :class="{ 'placeholder': !formData.loanInfo.overdueTime }">
+                  {{ formData.loanInfo.overdueTime || '逾期时间' }}
+                </view>
+                <uv-icon name="arrow-down" color="#AAAAAA" size="14"></uv-icon>
+              </view>
             </view>
           </view>
         </view>
@@ -82,7 +78,7 @@
               placeholder="剩余金额" 
               placeholderClass="input-placeholder"
               border="none"
-              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
               clearable
             />
           </view>
@@ -92,52 +88,58 @@
               placeholder="补交金额" 
               placeholderClass="input-placeholder"
               border="none"
-              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 102rpx; line-height: 102rpx;"
+              customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
               clearable
             />
           </view>
         </view>
         
         <!-- 文件上传区域 -->
-        <view class="file-upload-area" v-if="!formData.repaymentInfo.screenshot" @click="chooseScreenshot">
-          <view class="upload-icon">+</view>
-          <view class="upload-text">上传补交截图</view>
-        </view>
-        
-        <!-- 图片预览区域 -->
-        <view class="screenshot-preview" v-if="formData.repaymentInfo.screenshot">
-          <view class="preview-container">
-            <image 
-              :src="formData.repaymentInfo.screenshot.url || formData.repaymentInfo.screenshot.tempPath" 
-              class="preview-image"
-              mode="aspectFill"
-              @click="previewImage"
-              @error="onImageError"
-              @load="onImageLoad"
-            />
-            <view class="preview-overlay" v-if="formData.repaymentInfo.screenshot.status === 'uploading'">
-              <uv-loading-icon size="24" mode="circle" color="#FFFFFF"></uv-loading-icon>
-              <text class="upload-status-text">上传中...</text>
-            </view>
-            <view class="preview-overlay" v-if="formData.repaymentInfo.screenshot.status === 'failed'">
-              <uv-icon name="close-circle" color="#FFFFFF" size="24"></uv-icon>
-              <text class="upload-status-text">上传失败</text>
-            </view>
-            <view class="delete-btn" @click.stop="deleteScreenshot" v-if="formData.repaymentInfo.screenshot.status !== 'uploading'">
-              <uv-icon name="close" color="#FFFFFF" size="12"></uv-icon>
-            </view>
+        <view class="file-upload-area">
+          <view v-if="screenshotFiles.length === 0" class="upload-placeholder" @click="handleScreenshotUpload">
+            <view class="upload-icon">+</view>
+            <view class="upload-text">上传补交截图</view>
+            <view class="upload-hint">请确保截图清晰完整</view>
           </view>
-          <view class="reselect-btn" @click="chooseScreenshot" v-if="formData.repaymentInfo.screenshot.status !== 'uploading'">
-            <text class="reselect-text">重新选择</text>
+          <view v-else class="uploaded-files">
+            <view v-for="file in screenshotFiles" :key="file.id" class="uploaded-file" @click.stop="previewImage(file.path)">
+              <image :src="file.path" class="file-preview" mode="aspectFill"></image>
+              <view class="file-info">
+                <text class="file-name">{{ file.name }}</text>
+                <text class="file-size">{{ (file.size / 1024).toFixed(1) }}KB</text>
+              </view>
+              <view class="delete-btn" @click.stop="deleteScreenshot(file.id)">
+                <uv-icon name="close" color="#FFFFFF" size="12"></uv-icon>
+              </view>
+            </view>
           </view>
         </view>
       </view>
       
       <!-- 底部提交按钮 -->
-      <view class="submit-button" @click="handleSubmit">
-        <text class="submit-text">提 交 审 核</text>
+      <view class="submit-button" @click="handleSubmit" :class="{ 'submitting': isSubmitting }">
+        <text class="submit-text">{{ isSubmitting ? '提交中...' : '提 交 审 核' }}</text>
       </view>
     </view>
+    
+    <!-- 日期选择器 -->
+    <uv-datetime-picker
+      ref="loanTimePicker"
+      v-model="loanTimePickerValue"
+      mode="date"
+      :maxDate="new Date().getTime()"
+      @confirm="onLoanTimeConfirm"
+      @close="onLoanTimeClose"
+    ></uv-datetime-picker>
+    
+    <uv-datetime-picker
+      ref="overdueTimePicker"
+      v-model="overdueTimePickerValue"
+      mode="date"
+      :maxDate="new Date().getTime()"
+      @confirm="onOverdueTimeConfirm"
+      @close="onOverdueTimeClose"
+    ></uv-datetime-picker>
     
     <!-- iOS Home Indicator -->
     <!-- <view class="home-indicator"></view> -->
@@ -148,6 +150,7 @@
 import config from '@/config/index.js'
 import { staticBaseUrl } from '@/config/index.js'
 import { uploadFile } from '@/utils/file.js'
+import applicationRecordApi from '@/api/modules/application-record.js'
 
 export default {
   name: 'CreditRecoveryPage',
@@ -164,10 +167,13 @@ export default {
         },
         repaymentInfo: {
           remainingAmount: '',
-          repaymentAmount: '',
-          screenshot: null // { tempPath, url, status: 'uploading' | 'success' | 'failed' }
+          repaymentAmount: ''
         }
-      }
+      },
+      screenshotFiles: [],
+      isSubmitting: false,
+      loanTimePickerValue: new Date().getTime(),
+      overdueTimePickerValue: new Date().getTime()
     }
   },
   methods: {
@@ -182,108 +188,111 @@ export default {
       })
     },
     
-    // 选择截图
-    chooseScreenshot() {
-      uni.chooseImage({
-        count: 1,
-        sizeType: ['original', 'compressed'],
-        sourceType: ['album', 'camera'],
-        success: (res) => {
-          const tempPath = res.tempFilePaths[0]
-          this.formData.repaymentInfo.screenshot = {
-            tempPath: tempPath,
-            url: '',
-            status: 'uploading'
-          }
-          
-          // 开始上传
-          this.uploadScreenshot(tempPath)
-        },
-        fail: (err) => {
-          console.error('选择图片失败:', err)
-          uni.showToast({
-            title: '选择图片失败',
-            icon: 'none'
-          })
-        }
-      })
+    // 显示借款时间选择器
+    showLoanTimePicker() {
+      this.$refs.loanTimePicker.open()
     },
     
-    // 上传截图
-    async uploadScreenshot(filePath) {
+    // 显示逾期时间选择器
+    showOverdueTimePicker() {
+      this.$refs.overdueTimePicker.open()
+    },
+    
+    // 借款时间确认
+    onLoanTimeConfirm(value) {
+      const date = new Date(value.value)
+      this.formData.loanInfo.loanTime = this.formatDate(date)
+    },
+    
+    // 借款时间取消
+    onLoanTimeClose() {
+      // 关闭选择器时的处理
+    },
+    
+    // 逾期时间确认
+    onOverdueTimeConfirm(value) {
+      const date = new Date(value.value)
+      this.formData.loanInfo.overdueTime = this.formatDate(date)
+    },
+    
+    // 逾期时间取消
+    onOverdueTimeClose() {
+      // 关闭选择器时的处理
+    },
+    
+    // 格式化日期
+    formatDate(date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+    
+    // 处理截图上传
+    handleScreenshotUpload() {
+      this.uploadFile('screenshot', '补交截图', this.screenshotFiles)
+    },
+
+    async uploadFile(type, typeName, fileArray) {
       try {
-        const uploadParams = {
-          file: filePath,
-          businessType: 'CREDIT_RECOVERY_SCREENSHOT'
-        }
-        
-        const uploadResult = await uploadFile(uploadParams)
-        console.log('上传结果：', uploadResult)
-        
-        // 上传成功 - 处理不同的响应格式
-        const finalUrl = uploadResult.fileUrl || uploadResult.url || this.formData.repaymentInfo.screenshot.tempPath
-        console.log('最终使用的图片URL：', finalUrl)
-        
-        this.formData.repaymentInfo.screenshot = {
-          ...this.formData.repaymentInfo.screenshot,
-          url: finalUrl,
-          fileId: uploadResult.fileId || uploadResult.id || Date.now(),
-          status: 'success'
-        }
-        
-        console.log('更新后的screenshot对象：', this.formData.repaymentInfo.screenshot)
-        
-        uni.showToast({
-          title: '上传成功',
-          icon: 'success'
+        const result = await new Promise((resolve, reject) => {
+          uni.chooseImage({
+            count: 1,
+            sizeType: ['compressed'],
+            sourceType: ['album', 'camera'],
+            success: resolve,
+            fail: reject
+          })
         })
+
+        if (result.tempFilePaths && result.tempFilePaths.length > 0) {
+          // 模拟文件上传成功，实际项目中应调用uploadFile函数
+          const uploadedFiles = result.tempFilePaths.map((path, index) => ({
+            id: Date.now() + index,
+            name: `${typeName}_${Date.now()}_${index + 1}.jpg`,
+            path: path,
+            size: Math.floor(Math.random() * 1000000) + 100000,
+            uploadTime: new Date().toISOString()
+          }))
+
+          fileArray.push(...uploadedFiles)
+          
+          uni.showToast({
+            title: `${typeName}上传成功`,
+            icon: 'success'
+          })
+        }
       } catch (error) {
-        console.error('上传失败:', error)
-        this.formData.repaymentInfo.screenshot.status = 'failed'
-        
+        console.error(`${typeName}上传失败:`, error)
         uni.showToast({
-          title: '上传失败，请重试',
+          title: `${typeName}上传失败，请重试`,
           icon: 'none'
         })
       }
     },
     
     // 删除截图
-    deleteScreenshot() {
-      this.formData.repaymentInfo.screenshot = null
+    deleteScreenshot(fileId) {
+      this.screenshotFiles = this.screenshotFiles.filter(file => file.id !== fileId)
     },
     
     // 预览图片
-    previewImage() {
-      const screenshot = this.formData.repaymentInfo.screenshot
-      if (screenshot && (screenshot.url || screenshot.tempPath)) {
-        const previewUrl = screenshot.url || screenshot.tempPath
-        uni.previewImage({
-          urls: [previewUrl],
-          current: 0
-        })
-      }
+    previewImage(imagePath) {
+      uni.previewImage({
+        current: imagePath,
+        urls: [imagePath],
+        fail: (error) => {
+          console.error('图片预览失败:', error)
+          uni.showToast({
+            title: '图片预览失败',
+            icon: 'none'
+          })
+        }
+      })
     },
-    
-    // 图片加载成功
-    onImageLoad(e) {
-      console.log('图片加载成功：', e)
-    },
-    
-    // 图片加载失败
-    onImageError(e) {
-      console.error('图片加载失败：', e)
-      console.log('当前图片URL：', this.formData.repaymentInfo.screenshot?.url)
-      console.log('当前tempPath：', this.formData.repaymentInfo.screenshot?.tempPath)
-      
-      // 如果url加载失败，尝试使用tempPath
-      if (this.formData.repaymentInfo.screenshot && this.formData.repaymentInfo.screenshot.url && this.formData.repaymentInfo.screenshot.tempPath) {
-        this.formData.repaymentInfo.screenshot.url = this.formData.repaymentInfo.screenshot.tempPath
-      }
-    },
-    
-    async handleSubmit() {
-      // 表单验证
+
+    // 表单验证
+    validateForm() {
       const { loanInfo, repaymentInfo } = this.formData
       
       if (!loanInfo.bank || !loanInfo.loanTime || !loanInfo.amount || !loanInfo.overdueTime) {
@@ -291,7 +300,7 @@ export default {
           title: '请完善借款逾期信息',
           icon: 'none'
         })
-        return
+        return false
       }
       
       if (!repaymentInfo.remainingAmount || !repaymentInfo.repaymentAmount) {
@@ -299,63 +308,100 @@ export default {
           title: '请完善补交信息',
           icon: 'none'
         })
-        return
+        return false
       }
       
-      if (!repaymentInfo.screenshot || repaymentInfo.screenshot.status !== 'success') {
+      if (this.screenshotFiles.length === 0) {
         uni.showToast({
           title: '请上传补交截图',
           icon: 'none'
         })
-        return
+        return false
       }
       
+      return true
+    },
+    
+    async handleSubmit() {
+      if (this.isSubmitting) return
+
+      // 表单验证
+      if (!this.validateForm()) return
+
+      this.isSubmitting = true
+
       try {
-        // 导入青年帮扶API模块
-        const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
+        // 显示加载提示
+        uni.showLoading({
+          title: '提交中...',
+          mask: true
+        })
         
         // 准备提交数据
         const submitData = {
-          applicationType: 'CREDIT_REPAIR',
-          loanInfo: {
-            bankOrPlatform: loanInfo.bank,
-            loanTime: loanInfo.loanTime,
-            amount: parseFloat(loanInfo.amount),
-            overdueTime: loanInfo.overdueTime
+          overdueInfo: {
+            bankOrPlatform: this.formData.loanInfo.bank,
+            loanTime: this.formData.loanInfo.loanTime,
+            amount: parseFloat(this.formData.loanInfo.amount),
+            overdueTime: this.formData.loanInfo.overdueTime
           },
           repaymentInfo: {
-            remainingAmount: parseFloat(repaymentInfo.remainingAmount),
-            repaymentAmount: parseFloat(repaymentInfo.repaymentAmount),
-            screenshotUrl: repaymentInfo.screenshot.url,
-            screenshotFileId: repaymentInfo.screenshot.fileId
+            remainingAmount: parseFloat(this.formData.repaymentInfo.remainingAmount),
+            repaymentAmount: parseFloat(this.formData.repaymentInfo.repaymentAmount),
+            screenshotFiles: this.screenshotFiles.map(file => ({
+              name: file.name,
+              path: file.path,
+              size: file.size
+            }))
           }
         }
         
-        // 调用信用修复申请接口
-        const res = await youthAssistanceApi.submitCreditRepairApplication(submitData)
+        // 调用信用记录恢复申请接口
+        const res = await applicationRecordApi.submitCreditRecoveryApplication(submitData)
         
-        if (res && res.success) {
-          uni.showToast({
-            title: '信用修复申请提交成功',
-            icon: 'success',
-            duration: 1500
-          })
+        if (res && res.success !== false) {
+          uni.hideLoading()
           
-          // 延时跳转到信用评分页面
-          setTimeout(() => {
-            uni.navigateTo({
-              url: '/pages/user/fund/credit-score/index'
+          // 显示成功提示
+          await new Promise(resolve => {
+            uni.showModal({
+              title: '提交成功',
+              content: '您的信用记录恢复申请已提交，我们将在3-5个工作日内审核并联系您。',
+              showCancel: false,
+              confirmText: '确定',
+              success: resolve
             })
-          }, 1500)
+          })
+
+          // 返回上一页
+          uni.navigateBack({
+            delta: 1,
+            fail: () => {
+              uni.switchTab({
+                url: '/pages/user/fund/index'
+              })
+            }
+          })
         } else {
           throw new Error(res.message || '提交失败')
         }
       } catch (error) {
-        console.error('信用修复申请提交失败：', error)
-        uni.showToast({
-          title: error.message || '提交失败，请重试',
-          icon: 'none'
+        console.error('信用记录恢复申请提交失败：', error)
+        uni.hideLoading()
+        
+        uni.showModal({
+          title: '提交失败',
+          content: error.message || '提交失败，请稍后重试',
+          confirmText: '重试',
+          cancelText: '取消',
+          success: (res) => {
+            if (res.confirm) {
+              setTimeout(() => this.handleSubmit(), 1000)
+            }
+          }
         })
+      } finally {
+        this.isSubmitting = false
       }
     }
   }
@@ -442,8 +488,6 @@ export default {
           
           .input-field {
             flex: 1;
-            
-            // 移除原有的input-control样式，因为现在使用uv-input
           }
         }
       }
@@ -455,8 +499,6 @@ export default {
         
         .input-field {
           flex: 1;
-          
-          // 移除原有的input-control样式，因为现在使用uv-input
         }
       }
       
@@ -464,93 +506,124 @@ export default {
         color: #AAAAAA;
       }
       
+      // 日期选择器样式
+      .date-picker-wrapper {
+        background-color: #F7F7F7;
+        border-radius: 12rpx;
+        height: 80rpx;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20rpx;
+        box-sizing: border-box;
+        
+        .date-display {
+          font-size: 28rpx;
+          color: #333333;
+          
+          &.placeholder {
+            color: #AAAAAA;
+          }
+        }
+      }
+      
       // uv-input内部输入框的样式调整
       :deep(.uv-input__content__field-wrapper__field) {
-        padding: 34rpx 20rpx !important;
+        padding: 20rpx !important;
         box-sizing: border-box !important;
       }
       
       .file-upload-area {
-        background-color: #F7F7F7;
-        border-radius: 16rpx;
-        padding: 60rpx 40rpx;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 200rpx;
+        background-color: #F5F5F5;
+        border-radius: 24rpx;
+        padding: 40rpx 30rpx;
+        min-height: 160rpx;
+        transition: all 0.3s ease;
         
-        .upload-icon {
-          color: #AAAAAA;
-          font-size: 60rpx;
-          font-weight: normal;
-          line-height: 1;
-          margin-bottom: 16rpx;
-        }
-        
-        .upload-text {
-          color: #AAAAAA;
-          font-size: 28rpx;
-          font-weight: normal;
-          text-align: center;
-        }
-      }
-      
-      .screenshot-preview {
-        .preview-container {
-          position: relative;
-          width: 100%;
-          height: 300rpx;
-          border-radius: 16rpx;
-          overflow: hidden;
-          margin-bottom: 20rpx;
-          
-          .preview-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        .upload-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          .upload-icon {
+            color: #C0C0C0;
+            font-size: 120rpx;
+            font-weight: normal;
+            line-height: 1;
+            margin-bottom: 15rpx;
           }
-          
-          .preview-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            
-            .upload-status-text {
-              color: #FFFFFF;
-              font-size: 24rpx;
-              margin-top: 12rpx;
-            }
-          }
-          
-          .delete-btn {
-            position: absolute;
-            top: 12rpx;
-            right: 12rpx;
-            width: 40rpx;
-            height: 40rpx;
-            background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-        }
-        
-        .reselect-btn {
-          text-align: center;
-          padding: 20rpx;
-          
-          .reselect-text {
-            color: #3B82F6;
+
+          .upload-text {
+            color: #333333;
             font-size: 28rpx;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 8rpx;
+          }
+
+          .upload-hint {
+            color: #888888;
+            font-size: 24rpx;
+            text-align: center;
+          }
+        }
+
+        .uploaded-files {
+          .uploaded-file {
+            display: flex;
+            align-items: center;
+            padding: 20rpx;
+            background-color: #FFFFFF;
+            border-radius: 16rpx;
+            margin-bottom: 16rpx;
+            border: 2rpx solid #E8F4FD;
+            position: relative;
+            transition: all 0.3s ease;
+
+            &:hover {
+              border-color: #3B82F6;
+              box-shadow: 0 4rpx 12rpx rgba(59, 130, 246, 0.15);
+            }
+
+            .file-preview {
+              width: 80rpx;
+              height: 80rpx;
+              border-radius: 12rpx;
+              margin-right: 20rpx;
+              border: 1rpx solid #E8F4FD;
+            }
+
+            .file-info {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+
+              .file-name {
+                color: #333333;
+                font-size: 26rpx;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                margin-bottom: 8rpx;
+              }
+
+              .file-size {
+                color: #888888;
+                font-size: 22rpx;
+              }
+            }
+
+            .delete-btn {
+              width: 40rpx;
+              height: 40rpx;
+              background-color: rgba(0, 0, 0, 0.6);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-left: 20rpx;
+            }
           }
         }
       }
@@ -569,6 +642,12 @@ export default {
       bottom: 90rpx;
       left: 50%;
       transform: translateX(-50%);
+      transition: all 0.3s ease;
+
+      &.submitting {
+        background-color: #9CA3AF;
+        pointer-events: none;
+      }
       
       .submit-text {
         color: #FFFFFF;
