@@ -373,9 +373,9 @@ export default {
             })
           })
 
-          // 返回上一页
-          uni.navigateBack({
-            delta: 1,
+          // 跳转到信用分数页面
+          uni.navigateTo({
+            url: '/pages/user/fund/credit-score/index',
             fail: () => {
               uni.switchTab({
                 url: '/pages/user/fund/index'

@@ -190,24 +190,30 @@ export default {
         // 导入青年帮扶API模块
         const youthAssistanceApi = (await import('@/api/modules/youth-assistance.js')).default
         
-        // 获取用户信用评分和债务信息
-        const creditRes = await youthAssistanceApi.getUserCreditScore()
+        // 调用getCreditRecord方法获取信用记录信息
+        const creditRes = await youthAssistanceApi.getCreditRecord()
         
         if (creditRes && creditRes.success) {
-          this.remainingDebt = creditRes.data.remainingDebt || 0
+          // 从信用记录中提取剩余债务信息
+          this.remainingDebt = creditRes.data.remainingDebt || creditRes.data.totalDebt || 0
           
           // 如果有还款提醒设置，加载提醒信息
           if (creditRes.data.paymentReminder) {
             this.selectedDate = creditRes.data.paymentReminder.date
             this.isReminderSet = true
           }
+          
+          // 如果有信用分数，可以在这里处理
+          if (creditRes.data.creditScore) {
+            console.log('用户信用分数：', creditRes.data.creditScore)
+          }
         } else {
           // API调用失败时使用默认值
-          console.warn('获取信用数据失败，使用默认值')
+          console.warn('获取信用记录失败，使用默认值')
           this.remainingDebt = 85166
         }
       } catch (error) {
-        console.error('加载信用数据失败：', error)
+        console.error('加载信用记录失败：', error)
         // 使用默认值
         this.remainingDebt = 85166
       } finally {
