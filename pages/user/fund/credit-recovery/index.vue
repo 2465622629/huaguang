@@ -26,13 +26,15 @@
           <view class="input-row">
             <view class="input-field">
               <uv-input 
-                v-model="formData.loanInfo.bank" 
+                :value="formData.loanInfo.bank"
+                @input="onBankInput"
                 placeholder="银行/平台" 
                 placeholderClass="input-placeholder"
                 border="none"
                 customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
                 clearable
               />
+              <view v-if="validationErrors.bank" class="error-message">{{ validationErrors.bank }}</view>
             </view>
             <view class="input-field">
               <view class="date-picker-wrapper" @click="showLoanTimePicker">
@@ -46,13 +48,15 @@
           <view class="input-row">
             <view class="input-field">
               <uv-input 
-                v-model="formData.loanInfo.amount" 
+                :value="formData.loanInfo.amount"
+                @input="(value) => onAmountInput(value, 'amount')"
                 placeholder="金额" 
                 placeholderClass="input-placeholder"
                 border="none"
                 customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
                 clearable
               />
+              <view v-if="validationErrors.amount" class="error-message">{{ validationErrors.amount }}</view>
             </view>
             <view class="input-field">
               <view class="date-picker-wrapper" @click="showOverdueTimePicker">
@@ -74,23 +78,27 @@
         <view class="input-grid-1x2">
           <view class="input-field">
             <uv-input 
-              v-model="formData.repaymentInfo.remainingAmount" 
+              :value="formData.repaymentInfo.remainingAmount"
+              @input="(value) => onAmountInput(value, 'remainingAmount')"
               placeholder="剩余金额" 
               placeholderClass="input-placeholder"
               border="none"
               customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
               clearable
             />
+            <view v-if="validationErrors.remainingAmount" class="error-message">{{ validationErrors.remainingAmount }}</view>
           </view>
           <view class="input-field">
             <uv-input 
-              v-model="formData.repaymentInfo.repaymentAmount" 
+              :value="formData.repaymentInfo.repaymentAmount"
+              @input="(value) => onAmountInput(value, 'repaymentAmount')"
               placeholder="补交金额" 
               placeholderClass="input-placeholder"
               border="none"
               customStyle="background-color: #F7F7F7; border-radius: 12rpx; padding: 0; font-size: 28rpx; height: 80rpx; line-height: 80rpx;"
               clearable
             />
+            <view v-if="validationErrors.repaymentAmount" class="error-message">{{ validationErrors.repaymentAmount }}</view>
           </view>
         </view>
         
@@ -173,7 +181,14 @@ export default {
       screenshotFiles: [],
       isSubmitting: false,
       loanTimePickerValue: new Date().getTime(),
-      overdueTimePickerValue: new Date().getTime()
+      overdueTimePickerValue: new Date().getTime(),
+      // 验证错误信息
+      validationErrors: {
+        bank: '',
+        amount: '',
+        remainingAmount: '',
+        repaymentAmount: ''
+      }
     }
   },
   methods: {
@@ -291,21 +306,93 @@ export default {
       })
     },
 
+    // 银行/平台名称验证（只能输入中文、英文字母）
+    validateBankName(value) {
+      const regex = /^[\u4e00-\u9fa5a-zA-Z\s]+$/
+      if (!value) {
+        return '请输入银行/平台名称'
+      }
+      if (!regex.test(value)) {
+        return '银行/平台名称只能包含中文和英文字母'
+      }
+      return ''
+    },
+
+    // 金额验证（只能输入数字和小数点）
+    validateAmount(value, fieldName) {
+      const regex = /^\d+(\.\d{1,2})?$/
+      if (!value) {
+        return `请输入${fieldName}`
+      }
+      if (!regex.test(value)) {
+        return `${fieldName}只能输入数字，最多保留两位小数`
+      }
+      if (parseFloat(value) <= 0) {
+        return `${fieldName}必须大于0`
+      }
+      return ''
+    },
+
+    // 银行/平台输入事件
+    onBankInput(value) {
+      // 过滤非法字符
+      const filteredValue = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g, '')
+      this.formData.loanInfo.bank = filteredValue
+      this.validationErrors.bank = this.validateBankName(filteredValue)
+    },
+
+    // 金额输入事件
+    onAmountInput(value, field) {
+      // 过滤非法字符，只保留数字和小数点
+      const filteredValue = value.replace(/[^\d.]/g, '')
+      // 确保只有一个小数点
+      const parts = filteredValue.split('.')
+      if (parts.length > 2) {
+        parts.splice(2)
+      }
+      // 限制小数点后最多两位
+      if (parts[1] && parts[1].length > 2) {
+        parts[1] = parts[1].substring(0, 2)
+      }
+      const finalValue = parts.join('.')
+      
+      if (field === 'amount') {
+        this.formData.loanInfo.amount = finalValue
+        this.validationErrors.amount = this.validateAmount(finalValue, '借款金额')
+      } else if (field === 'remainingAmount') {
+        this.formData.repaymentInfo.remainingAmount = finalValue
+        this.validationErrors.remainingAmount = this.validateAmount(finalValue, '剩余金额')
+      } else if (field === 'repaymentAmount') {
+        this.formData.repaymentInfo.repaymentAmount = finalValue
+        this.validationErrors.repaymentAmount = this.validateAmount(finalValue, '补交金额')
+      }
+    },
+
     // 表单验证
     validateForm() {
       const { loanInfo, repaymentInfo } = this.formData
+      let isValid = true
       
-      if (!loanInfo.bank || !loanInfo.loanTime || !loanInfo.amount || !loanInfo.overdueTime) {
-        uni.showToast({
-          title: '请完善借款逾期信息',
-          icon: 'none'
-        })
-        return false
-      }
+      // 验证银行/平台
+      this.validationErrors.bank = this.validateBankName(loanInfo.bank)
+      if (this.validationErrors.bank) isValid = false
       
-      if (!repaymentInfo.remainingAmount || !repaymentInfo.repaymentAmount) {
+      // 验证借款金额
+      this.validationErrors.amount = this.validateAmount(loanInfo.amount, '借款金额')
+      if (this.validationErrors.amount) isValid = false
+      
+      // 验证剩余金额
+      this.validationErrors.remainingAmount = this.validateAmount(repaymentInfo.remainingAmount, '剩余金额')
+      if (this.validationErrors.remainingAmount) isValid = false
+      
+      // 验证补交金额
+      this.validationErrors.repaymentAmount = this.validateAmount(repaymentInfo.repaymentAmount, '补交金额')
+      if (this.validationErrors.repaymentAmount) isValid = false
+      
+      // 验证必填字段
+      if (!loanInfo.loanTime || !loanInfo.overdueTime) {
         uni.showToast({
-          title: '请完善补交信息',
+          title: '请选择借款时间和逾期时间',
           icon: 'none'
         })
         return false
@@ -314,6 +401,14 @@ export default {
       if (this.screenshotFiles.length === 0) {
         uni.showToast({
           title: '请上传补交截图',
+          icon: 'none'
+        })
+        return false
+      }
+      
+      if (!isValid) {
+        uni.showToast({
+          title: '请检查输入格式是否正确',
           icon: 'none'
         })
         return false
@@ -506,6 +601,13 @@ export default {
         color: #AAAAAA;
       }
       
+      .error-message {
+        color: #FF4444;
+        font-size: 22rpx;
+        margin-top: 8rpx;
+        padding-left: 20rpx;
+      }
+      
       // 日期选择器样式
       .date-picker-wrapper {
         background-color: #F7F7F7;
@@ -669,4 +771,4 @@ export default {
     border-radius: 4rpx;
   }
 }
-</style> 
+</style>

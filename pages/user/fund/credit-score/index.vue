@@ -212,6 +212,37 @@ export default {
           console.warn('获取信用记录失败，使用默认值')
           this.remainingDebt = 85166
         }
+        
+        // 调用getPaymentReminder方法获取还款提醒数据
+        try {
+          const paymentReminderRes = await youthAssistanceApi.getPaymentReminder()
+          
+          if (paymentReminderRes && paymentReminderRes.code === 0) {
+            const reminderData = paymentReminderRes.data
+            
+            // 处理还款提醒数据
+            if (reminderData.nextPaymentDate) {
+              this.selectedDate = reminderData.nextPaymentDate
+              this.isReminderSet = true
+            }
+            
+            // 可以根据需要处理其他还款提醒相关数据
+            if (reminderData.paymentAmount) {
+              console.log('下次还款金额：', reminderData.paymentAmount)
+            }
+            
+            if (reminderData.daysRemaining !== undefined) {
+              console.log('距离还款剩余天数：', reminderData.daysRemaining)
+            }
+            
+            if (reminderData.isOverdue) {
+              console.log('是否逾期：', reminderData.isOverdue)
+            }
+          }
+        } catch (reminderError) {
+          console.warn('获取还款提醒数据失败：', reminderError)
+        }
+        
       } catch (error) {
         console.error('加载信用记录失败：', error)
         // 使用默认值

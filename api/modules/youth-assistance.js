@@ -136,6 +136,14 @@ const youthAssistanceApi = {
   },
 
   /**
+   * @description 获取还款提醒数据
+   * @returns {Promise<object>} - 还款提醒数据，包含下次还款日期、还款金额、剩余天数等信息
+   */
+  getPaymentReminder() {
+    return get('/user/statistics/page/credit-score/payment-reminder');
+  },
+
+  /**
    * @description 获取指定帮扶申请的详细信息
    * @param {number|string} applicationId - 申请ID
    * @returns {Promise<object>} - 申请详细信息
