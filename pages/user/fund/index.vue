@@ -193,9 +193,9 @@ export default {
     navigateToCounseling() { uni.navigateTo({ url: '/pages/user/fund/counseling/index' }) },
     navigateToCreditRecovery() { uni.navigateTo({ url: '/pages/user/fund/credit-recovery/index' }) },
     navigateToCase() {
-      // uni.navigateTo({ 
-      //   url: '/pages/user/fund/case/index' 
-      // }) 
+      uni.navigateTo({ 
+        url: '/pages/user/fund/case/index' 
+      }) 
     },
     /**
      * 加载页面数据

@@ -8,13 +8,14 @@
       title="课程详情"
       title-color="#FFFFFF"
       @left-click="goBack"
+      placeholder
     ></uv-navbar>
 
     <!-- 页面内容 -->
     <scroll-view 
       class="page-content" 
       scroll-y="true"
-      :style="{ height: scrollViewHeight + 'px' }"
+      style="flex: 1; height: auto;"
       :refresher-enabled="true"
       :refresher-triggered="isRefreshing"
       @refresherrefresh="onRefresh"
@@ -196,7 +197,6 @@ export default {
   data() {
     return {
       config,
-      scrollViewHeight: 600,
       isRefreshing: false,
       isLoading: false,
       errorState: {
@@ -238,60 +238,53 @@ export default {
     },
     
     initializePage() {
-      this.calculateScrollViewHeight()
       this.loadCourseData()
     },
     
-    calculateScrollViewHeight() {
-      const systemInfo = uni.getSystemInfoSync()
-      const statusBarHeight = systemInfo.statusBarHeight || 44
-      const navBarHeight = 88
-      
-      this.scrollViewHeight = systemInfo.windowHeight - statusBarHeight - navBarHeight
-    },
-    
     async loadCourseData() {
+      this.isLoading = true;
+      this.errorState.hasError = false;
       try {
-        this.isLoading = true
-        console.log('加载课程数据')
+        console.log('加载课程数据');
         // 模拟数据加载
-        setTimeout(() => {
-          this.courseInfo = {
-            title: '技能训练课程',
-            description: '这是一个技能训练课程的详细介绍...',
-            duration: '2小时30分钟',
-            rating: 4.5,
-            reviewCount: 128,
-            viewCount: 1520,
-            favoriteCount: 85,
-            shareCount: 32,
-            isFavorited: false,
-            category: '职业技能',
-            level: '初级',
-            tags: ['实用', '热门'],
-            difficulty: '初级',
-            language: '中文',
-            updateTime: new Date().toISOString()
-          }
-          this.isLoading = false
-        }, 1000)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        this.courseInfo = {
+          title: '技能训练课程',
+          description: '这是一个技能训练课程的详细介绍...',
+          duration: '2小时30分钟',
+          rating: 4.5,
+          reviewCount: 128,
+          viewCount: 1520,
+          favoriteCount: 85,
+          shareCount: 32,
+          isFavorited: false,
+          category: '职业技能',
+          level: '初级',
+          tags: ['实用', '热门'],
+          difficulty: '初级',
+          language: '中文',
+          updateTime: new Date().toISOString()
+        };
       } catch (error) {
-        console.error('加载课程数据失败:', error)
+        console.error('加载课程数据失败:', error);
         this.errorState = {
           hasError: true,
           errorMessage: '加载失败，请稍后重试',
           canRetry: true
-        }
+        };
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
     
-    onRefresh() {
-      this.isRefreshing = true
-      setTimeout(() => {
-        this.isRefreshing = false
-      }, 1000)
+    async onRefresh() {
+      this.isRefreshing = true;
+      try {
+        await this.loadCourseData();
+      } finally {
+        this.isRefreshing = false;
+      }
     },
     
     retryLoad() {
@@ -667,4 +660,4 @@ export default {
     }
   }
 }
-</style> 
+</style>

@@ -142,11 +142,11 @@ export default {
       this.loading = true
       
       try {
-        // 导入统计API模块
-        const statisticsApi = (await import('@/api/modules/statistics.js')).default
+        // 导入法律服务API模块
+        const legalApi = (await import('@/api/modules/legal.js')).default
         
-        // 使用帮扶案例统计接口
-        const res = await statisticsApi.getAssistanceCases({
+        // 使用帮扶案例接口
+        const res = await legalApi.getAssistanceCases({
           page: this.page,
           size: this.pageSize,
           serviceType: this.currentFilter === 'all' ? undefined : this.currentFilter
@@ -419,6 +419,21 @@ export default {
     // 加载更多
     loadMore() {
       this.loadCaseData()
+    },
+    
+    // 将API返回的serviceType映射到页面筛选类型
+    mapServiceTypeToFilter(serviceType) {
+      // 根据API返回的serviceType映射到页面的筛选类型
+      const typeMap = {
+        'legal': 'legal',           // 法律援助
+        'employment': 'employment', // 就业帮扶
+        'legal_aid': 'legal',       // 法律援助的其他表示
+        'job_assistance': 'employment', // 就业帮扶的其他表示
+        'legal_consultation': 'legal',  // 法律咨询
+        'career_guidance': 'employment' // 职业指导
+      }
+      
+      return typeMap[serviceType] || 'legal' // 默认返回legal类型
     }
   }
 }
