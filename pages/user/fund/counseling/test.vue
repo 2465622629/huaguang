@@ -1312,7 +1312,10 @@ export default {
 
   
   // 测试卡片
-  .test-card {
+    .test-card {
+      transform: scale(0.8);
+      transform-origin: top center;
+      margin-bottom: -120rpx; // 调整由于缩放产生的额外边距
     margin: 40rpx auto;
     width: 75%;
     height: calc(100vh - 350rpx); // {{ AURA-X: Modify - 设置固定高度以支持内部滚动 }}
