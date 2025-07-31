@@ -466,11 +466,14 @@ export default {
 <style lang="scss" scoped>
 .debt-apply-page {
   min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background-color: #EBF4FA;
   position: relative;
   background-repeat: no-repeat;
   background-position: center center;
   background-size: 100% 100%;
+  box-sizing: border-box;
 
   .status-bar {
     height: var(--status-bar-height);

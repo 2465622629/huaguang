@@ -335,13 +335,16 @@ export default {
 @import '@/styles/variables.scss';
 
 .fund-page {
-  min-height: 100%;
+  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   padding-bottom: 100rpx;
   /* 为 TabBar 预留空间 */
   background-image: $fund-bg-image;
   background-size: cover;
   background-position: top;
   background-repeat: no-repeat;
+  box-sizing: border-box;
 
   .grid-section {
     padding: 20rpx;

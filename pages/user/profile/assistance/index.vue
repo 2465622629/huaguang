@@ -102,7 +102,7 @@
 
 <script>
 import config from '@/config/index.js'
-import { getPersonalCenterAssistanceRecords } from '@/api/modules/application-record.js'
+import { getMyAssistanceRecords } from '@/api/modules/personal-center.js'
 import userApi from '@/api/modules/user.js'
 
 export default {
@@ -261,7 +261,7 @@ export default {
     // 带重试机制的获取帮扶记录
     async getAssistanceRecordsWithRetry() {
       try {
-        const response = await getPersonalCenterAssistanceRecords({
+        const response = await getMyAssistanceRecords({
           page: this.page,
           size: this.pageSize
         })

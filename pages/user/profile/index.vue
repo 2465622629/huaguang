@@ -214,10 +214,10 @@ export default {
 		// 页面显示时检查是否需要刷新数据
 		this.checkAndRefreshData();
 		
-		// 开发环境下测试接口集成
-		if (process.env.NODE_ENV === 'development') {
-			this.testInterfaceIntegration();
-		}
+		// 移除接口测试，避免页面加载时出现弹窗
+		// if (process.env.NODE_ENV === 'development') {
+		// 	this.testInterfaceIntegration();
+		// }
 	},
 	methods: {
 		// 初始化页面
@@ -1550,14 +1550,14 @@ export default {
 			console.log(`=== 接口集成测试完成: ${successCount}/${totalCount} 成功 ===`);
 			console.log('详细结果:', testResults);
 			
-			// 在开发环境显示测试结果
-			if (successCount < totalCount) {
-				uni.showToast({
-					title: `接口测试: ${successCount}/${totalCount} 成功`,
-					icon: 'none',
-					duration: 3000
-				});
-			}
+			// 移除弹窗显示，避免页面加载时出现弹窗
+			// if (successCount < totalCount) {
+			// 	uni.showToast({
+			// 		title: `接口测试: ${successCount}/${totalCount} 成功`,
+			// 		icon: 'none',
+			// 		duration: 3000
+			// 	});
+			// }
 		}
 	}
 }
@@ -1783,4 +1783,4 @@ export default {
 .icon-tuandui::before { content: '👥'; }
 .icon-haibao::before { content: '🖼️'; }
 .icon-yongjin::before { content: '💰'; }
-</style> 
+</style>
